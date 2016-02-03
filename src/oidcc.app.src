@@ -1,0 +1,16 @@
+{application, oidcc, [
+	{description, "a easy to use OpenID Connect client library"},
+	{vsn, "rolling"},
+    {id, "git"},
+	{modules, []},
+	{registered, [oidcc_sup]},
+	{applications, [
+        kernel,
+        stdlib,
+        crypto,
+        ejwt,
+        ehtc,
+        base64url
+                   ]},
+	{mod, {oidcc_app, []}}
+]}.

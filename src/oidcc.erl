@@ -9,6 +9,7 @@
 -export([retrieve_token/2]).
 -export([parse_and_validate_token/2]).
 -export([parse_and_validate_token/3]).
+-export([retrieve_user_info/2]).
 
 
 add_openid_provider(Id, Description, ClientId, ClientSecret, ConfigEndpoint,
@@ -137,4 +138,23 @@ parse_and_validate_token(Token, OpenIdProvider, _Nonce) ->
     parse_and_validate_token(Token, OpenIdProvider).
 
 
+retrieve_user_info(#{access := AccessToken},OpenIdProvider) ->
+    #{token := Token} = AccessToken,
+    retrieve_user_info(Token, OpenIdProvider);
+retrieve_user_info(#{token := Token},OpenIdProvider) ->
+    retrieve_user_info(Token, OpenIdProvider);
+retrieve_user_info(Token,#{userinfo_endpoint := Endpoint}) when is_binary(Token) ->
+    Header = [{<<"authorization">>,<< <<"Bearer ">>/binary, Token/binary >>}],
+    return_user_info(ehtc:http_sync_get(Endpoint,Header));
+retrieve_user_info(Token,OpenIdProvider) ->
+    {ok, Config} = get_openid_provider_info(OpenIdProvider),
+    retrieve_user_info(Token, Config).
+
+
+return_user_info({ok, #{status := 200, body := Data}}) ->
+    jsx:decode(Data,[{labels, attempt_atom}, return_maps]);
+return_user_info({ok, Map}) ->
+    {error, {bad_status, Map}};
+return_user_info({error, _}=Error) ->
+    Error.
 

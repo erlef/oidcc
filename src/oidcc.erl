@@ -152,7 +152,10 @@ retrieve_user_info(Token,OpenIdProvider) ->
 
 
 return_user_info({ok, #{status := 200, body := Data}}) ->
-    jsx:decode(Data,[{labels, attempt_atom}, return_maps]);
+    try jsx:decode(Data,[{labels, attempt_atom}, return_maps])
+    of Map -> {ok, Map}
+    catch Error -> {error, Error}
+    end;
 return_user_info({ok, Map}) ->
     {error, {bad_status, Map}};
 return_user_info({error, _}=Error) ->

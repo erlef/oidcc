@@ -3,6 +3,7 @@
 
 %% API.
 -export([start_link/1]).
+-export([set_name/2]).
 -export([set_description/2]).
 -export([set_client_id/2]).
 -export([set_client_secret/2]).
@@ -19,7 +20,8 @@
 -export([code_change/3]).
 
 -record(state, {
-          id = unknown,
+          id = undefined,
+          name = undefined,
           desc = none,
           client_id = unknown,
           client_secret = unknown,
@@ -39,6 +41,9 @@
 start_link(Id) ->
 	gen_server:start_link(?MODULE, Id, []).
 
+-spec set_name(Name :: binary(), Pid :: pid() ) -> ok.
+set_name(Name, Pid) ->
+    gen_server:call(Pid,{set_name,Name}).
 
 -spec set_description(Description :: binary(), Pid :: pid() ) -> ok.
 set_description(Description, Pid) ->
@@ -72,6 +77,8 @@ init(Id) ->
 handle_call(get_config, _From, State) ->
     Conf = create_config(State), 
 	{reply, {ok, Conf}, State};
+handle_call({set_name,Name}, _From, State) ->
+	{reply, ok, State#state{name = Name}};
 handle_call({set_description,Description}, _From, State) ->
 	{reply, ok, State#state{desc = Description}};
 handle_call({set_client_id,ClientId}, _From, State) ->

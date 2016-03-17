@@ -2,12 +2,18 @@
 -behaviour(supervisor).
 
 -export([add_openid_provider/1]).
+-export([add_openid_provider/0]).
 -export([get_openid_provider/1]).
 -export([get_openid_provider_list/0]).
 
 -export([start_link/0]).
 -export([init/1]).
 
+
+-spec add_openid_provider() -> {ok, pid()}.
+add_openid_provider() ->
+    Id = get_unique_id(), 
+    supervisor:start_child(?MODULE, openid_provider_spec(Id)).
 
 -spec add_openid_provider(Id :: binary()) -> 
     {ok, pid()} | {error, term()}.
@@ -49,3 +55,24 @@ openid_provider_spec(Id) ->
     #{ id => Id,
        start => {oidcc_openid_provider,start_link,[Id]}
      }.
+
+get_unique_id() ->
+    List = gen_supervisor:which_children(?MODULE),
+    Id = random_id(),
+    case lists:keyfind(Id,1,List) of
+        true -> Id;
+        false -> get_unique_id()
+    end.
+
+
+random_id() ->
+    random_id(5).
+
+random_id(Length) ->
+    Random = try crypto:strong_rand_bytes(Length) of
+                 Data -> Data
+             catch
+                 low_entropy ->
+                     crypto:rand_bytes(Length)
+             end,
+    base64url:encode(Random).

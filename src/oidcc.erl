@@ -1,6 +1,7 @@
 -module(oidcc).
 
 -export([add_openid_provider/6]).
+-export([add_openid_provider/7]).
 -export([get_openid_provider_info/1]).
 -export([get_openid_provider_list/0]).
 -export([create_redirect_url/1]).
@@ -12,15 +13,29 @@
 -export([retrieve_user_info/2]).
 
 
-add_openid_provider(Id, Description, ClientId, ClientSecret, ConfigEndpoint,
+add_openid_provider(Name, Description, ClientId, ClientSecret, ConfigEndpoint,
+                    LocalEndpoint) ->
+    {ok, Pid} = oidcc_openid_provider_sup:add_openid_provider(), 
+    update_openid_provider(Name, Description, ClientId, ClientSecret,
+                           ConfigEndpoint, LocalEndpoint,Pid).
+
+add_openid_provider(Id, Name, Description, ClientId, ClientSecret, ConfigEndpoint,
                     LocalEndpoint) ->
     {ok, Pid} = oidcc_openid_provider_sup:add_openid_provider(Id), 
+    update_openid_provider(Name, Description, ClientId, ClientSecret,
+                           ConfigEndpoint, LocalEndpoint,Pid).
+
+update_openid_provider(Name,
+                       Description,ClientId,ClientSecret,ConfigEndpoint,LocalEndpoint,
+                       Pid) ->
+    ok = oidcc_openid_provider:set_name(Name,Pid),
     ok = oidcc_openid_provider:set_description(Description,Pid),
     ok = oidcc_openid_provider:set_client_id(ClientId,Pid),
     ok = oidcc_openid_provider:set_client_secret(ClientSecret,Pid),
     ok = oidcc_openid_provider:set_config_endpoint(ConfigEndpoint,Pid),
     ok = oidcc_openid_provider:set_local_endpoint(LocalEndpoint,Pid),
     ok.
+
 
 get_openid_provider_info(Pid) when is_pid(Pid) ->
     oidcc_openid_provider:get_config(Pid);

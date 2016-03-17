@@ -15,15 +15,17 @@
 
 add_openid_provider(Name, Description, ClientId, ClientSecret, ConfigEndpoint,
                     LocalEndpoint) ->
-    {ok, Pid} = oidcc_openid_provider_sup:add_openid_provider(), 
-    update_openid_provider(Name, Description, ClientId, ClientSecret,
-                           ConfigEndpoint, LocalEndpoint,Pid).
+    {ok, Id, Pid} = oidcc_openid_provider_sup:add_openid_provider(), 
+    ok = update_openid_provider(Name, Description, ClientId, ClientSecret,
+                           ConfigEndpoint, LocalEndpoint,Pid),
+    {ok, Id, Pid}.
 
 add_openid_provider(Id, Name, Description, ClientId, ClientSecret, ConfigEndpoint,
                     LocalEndpoint) ->
-    {ok, Pid} = oidcc_openid_provider_sup:add_openid_provider(Id), 
-    update_openid_provider(Name, Description, ClientId, ClientSecret,
-                           ConfigEndpoint, LocalEndpoint,Pid).
+    {ok, Id, Pid} = oidcc_openid_provider_sup:add_openid_provider(Id), 
+    ok = update_openid_provider(Name, Description, ClientId, ClientSecret,
+                           ConfigEndpoint, LocalEndpoint,Pid),
+    {ok, Id, Pid}.
 
 update_openid_provider(Name,
                        Description,ClientId,ClientSecret,ConfigEndpoint,LocalEndpoint,

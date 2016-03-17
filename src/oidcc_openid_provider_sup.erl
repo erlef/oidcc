@@ -10,15 +10,17 @@
 -export([init/1]).
 
 
--spec add_openid_provider() -> {ok, pid()}.
+-spec add_openid_provider() -> {ok, Id::binary(), pid()}.
 add_openid_provider() ->
     Id = get_unique_id(), 
-    supervisor:start_child(?MODULE, openid_provider_spec(Id)).
+    {ok, Pid} = supervisor:start_child(?MODULE, openid_provider_spec(Id)),
+    {ok, Id, Pid}.
 
 -spec add_openid_provider(Id :: binary()) -> 
-    {ok, pid()} | {error, term()}.
+    {ok, binary(), pid()} | {error, term()}.
 add_openid_provider(Id) ->
-    supervisor:start_child(?MODULE, openid_provider_spec(Id)).
+    {ok, Pid} = supervisor:start_child(?MODULE, openid_provider_spec(Id)),
+    {ok, Id, Pid}.
 
 
 

@@ -57,7 +57,7 @@ openid_provider_spec(Id) ->
      }.
 
 get_unique_id() ->
-    List = gen_supervisor:which_children(?MODULE),
+    List = supervisor:which_children(?MODULE),
     Id = random_id(),
     case lists:keyfind(Id,1,List) of
         true -> Id;

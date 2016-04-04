@@ -8,6 +8,7 @@
 -export([set_client_id/2]).
 -export([set_client_secret/2]).
 -export([set_config_endpoint/2]).
+-export([update_config/1]).
 -export([set_local_endpoint/2]).
 -export([get_config/1]).
 
@@ -62,6 +63,10 @@ set_client_secret(ClientSecret, Pid) ->
 set_config_endpoint(ConfigEndpoint, Pid) ->
     gen_server:call(Pid,{set_config_endpoint,ConfigEndpoint}).
 
+-spec update_config(Pid :: pid() ) -> ok.
+update_config(Pid) ->
+    gen_server:call(Pid,update_config).
+
 -spec set_local_endpoint(Url :: binary(), Pid :: pid() ) -> ok.
 set_local_endpoint(Url, Pid) ->
     gen_server:call(Pid,{set_local_endpoint,Url}).
@@ -90,8 +95,13 @@ handle_call({set_local_endpoint,Url}, _From, State) ->
 handle_call({set_config_endpoint,ConfigEndpoint}, _From, State) ->
     ok = trigger_config_retrieval(),
 	{reply, ok, State#state{config_ep=ConfigEndpoint}};
+handle_call(update_config, _From, State) ->
+    ok = trigger_config_retrieval(),
+	{reply, ok, State};
 handle_call(_Request, _From, State) ->
 	{reply, ignored, State}.
+
+
 handle_cast(retrieve_config, State) ->
     {ok, ConPid} = retrieve_config(State),
  	{noreply, State#state{client_pid = ConPid,retrieving=config}};
@@ -126,12 +136,11 @@ retrieve_keys(#state{client_pid = ConPid, config = Config}) ->
     stop_existing_client(ConPid),
     ehtc:http_get(KeyEndpoint, Header). 
 
-handle_http_result(200,_Header,Body, config,  State) ->
-    handle_config(Body, State);
-handle_http_result(200,_Header,Body, keys,  State) ->
-    handle_keys(Body, State);
-handle_http_result(Status,Header,Body, Retrieve,  State) ->
-    io:format("got result: ~p ~n ~p ~n ~p ~n ~p~n",[Retrieve, Status, Header, Body]),
+handle_http_result(200, Header,Body, config,  State) ->
+    handle_config(Body, Header, State);
+handle_http_result(200, Header,Body, keys,  State) ->
+    handle_keys(Body, Header, State);
+handle_http_result(_Status, _Header, _Body, _Retrieve,  State) ->
     State.
 
 
@@ -161,12 +170,15 @@ create_config(#state{id = Id, desc = Desc,  client_id = ClientId,  client_secret
 
 
     
-handle_config(Data, State) ->
+handle_config(Data, _Header, State) ->
+    %TODO: implement update at expire data/time
     Config = jsx:decode(Data,[return_maps, {labels, attempt_atom}]),
     ok = trigger_key_retrieval(),
+    timer:apply_after(3600000,?MODULE,update_config,[self()]),
     State#state{config = Config}. 
 
-handle_keys(Data, #state{config = Config } = State) ->
+handle_keys(Data, _Header, #state{config = Config } = State) ->
+    %TODO: implement update at expire data/time
     #{keys := KeyList } = jsx:decode(Data,[return_maps, {labels, attempt_atom}]),
     Keys = extract_supported_keys(KeyList,[]),
     State#state{config = maps:put(keys, Keys, Config), ready = true,

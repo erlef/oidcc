@@ -9,6 +9,7 @@
 -export([set_client_secret/2]).
 -export([set_config_endpoint/2]).
 -export([update_config/1]).
+%% -export([force_update_config/1]).
 -export([set_local_endpoint/2]).
 -export([get_config/1]).
 
@@ -28,11 +29,12 @@
           client_secret = unknown,
           config_ep = unknown,
           config = #{},
+          keys = [],
           ready = false,
           lasttime_updated = never,
           local_endpoint = unknown,
 
-          client_pid = none,
+          client_pid = undefined,
           retrieving = none
 }).
 
@@ -102,7 +104,7 @@ handle_call(_Request, _From, State) ->
 	{reply, ignored, State}.
 
 
-handle_cast(retrieve_config, State) ->
+handle_cast(retrieve_config, #state{client_pid = undefined} = State) ->
     {ok, ConPid} = retrieve_config(State),
  	{noreply, State#state{client_pid = ConPid,retrieving=config}};
 handle_cast(retrieve_keys, State) ->
@@ -151,19 +153,19 @@ handle_http_result(HttpData, #state{ retrieving = Retrieve} = State) ->
 
 
 
-stop_existing_client(none) ->
-    ok;
-stop_existing_client(Pid) ->
-    ehtc:tclose(Pid).
+stop_existing_client(Pid) when is_pid(Pid) ->
+    ehtc:tclose(Pid);
+stop_existing_client(_) ->
+    ok.
 
 create_config(#state{id = Id, desc = Desc,  client_id = ClientId,  client_secret =
-                     ClientSecret, config_ep = ConfEp, config=Config,
+                     ClientSecret, config_ep = ConfEp, config=Config, keys = Keys,
                      lasttime_updated = LastTimeUpdated, ready = Ready,
                      local_endpoint = LocalEndpoint}) ->
     StateList = [{id,Id}, {description,Desc}, {client_id, ClientId},
                  {client_secret, ClientSecret}, {config_endpoint, ConfEp},
                  {lasttime_updated, LastTimeUpdated}, {ready, Ready}, 
-                 {local_endpoint, LocalEndpoint}],
+                 {local_endpoint, LocalEndpoint}, {keys, Keys}],
     maps:merge(Config, maps:from_list(StateList)).
 
 
@@ -177,12 +179,13 @@ handle_config(Data, _Header, State) ->
     timer:apply_after(3600000,?MODULE,update_config,[self()]),
     State#state{config = Config}. 
 
-handle_keys(Data, _Header, #state{config = Config } = State) ->
+handle_keys(Data, _Header, #state{client_pid = Client} = State) ->
     %TODO: implement update at expire data/time
     #{keys := KeyList } = jsx:decode(Data,[return_maps, {labels, attempt_atom}]),
     Keys = extract_supported_keys(KeyList,[]),
-    State#state{config = maps:put(keys, Keys, Config), ready = true,
-                lasttime_updated = timestamp()}. 
+    stop_existing_client(Client),
+    State#state{keys  = Keys, ready = true, lasttime_updated = timestamp(),
+                client_pid = undefined}. 
 
 extract_supported_keys([], List) ->
     List;
@@ -202,8 +205,9 @@ extract_supported_keys([_H|T], List) ->
    
 
 
-handle_http_client_crash(_State, _Reason) -> 
-    ok.
+handle_http_client_crash(State, _Reason) -> 
+    trigger_config_retrieval(),
+    State#state{client_pid = undefined}.
 
 trigger_config_retrieval() ->
     gen_server:cast(self(),retrieve_config).

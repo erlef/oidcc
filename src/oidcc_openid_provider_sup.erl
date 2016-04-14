@@ -12,12 +12,14 @@
 
 -spec add_openid_provider() -> {ok, Id::binary(), pid()}.
 add_openid_provider() ->
-    Id = get_unique_id(), 
+    Id = get_unique_id(),
     {ok, Pid} = supervisor:start_child(?MODULE, openid_provider_spec(Id)),
     {ok, Id, Pid}.
 
--spec add_openid_provider(Id :: binary()) -> 
+-spec add_openid_provider(Id :: binary()| undefined) ->
     {ok, binary(), pid()} | {error, term()}.
+add_openid_provider(undefined) ->
+    add_openid_provider();
 add_openid_provider(Id) ->
     {ok, Pid} = supervisor:start_child(?MODULE, openid_provider_spec(Id)),
     {ok, Id, Pid}.
@@ -26,7 +28,7 @@ add_openid_provider(Id) ->
 
 get_openid_provider(Id) ->
     {ok, Children} = get_openid_provider_list(),
-    Filter = fun({ChildId,Pid}, Acc) ->
+    Filter = fun({ChildId, Pid}, Acc) ->
                      case ChildId of
                          Id -> Pid;
                          _ -> Acc
@@ -37,31 +39,31 @@ get_openid_provider(Id) ->
         undefined -> {error, undefined};
         Pid when is_pid(Pid) -> {ok, Pid}
     end.
-    
+
 get_openid_provider_list() ->
     Children = supervisor:which_children(?MODULE),
-    MakeTuple = fun({ChildId,Pid,_,_}, Acc) ->
-                        [{ChildId,Pid} | Acc]
-             end,
+    MakeTuple = fun({ChildId, Pid, _, _}, Acc) ->
+                        [{ChildId, Pid} | Acc]
+                end,
     {ok, lists:foldl(MakeTuple, [], Children)}.
 
 start_link() ->
-	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
-	Procs = [],
-	{ok, {{one_for_one, 1, 5}, Procs}}.
+    Procs = [],
+    {ok, {{one_for_one, 1, 5}, Procs}}.
 
 
 openid_provider_spec(Id) ->
     #{ id => Id,
-       start => {oidcc_openid_provider,start_link,[Id]}
+       start => {oidcc_openid_provider, start_link, [Id]}
      }.
 
 get_unique_id() ->
     List = supervisor:which_children(?MODULE),
     Id = random_id(),
-    case lists:keyfind(Id,1,List) of
+    case lists:keyfind(Id, 1, List) of
         false -> Id;
         true -> get_unique_id()
     end.

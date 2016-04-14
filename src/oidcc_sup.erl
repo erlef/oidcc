@@ -5,17 +5,17 @@
 -export([init/1]).
 
 start_link() ->
-	supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 init([]) ->
-	Procs = [
+    Procs = [
              openid_provider_supervisor()
             ],
-	{ok, {{one_for_one, 1, 5}, Procs}}.
+    {ok, {{one_for_one, 1, 5}, Procs}}.
 
 
 openid_provider_supervisor() ->
     #{ id => op_sup,
-       start => {oidcc_openid_provider_sup,start_link,[]},
+       start => {oidcc_openid_provider_sup, start_link, []},
        type => supervisor
      }.

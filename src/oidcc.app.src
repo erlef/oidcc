@@ -10,7 +10,6 @@
                          stdlib,
                          crypto,
                          ejwt,
-                         ehtc,
                          base64url
                         ]},
          {mod, {oidcc_app, []}}

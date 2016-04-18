@@ -25,6 +25,7 @@ add_openid_provider_test() ->
     ok = meck:expect(oidcc_openid_provider, set_client_secret, UpdateFun),
     ok = meck:expect(oidcc_openid_provider, set_config_endpoint, UpdateFun),
     ok = meck:expect(oidcc_openid_provider, set_local_endpoint, UpdateFun),
+    ok = meck:expect(oidcc_openid_provider, update_config, fun(_) -> ok end),
 
     ok = meck:expect(oidcc_openid_provider_sup, add_openid_provider, AddFun),
 

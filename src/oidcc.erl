@@ -33,6 +33,7 @@ update_openid_provider(Name, Description, ClientId, ClientSecret,
     ok = oidcc_openid_provider:set_client_secret(ClientSecret, Pid),
     ok = oidcc_openid_provider:set_config_endpoint(ConfigEndpoint, Pid),
     ok = oidcc_openid_provider:set_local_endpoint(LocalEndpoint, Pid),
+    ok = oidcc_openid_provider:update_config(Pid),
     ok.
 
 

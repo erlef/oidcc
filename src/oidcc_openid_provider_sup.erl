@@ -13,17 +13,21 @@
 -spec add_openid_provider() -> {ok, Id::binary(), pid()}.
 add_openid_provider() ->
     Id = get_unique_id(),
-    {ok, Pid} = supervisor:start_child(?MODULE, openid_provider_spec(Id)),
-    {ok, Id, Pid}.
+    add_openid_provider(Id).
 
 -spec add_openid_provider(Id :: binary()| undefined) ->
     {ok, binary(), pid()} | {error, term()}.
 add_openid_provider(undefined) ->
     add_openid_provider();
 add_openid_provider(Id) ->
-    {ok, Pid} = supervisor:start_child(?MODULE, openid_provider_spec(Id)),
-    {ok, Id, Pid}.
-
+    case is_unique_id(Id) of
+        true ->
+            {ok, Pid} = supervisor:start_child(?MODULE,
+                                               openid_provider_spec(Id)),
+            {ok, Id, Pid};
+        false ->
+            {error, id_already_used}
+    end.
 
 
 get_openid_provider(Id) ->
@@ -61,11 +65,17 @@ openid_provider_spec(Id) ->
      }.
 
 get_unique_id() ->
-    List = supervisor:which_children(?MODULE),
     Id = random_id(),
+    case is_unique_id(Id) of
+        true -> Id;
+        false -> get_unique_id()
+    end.
+
+is_unique_id(Id) ->
+    List = supervisor:which_children(?MODULE),
     case lists:keyfind(Id, 1, List) of
-        false -> Id;
-        true -> get_unique_id()
+        false -> true;
+        _ -> false
     end.
 
 

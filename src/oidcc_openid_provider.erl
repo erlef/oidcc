@@ -103,7 +103,6 @@ handle_call({set_client_secret, ClientSecret}, _From, State) ->
 handle_call({set_local_endpoint, Url}, _From, State) ->
     {reply, ok, State#state{local_endpoint=Url}};
 handle_call({set_config_endpoint, ConfigEndpoint}, _From, State) ->
-    ok = trigger_config_retrieval(),
     {reply, ok, State#state{config_ep=ConfigEndpoint}};
 handle_call(update_config, _From, State) ->
     ok = trigger_config_retrieval(),
@@ -197,11 +196,11 @@ create_config(#state{id = Id, desc = Desc, client_id = ClientId,
                      client_secret = ClientSecret, config_ep = ConfEp,
                      config=Config, keys = Keys,
                      lasttime_updated = LastTimeUpdated, ready = Ready,
-                     local_endpoint = LocalEndpoint}) ->
-    StateList = [{id, Id}, {description, Desc}, {client_id, ClientId},
-                 {client_secret, ClientSecret}, {config_endpoint, ConfEp},
-                 {lasttime_updated, LastTimeUpdated}, {ready, Ready},
-                 {local_endpoint, LocalEndpoint}, {keys, Keys}],
+                     local_endpoint = LocalEndpoint, name = Name}) ->
+    StateList = [{id, Id}, {name, Name}, {description, Desc},
+                 {client_id, ClientId}, {client_secret, ClientSecret},
+                 {config_endpoint, ConfEp}, {lasttime_updated, LastTimeUpdated},
+                 {ready, Ready}, {local_endpoint, LocalEndpoint}, {keys, Keys}],
     maps:merge(Config, maps:from_list(StateList)).
 
 

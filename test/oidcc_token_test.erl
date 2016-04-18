@@ -34,7 +34,7 @@ validate_pass_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(valid,ClientId,Nonce,Issuer),
-    #{} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {ok,#{}} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 
@@ -48,7 +48,7 @@ validate_group_pass_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(valid_group,ClientId,Nonce,Issuer),
-    #{} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {ok,#{}} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 
@@ -61,7 +61,7 @@ validate_fail_field_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(missing_field,ClientId,Nonce,Issuer),
-    {error, required_field_missing} = oidcc_token:save_validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {error, required_field_missing} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 
@@ -75,7 +75,7 @@ validate_fail_issuer_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(valid,ClientId,Nonce,BadIssuer),
-    {error, wrong_issuer} = oidcc_token:save_validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {error, wrong_issuer} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 
@@ -88,7 +88,7 @@ validate_fail_audience_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(valid,BadClientId,Nonce,Issuer),
-    {error, not_in_audience} = oidcc_token:save_validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {error, not_in_audience} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 
@@ -101,7 +101,7 @@ validate_fail_audience_group_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(valid_group,BadClientId,Nonce,Issuer),
-    {error, not_in_audience} = oidcc_token:save_validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {error, not_in_audience} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 
@@ -113,7 +113,7 @@ validate_fail_algo_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(bad_algo,ClientId,Nonce,Issuer),
-    {error, not_rs256} = oidcc_token:save_validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {error, not_rs256} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 
@@ -125,7 +125,7 @@ validate_fail_expired_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(expired,ClientId,Nonce,Issuer),
-    {error, expired} = oidcc_token:save_validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {error, expired} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 
@@ -139,7 +139,7 @@ validate_fail_nonce_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(valid,ClientId,BadNonce,Issuer),
-    {error, wrong_nonce} = oidcc_token:save_validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {error, wrong_nonce} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 

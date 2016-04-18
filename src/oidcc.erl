@@ -18,9 +18,9 @@ add_openid_provider(Name, Description, ClientId, ClientSecret, ConfigEndpoint,
     add_openid_provider(undefined, Name, Description, ClientId, ClientSecret,
                         ConfigEndpoint, LocalEndpoint).
 
-add_openid_provider(Id, Name, Description, ClientId, ClientSecret,
+add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
                     ConfigEndpoint, LocalEndpoint) ->
-    {ok, Id, Pid} = oidcc_openid_provider_sup:add_openid_provider(Id),
+    {ok, Id, Pid} = oidcc_openid_provider_sup:add_openid_provider(IdIn),
     ok = update_openid_provider(Name, Description, ClientId, ClientSecret,
                            ConfigEndpoint, LocalEndpoint, Pid),
     {ok, Id, Pid}.
@@ -142,19 +142,14 @@ return_token( {ok, #{body := Body, status := Status}} ) ->
 parse_and_validate_token(Token, OpenIdProvider) ->
     parse_and_validate_token(Token, OpenIdProvider, undefined).
 
-parse_and_validate_token(Token, OpenIdProvider, Nonce) when is_binary(Nonce) ->
+parse_and_validate_token(Token, OpenIdProvider, Nonce) ->
     TokenMap = oidcc_token:extract_token_map(Token),
     #{id := IdToken0 } = TokenMap,
-    try oidcc_token:validate_id_token(IdToken0, OpenIdProvider, Nonce)
-    of IdToken ->
-           {ok, maps:put(id, IdToken, TokenMap)}
-    catch
-        Error ->
-            {error, Error}
-    end;
-parse_and_validate_token(Token, OpenIdProvider, _Nonce) ->
-    parse_and_validate_token(Token, OpenIdProvider).
-
+    case oidcc_token:validate_id_token(IdToken0, OpenIdProvider, Nonce) of
+        {ok, IdToken} ->
+           {ok, maps:put(id, IdToken, TokenMap)};
+        Other -> Other
+    end.
 
 retrieve_user_info(#{access := AccessToken}, OpenIdProvider) ->
     #{token := Token} = AccessToken,

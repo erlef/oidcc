@@ -2,7 +2,6 @@
 
 -export([extract_token_map/1]).
 -export([validate_id_token/3]).
--export([save_validate_id_token/3]).
 
 extract_token_map(Token) ->
     TokenMap = jsx:decode(Token, [return_maps]),
@@ -15,15 +14,14 @@ extract_token_map(Token) ->
       refresh => RefreshToken
      }.
 
-save_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
-    try
-        Result = validate_id_token(IdToken, OpenIdProviderId, Nonce),
-        {ok, Result}
+validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
+    try int_validate_id_token(IdToken, OpenIdProviderId, Nonce) of
+        Result -> {ok, Result}
     catch
         Exception -> {error, Exception}
     end.
 
-validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
+int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     {ok, OpInfo} = oidcc:get_openid_provider_info(OpenIdProviderId),
     {Header, Claims} = case ejwt:pre_parse_jwt(IdToken) of
                            #{ header := H, claims := C }  -> {H, C};

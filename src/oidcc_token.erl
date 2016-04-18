@@ -14,8 +14,14 @@ extract_token_map(Token) ->
       refresh => RefreshToken
      }.
 
-
 validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
+    try int_validate_id_token(IdToken, OpenIdProviderId, Nonce) of
+        Result -> {ok, Result}
+    catch
+        Exception -> {error, Exception}
+    end.
+
+int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     {ok, OpInfo} = oidcc:get_openid_provider_info(OpenIdProviderId),
     {Header, Claims} = case ejwt:pre_parse_jwt(IdToken) of
                            #{ header := H, claims := C }  -> {H, C};
@@ -53,8 +59,7 @@ validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     % not list the Client as a valid audience, or if it contains additional
     % audiences not trusted by the Client.
     #{ aud := Audience} = Claims,
-    %TODO: implement also lists
-    case (Audience == ClientId) of
+    case is_part_of_audience(ClientId, Audience) of
         true -> ok;
         false -> throw(not_in_audience)
     end,
@@ -145,6 +150,11 @@ contains_all_required_claims(Jwt) ->
                 end,
     Result =  maps:fold(CheckKeys, Required, Jwt),
     Result =:= [].
+
+is_part_of_audience(ClientId, Audience) when is_binary(Audience) ->
+    Audience == ClientId;
+is_part_of_audience(ClientId, Audience) when is_list(Audience) ->
+    lists:member(ClientId, Audience).
 
 get_needed_key([], _) ->
     throw(no_key);

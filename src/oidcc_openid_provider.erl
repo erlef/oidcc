@@ -3,6 +3,7 @@
 
 %% API.
 -export([start_link/1]).
+-export([stop/1]).
 -export([set_name/2]).
 -export([set_description/2]).
 -export([set_client_id/2]).
@@ -46,6 +47,10 @@
 -spec start_link(Id :: binary()) -> {ok, pid()}.
 start_link(Id) ->
     gen_server:start_link(?MODULE, Id, []).
+
+-spec stop(Pid ::pid()) -> ok.
+stop(Pid) ->
+    gen_server:cast(Pid, stop).
 
 -spec set_name(Name :: binary(), Pid :: pid() ) -> ok.
 set_name(Name, Pid) ->
@@ -121,6 +126,8 @@ handle_cast(retrieve_keys, State) ->
                            sref=StreamRef,
                            retrieving=keys},
     {noreply, NewState};
+handle_cast(stop, State) ->
+    {stop, normal, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 

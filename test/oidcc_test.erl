@@ -17,7 +17,7 @@ add_openid_provider_test() ->
                         ok
                 end,
     ok = meck:new(oidcc_openid_provider),
-    ok = meck:new(oidcc_openid_provider_sup),
+    ok = meck:new(oidcc_openid_provider_mgr),
 
     ok = meck:expect(oidcc_openid_provider, set_name, UpdateFun),
     ok = meck:expect(oidcc_openid_provider, set_description, UpdateFun),
@@ -27,7 +27,7 @@ add_openid_provider_test() ->
     ok = meck:expect(oidcc_openid_provider, set_local_endpoint, UpdateFun),
     ok = meck:expect(oidcc_openid_provider, update_config, fun(_) -> ok end),
 
-    ok = meck:expect(oidcc_openid_provider_sup, add_openid_provider, AddFun),
+    ok = meck:expect(oidcc_openid_provider_mgr, add_openid_provider, AddFun),
 
     Name = <<"My Test Oidc">>,
     Id = <<"123345456">>,
@@ -49,9 +49,9 @@ add_openid_provider_test() ->
                                                       ConfigEndpoint,
                                                       LocalEndpoint),
     true = meck:validate(oidcc_openid_provider),
-    true = meck:validate(oidcc_openid_provider_sup),
+    true = meck:validate(oidcc_openid_provider_mgr),
     meck:unload(oidcc_openid_provider),
-    meck:unload(oidcc_openid_provider_sup),
+    meck:unload(oidcc_openid_provider_mgr),
     ok.
 
 get_openid_provider_info_test() ->
@@ -69,32 +69,32 @@ get_openid_provider_info_test() ->
                      end
              end,
     ok = meck:new(oidcc_openid_provider),
-    ok = meck:new(oidcc_openid_provider_sup),
+    ok = meck:new(oidcc_openid_provider_mgr),
 
     ok = meck:expect(oidcc_openid_provider, get_config, ConfigFun),
-    ok = meck:expect(oidcc_openid_provider_sup, get_openid_provider, MapFun),
+    ok = meck:expect(oidcc_openid_provider_mgr, get_openid_provider, MapFun),
 
     {ok, #{}} = oidcc:get_openid_provider_info(MyPid),
     {ok, #{}} = oidcc:get_openid_provider_info(ProviderId),
     {error,not_found} = oidcc:get_openid_provider_info(BadProviderId),
 
     true = meck:validate(oidcc_openid_provider),
-    true = meck:validate(oidcc_openid_provider_sup),
+    true = meck:validate(oidcc_openid_provider_mgr),
     meck:unload(oidcc_openid_provider),
-    meck:unload(oidcc_openid_provider_sup),
+    meck:unload(oidcc_openid_provider_mgr),
     ok.
 
 get_openid_provider_list_test() ->
     ListFun = fun() ->
                       {ok, []}
               end,
-    ok = meck:new(oidcc_openid_provider_sup),
-    ok = meck:expect(oidcc_openid_provider_sup, get_openid_provider_list, ListFun),
+    ok = meck:new(oidcc_openid_provider_mgr),
+    ok = meck:expect(oidcc_openid_provider_mgr, get_openid_provider_list, ListFun),
 
     {ok, []} = oidcc:get_openid_provider_list(),
 
-    true = meck:validate(oidcc_openid_provider_sup),
-    meck:unload(oidcc_openid_provider_sup),
+    true = meck:validate(oidcc_openid_provider_mgr),
+    meck:unload(oidcc_openid_provider_mgr),
     ok.
 
 create_redirect_url_test() ->
@@ -121,10 +121,10 @@ create_redirect_url_test() ->
                      end
              end,
     ok = meck:new(oidcc_openid_provider),
-    ok = meck:new(oidcc_openid_provider_sup),
+    ok = meck:new(oidcc_openid_provider_mgr),
 
     ok = meck:expect(oidcc_openid_provider, get_config, ConfigFun),
-    ok = meck:expect(oidcc_openid_provider_sup, get_openid_provider, MapFun),
+    ok = meck:expect(oidcc_openid_provider_mgr, get_openid_provider, MapFun),
 
     {ok, Url1} = oidcc:create_redirect_url(ProviderId),
     {ok, Url2} = oidcc:create_redirect_url(ProviderId,State),
@@ -143,9 +143,9 @@ create_redirect_url_test() ->
     Url3 = ExpUrl3,
 
     true = meck:validate(oidcc_openid_provider),
-    true = meck:validate(oidcc_openid_provider_sup),
+    true = meck:validate(oidcc_openid_provider_mgr),
     meck:unload(oidcc_openid_provider),
-    meck:unload(oidcc_openid_provider_sup),
+    meck:unload(oidcc_openid_provider_mgr),
     ok.
 
 retrieve_token_basic_test() ->
@@ -201,11 +201,11 @@ retrieve_token(AuthMethods) ->
                       {ok, HttpBody}
               end,
     ok = meck:new(oidcc_openid_provider),
-    ok = meck:new(oidcc_openid_provider_sup),
+    ok = meck:new(oidcc_openid_provider_mgr),
     ok = meck:new(gun),
 
     ok = meck:expect(oidcc_openid_provider, get_config, ConfigFun),
-    ok = meck:expect(oidcc_openid_provider_sup, get_openid_provider, MapFun),
+    ok = meck:expect(oidcc_openid_provider_mgr, get_openid_provider, MapFun),
     ok = meck:expect(gun, open, OpenFun),
     ok = meck:expect(gun, await_up, fun(_) -> {ok, tcp} end),
     ok = meck:expect(gun, post, PostFun),
@@ -218,10 +218,10 @@ retrieve_token(AuthMethods) ->
     {ok,_} = oidcc:retrieve_token(AuthCode,ProviderId),
 
     true = meck:validate(oidcc_openid_provider),
-    true = meck:validate(oidcc_openid_provider_sup),
+    true = meck:validate(oidcc_openid_provider_mgr),
     true = meck:validate(gun),
     meck:unload(oidcc_openid_provider),
-    meck:unload(oidcc_openid_provider_sup),
+    meck:unload(oidcc_openid_provider_mgr),
     meck:unload(gun),
     ok.
 
@@ -288,11 +288,11 @@ retrieve_user_info_test() ->
                       {ok, HttpBody}
               end,
     ok = meck:new(oidcc_openid_provider),
-    ok = meck:new(oidcc_openid_provider_sup),
+    ok = meck:new(oidcc_openid_provider_mgr),
     ok = meck:new(gun),
 
     ok = meck:expect(oidcc_openid_provider, get_config, ConfigFun),
-    ok = meck:expect(oidcc_openid_provider_sup, get_openid_provider, MapFun),
+    ok = meck:expect(oidcc_openid_provider_mgr, get_openid_provider, MapFun),
 
     ok = meck:expect(gun, open, OpenFun),
     ok = meck:expect(gun, await_up, fun(_) -> {ok, tcp} end),
@@ -307,9 +307,9 @@ retrieve_user_info_test() ->
 
     true = meck:validate(gun),
     true = meck:validate(oidcc_openid_provider),
-    true = meck:validate(oidcc_openid_provider_sup),
+    true = meck:validate(oidcc_openid_provider_mgr),
     meck:unload(gun),
     meck:unload(oidcc_openid_provider),
-    meck:unload(oidcc_openid_provider_sup),
+    meck:unload(oidcc_openid_provider_mgr),
     ok.
 

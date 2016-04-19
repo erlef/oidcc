@@ -20,7 +20,7 @@ add_openid_provider(Name, Description, ClientId, ClientSecret, ConfigEndpoint,
 
 add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
                     ConfigEndpoint, LocalEndpoint) ->
-    {ok, Id, Pid} = oidcc_openid_provider_sup:add_openid_provider(IdIn),
+    {ok, Id, Pid} = oidcc_openid_provider_mgr:add_openid_provider(IdIn),
     ok = update_openid_provider(Name, Description, ClientId, ClientSecret,
                            ConfigEndpoint, LocalEndpoint, Pid),
     {ok, Id, Pid}.
@@ -40,7 +40,7 @@ update_openid_provider(Name, Description, ClientId, ClientSecret,
 get_openid_provider_info(Pid) when is_pid(Pid) ->
     oidcc_openid_provider:get_config(Pid);
 get_openid_provider_info(OpenIdProviderId) when is_binary(OpenIdProviderId) ->
-    case oidcc_openid_provider_sup:get_openid_provider(OpenIdProviderId) of
+    case oidcc_openid_provider_mgr:get_openid_provider(OpenIdProviderId) of
         {ok, Pid} ->
             oidcc_openid_provider:get_config(Pid);
         {error, Reason} ->
@@ -49,7 +49,7 @@ get_openid_provider_info(OpenIdProviderId) when is_binary(OpenIdProviderId) ->
 
 
 get_openid_provider_list() ->
-    oidcc_openid_provider_sup:get_openid_provider_list().
+    oidcc_openid_provider_mgr:get_openid_provider_list().
 
 create_redirect_url(OpenIdProviderId) ->
     create_redirect_url(OpenIdProviderId, undefined, undefined).

@@ -9,6 +9,7 @@ start_link() ->
 
 init([]) ->
     Procs = [
+             openid_provider_manager(),
              openid_provider_supervisor()
             ],
     {ok, {{one_for_one, 1, 5}, Procs}}.
@@ -18,4 +19,10 @@ openid_provider_supervisor() ->
     #{ id => op_sup,
        start => {oidcc_openid_provider_sup, start_link, []},
        type => supervisor
+     }.
+
+openid_provider_manager() ->
+    #{ id => op_mgr,
+       start => {oidcc_openid_provider_mgr, start_link, []},
+       type => worker
      }.

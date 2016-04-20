@@ -179,39 +179,19 @@ retrieve_token(AuthMethods) ->
                      end
              end,
 
-    OpenFun = fun(Host, Port, _Config)  ->
-                      Host = "my.provider",
-                      Port = 443,
-                      {ok, gun}
+    HttpFun = fun(Method, Url, _Header, _Body)  ->
+                      Method = post,
+                      Url = TokenEndpoint,
+                      {ok, #{status => 200, header => [], body => HttpBody}}
               end,
 
-    PostFun = fun(ConPid, Path, _Header, _Body)  ->
-                      Path = "/token",
-                      ConPid = gun,
-                      gun_stream
-              end,
-    AwaitFun = fun(ConPid, Stream)  ->
-                      ConPid = gun,
-                      Stream = gun_stream,
-                      {response, nofin, 200, []}
-              end,
-    AwaitBodyFun = fun(ConPid, Stream)  ->
-                      ConPid = gun,
-                      Stream = gun_stream,
-                      {ok, HttpBody}
-              end,
     ok = meck:new(oidcc_openid_provider),
     ok = meck:new(oidcc_openid_provider_mgr),
-    ok = meck:new(gun),
+    ok = meck:new(oidcc_http_util),
 
     ok = meck:expect(oidcc_openid_provider, get_config, ConfigFun),
     ok = meck:expect(oidcc_openid_provider_mgr, get_openid_provider, MapFun),
-    ok = meck:expect(gun, open, OpenFun),
-    ok = meck:expect(gun, await_up, fun(_) -> {ok, tcp} end),
-    ok = meck:expect(gun, post, PostFun),
-    ok = meck:expect(gun, shutdown, fun(_) -> ok end),
-    ok = meck:expect(gun, await, AwaitFun),
-    ok = meck:expect(gun, await_body, AwaitBodyFun),
+    ok = meck:expect(oidcc_http_util, sync_http,HttpFun),
 
     AuthCode = <<"1234567890">>,
 
@@ -219,10 +199,10 @@ retrieve_token(AuthMethods) ->
 
     true = meck:validate(oidcc_openid_provider),
     true = meck:validate(oidcc_openid_provider_mgr),
-    true = meck:validate(gun),
+    true = meck:validate(oidcc_http_util),
     meck:unload(oidcc_openid_provider),
     meck:unload(oidcc_openid_provider_mgr),
-    meck:unload(gun),
+    meck:unload(oidcc_http_util),
     ok.
 
 
@@ -257,8 +237,8 @@ retrieve_user_info_test() ->
     HttpBody = <<"{\"name\":\"joe\"}">>,
 
     ConfigFun = fun(Pid)->
-                     Pid = MyPid,
-                     {ok, #{userinfo_endpoint => UserInfoEndpoint}}
+                        Pid = MyPid,
+                        {ok, #{userinfo_endpoint => UserInfoEndpoint}}
                 end,
     MapFun = fun(Id) ->
                      case Id of
@@ -266,50 +246,27 @@ retrieve_user_info_test() ->
                          _ -> {error, not_found}
                      end
              end,
-    OpenFun = fun(Host, Port, _Config)  ->
-                      Host = "my.provider",
-                      Port = 80,
-                      {ok, gun}
+    HttpFun = fun(Method, Url, _Header, _Body)  ->
+                      Method = get,
+                      Url = UserInfoEndpoint,
+                      {ok, #{status => 200, header => [], body => HttpBody}}
               end,
 
-    GetFun = fun(ConPid, Path, _Header)  ->
-                      Path = "/info",
-                      ConPid = gun,
-                      gun_stream
-              end,
-    AwaitFun = fun(ConPid, Stream)  ->
-                      ConPid = gun,
-                      Stream = gun_stream,
-                      {response, nofin, 200, []}
-              end,
-    AwaitBodyFun = fun(ConPid, Stream)  ->
-                      ConPid = gun,
-                      Stream = gun_stream,
-                      {ok, HttpBody}
-              end,
     ok = meck:new(oidcc_openid_provider),
     ok = meck:new(oidcc_openid_provider_mgr),
-    ok = meck:new(gun),
+    ok = meck:new(oidcc_http_util),
 
     ok = meck:expect(oidcc_openid_provider, get_config, ConfigFun),
     ok = meck:expect(oidcc_openid_provider_mgr, get_openid_provider, MapFun),
-
-    ok = meck:expect(gun, open, OpenFun),
-    ok = meck:expect(gun, await_up, fun(_) -> {ok, tcp} end),
-    ok = meck:expect(gun, get, GetFun),
-    ok = meck:expect(gun, shutdown, fun(_) -> ok end),
-    ok = meck:expect(gun, await, AwaitFun),
-    ok = meck:expect(gun, await_body, AwaitBodyFun),
-
+    ok = meck:expect(oidcc_http_util, sync_http,HttpFun),
     Token = #{access => #{token => <<"opensesame">> }},
 
     {ok, #{name := <<"joe">>} } = oidcc:retrieve_user_info(Token,ProviderId),
 
-    true = meck:validate(gun),
     true = meck:validate(oidcc_openid_provider),
     true = meck:validate(oidcc_openid_provider_mgr),
-    meck:unload(gun),
+    true = meck:validate(oidcc_http_util),
     meck:unload(oidcc_openid_provider),
     meck:unload(oidcc_openid_provider_mgr),
+    meck:unload(oidcc_http_util),
     ok.
-

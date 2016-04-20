@@ -111,7 +111,7 @@ retrieve_token(AuthCode, OpenIdProviderId) ->
 
     {Body, Header} = add_authentication(Body0, Header0, AuthMethods, ClientId,
                                         Secret),
-    return_token(http_post(Endpoint, Header, Body)).
+    return_token(oidcc_http_util:sync_http(post, Endpoint, Header, Body)).
 
 
 add_authentication(Body, Header, [<<"client_secret_post">>|_], _ClientId,
@@ -160,7 +160,8 @@ retrieve_user_info(#{token := Token}, OpenIdProvider) ->
 retrieve_user_info(Token, #{userinfo_endpoint := Endpoint})
   when is_binary(Token) ->
     Header = [{<<"authorization">>, << <<"Bearer ">>/binary, Token/binary >>}],
-    return_user_info(http_get(Endpoint, Header));
+    HttpResult = oidcc_http_util:sync_http(get, Endpoint, Header,undefined),
+    return_user_info(HttpResult);
 retrieve_user_info(Token, OpenIdProvider) ->
     {ok, Config} = get_openid_provider_info(OpenIdProvider),
     retrieve_user_info(Token, Config).
@@ -176,64 +177,3 @@ return_user_info({ok, Map}) ->
 return_user_info({error, _}=Error) ->
     Error.
 
-
-http_get(Url, Header) ->
-    Uri = uri:from_string(Url),
-    Host= binary:bin_to_list(uri:host(Uri)),
-    Port0 = uri:port(Uri),
-    Scheme = uri:scheme(Uri),
-    Config = scheme_to_map(Scheme),
-    Path = binary:bin_to_list(uri:path(Uri)),
-    Port = ensure_port(Port0, Scheme),
-    {ok, ConPid} = gun:open(Host, Port, Config),
-    {ok, _Protocol} = gun:await_up(ConPid),
-    StreamRef = gun:get(ConPid, Path, Header),
-    ok = gun:shutdown(ConPid),
-    {Status, Headers, Body} =
-    case gun:await(ConPid, StreamRef) of
-        {response, fin, S, H} ->
-            {S, H, <<>>};
-        {response, nofin, S, H} ->
-            {ok, B} = gun:await_body(ConPid, StreamRef),
-            {S, H, B}
-    end,
-    {ok, #{status => Status, header => Headers, body => Body }}.
-
-http_post(Url, Header, Body) ->
-    Uri = uri:from_string(Url),
-    Host= binary:bin_to_list(uri:host(Uri)),
-    Port0 = uri:port(Uri),
-    Scheme = uri:scheme(Uri),
-    Config = scheme_to_map(Scheme),
-    Path = binary:bin_to_list(uri:path(Uri)),
-    Port = ensure_port(Port0, Scheme),
-    {ok, ConPid} = gun:open(Host, Port, Config),
-    {ok, _Protocol} = gun:await_up(ConPid),
-    StreamRef = gun:post(ConPid, Path, Header, Body),
-    ok = gun:shutdown(ConPid),
-    {Status, Headers, InBody} =
-    case gun:await(ConPid, StreamRef) of
-        {response, fin, S, H} ->
-            {S, H, <<>>};
-        {response, nofin, S, H} ->
-            {ok, B} = gun:await_body(ConPid, StreamRef),
-            {S, H, B}
-    end,
-    {ok, #{status => Status, header => Headers, body => InBody }}.
-
-scheme_to_map(<<"http">>) ->
-    #{};
-scheme_to_map(<<"https">>) ->
-    #{transport => ssl};
-scheme_to_map(_) ->
-    #{transport => ssl}.
-
-
-ensure_port(undefined, <<"http">>) ->
-    80;
-ensure_port(undefined, <<"https">>) ->
-    443;
-ensure_port(Port, _) when is_number(Port) ->
-    Port;
-ensure_port(_Port, _)  ->
-    443.

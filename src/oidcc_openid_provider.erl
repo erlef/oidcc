@@ -23,23 +23,24 @@
 -export([code_change/3]).
 
 -record(state, {
+          ready = false,
+
           id = undefined,
           name = undefined,
-          desc = none,
-          client_id = unknown,
-          client_secret = unknown,
-          config_ep = unknown,
+          desc = undefined,
+          client_id = undefined,
+          client_secret = undefined,
+          config_ep = undefined,
           config = #{},
           keys = [],
-          ready = false,
-          lasttime_updated = never,
-          local_endpoint = unknown,
+          lasttime_updated = undefined,
+          local_endpoint = undefined,
 
           gun_pid = undefined,
           mref = undefined,
           sref = undefined,
           http = #{},
-          retrieving = none
+          retrieving = undefined
          }).
 
 %% API.
@@ -229,7 +230,7 @@ extract_supported_keys([#{ kty := <<"RSA">>,
                            n := N0,
                            e := E0
                          } = Map|T], List) ->
-    Kid = maps:get(kid, Map, unknown),
+    Kid = maps:get(kid, Map, undefined),
     N = binary:decode_unsigned(base64url:decode(N0)),
     E = binary:decode_unsigned(base64url:decode(E0)),
     Key = #{kty => rsa, alg => rs256, use => sign, key => [E, N], kid => Kid },
@@ -239,12 +240,15 @@ extract_supported_keys([_H|T], List) ->
 
 
 
-handle_http_client_crash(State, _Reason) ->
-    trigger_config_retrieval(),
-    State#state{gun_pid = undefined, retrieving= undefined, http=#{}}.
+handle_http_client_crash(_Reason, State) ->
+    trigger_config_retrieval(10000),
+    State#state{gun_pid=undefined, retrieving=undefined, http=#{}}.
 
 trigger_config_retrieval() ->
     gen_server:cast(self(), retrieve_config).
+
+trigger_config_retrieval(Time) ->
+    timer:apply_after(Time, gen_server, cast, [self(), retrieve_config]).
 
 trigger_key_retrieval() ->
     gen_server:cast(self(), retrieve_keys).

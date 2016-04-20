@@ -172,12 +172,12 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 retrieve_config(#state{config_ep = ConfigEndpoint}) ->
-    gun_get(ConfigEndpoint).
+    oidcc_http_util:async_http(get, ConfigEndpoint, [], undefined).
 
 retrieve_keys(#state{config = Config}) ->
     KeyEndpoint = maps:get(jwks_uri, Config, undefined),
     Header = [{<<"accept">>, "application/json"}],
-    gun_get(KeyEndpoint, Header).
+    oidcc_http_util:async_http(get, KeyEndpoint, Header, undefined).
 
 handle_http_result(200, Header, Body, config, State) ->
     handle_config(Body, Header, State);
@@ -190,7 +190,7 @@ handle_http_result(_Status, _Header, _Body, _Retrieve, State) ->
 handle_http_result(#state{ retrieving = Retrieve, http =Http} = State) ->
     #{header := Header, status := Status, body := InBody} = Http,
     NewState = stop_gun(State),
-    {ok, Body} = uncompress_body_if_needed(InBody, Header),
+    {ok, Body} = oidcc_http_util:uncompress_body_if_needed(InBody, Header),
     handle_http_result(Status, Header, Body, Retrieve, NewState).
 
 
@@ -204,8 +204,6 @@ create_config(#state{id = Id, desc = Desc, client_id = ClientId,
                  {config_endpoint, ConfEp}, {lasttime_updated, LastTimeUpdated},
                  {ready, Ready}, {local_endpoint, LocalEndpoint}, {keys, Keys}],
     maps:merge(Config, maps:from_list(StateList)).
-
-
 
 
 
@@ -262,57 +260,9 @@ trigger_key_retrieval() ->
 timestamp() ->
     erlang:system_time(seconds).
 
-gun_get(Url) ->
-    gun_get(Url, []).
-
-gun_get(Url, Header) ->
-    Uri = uri:from_string(Url),
-    Host= binary:bin_to_list(uri:host(Uri)),
-    Port0 = uri:port(Uri),
-    Scheme = uri:scheme(Uri),
-    Config = scheme_to_map(Scheme),
-    Path = binary:bin_to_list(uri:path(Uri)),
-    Port = ensure_port(Port0, Scheme),
-    {ok, ConPid} = gun:open(Host, Port, Config),
-    MRef = monitor(process, ConPid),
-    {ok, _Protocol} = gun:await_up(ConPid),
-    StreamRef = gun:get(ConPid, Path, Header),
-    {ok, ConPid, MRef, StreamRef}.
 
 stop_gun(#state{gun_pid = Pid, mref = MonitorRef} =State) ->
-    true = demonitor(MonitorRef),
-    ok = gun:shutdown(Pid),
+    ok = oidcc_http_util:async_close(Pid, MonitorRef),
     State#state{gun_pid=undefined, retrieving=undefined, http=#{}}.
 
-scheme_to_map(<<"http">>) ->
-    #{};
-scheme_to_map(<<"https">>) ->
-    #{transport => ssl};
-scheme_to_map(_) ->
-    #{transport => ssl}.
-
-
-ensure_port(undefined, <<"http">>) ->
-    80;
-ensure_port(undefined, <<"https">>) ->
-    443;
-ensure_port(Port, _) when is_number(Port) ->
-    Port;
-ensure_port(_Port, _)  ->
-    443.
-
-
-uncompress_body_if_needed(Body, Header) when is_list(Header) ->
-    Encoding = lists:keyfind(<<"content-encoding">>, 1, Header),
-    uncompress_body_if_needed(Body, Encoding);
-uncompress_body_if_needed(Body, false)  ->
-    {ok, Body};
-uncompress_body_if_needed(Body, {_, <<"gzip">>})  ->
-    {ok, zlib:gunzip(Body)};
-uncompress_body_if_needed(Body, {_, <<"deflate">>})  ->
-    Z  = zlib:open(),
-    ok = zlib:inflateInit(Z),
-    {ok, zlib:inflate(Z, Body)};
-uncompress_body_if_needed(_Body, {_, Compression})  ->
-    erlang:error({unsupported_encoding, Compression}).
 

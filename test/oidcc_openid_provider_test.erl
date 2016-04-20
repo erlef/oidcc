@@ -39,37 +39,34 @@ fetch_config_test() ->
     Id = <<"some id">>,
 
     ConfigEndpoint = <<"https://my.provider/info">>,
-    ConfigBody1 = <<"{\"issuer\":\"https://my.provider\"">>,
-    ConfigBody2 = <<", \"jwks_uri\": \"https://my.provider/keys\" }">>,
+    KeyEndpoint = <<"https://my.provider/keys">>,
+    ConfigBody1 = <<"{\"issuer\":\"https://my.provider\",">>,
+    ConfigBody2 = <<" \"jwks_uri\": \"https://my.provider/keys\" }">>,
     KeyBody = <<"{ \"keys\": [ { \"kty\": \"RSA\", \"alg\": \"RS256\", \"use\":
     \"sig\", \"kid\": \"6b8297523597b08d37e9c66e6dbbb32ea70e2770\", \"n\":
     \"ufxh3jipQ6N9GvVfaHIdFkCBQ7MA8XBkXswHQdwKEyXhYBPp11KKumenQ9hVodEkFEpVnblPxI-Tnmj_0lLX-d4CSEBzZO5hQGTSCKiCUESVOYrirLiN3Mxjt5qi4-7JESeATcptGbEk69T2NLlWYki_LcXTmt_-n4XV_HfgCg9DdrlTjq7xtDlc3KYUf6iizWEBKixd47Y91vzdegl-O5iu1WCHrF6owAu1Ok5q4pVoACPzXONLXnxjUNRpuYksmFZDJOeJEy4Ig59H0S-uy20StRSGCySSEjeACP_Kib7weqyRD-7zHzJpW6jR25XHvoIIbCvnnWkkCKj_noyimw\",
     \"e\": \"AQAB\" } ] }">>,
 
-    OpenFun = fun(Host, Port, _Config)  ->
-                      Host = "my.provider",
-                      Port = 443,
-                      {ok, gun}
-              end,
-
-    GetFun = fun(ConPid, Path, _Header)  ->
-                      ConPid = gun,
-                      case Path of
-                          "/info" -> config_stream;
-                          "/keys" -> key_stream
+    HttpFun = fun(Method, Url, _Header, _Body)  ->
+                      Method = get,
+                      case Url of
+                          ConfigEndpoint -> {ok, gun, mref, config_stream};
+                          KeyEndpoint -> {ok, gun, mref, key_stream}
                       end
               end,
 
-    AwaitFun = fun(ConPid, _Stream)  ->
-                      ConPid = gun,
-                      {response, nofin, 200, []}
+    CloseFun = fun(Pid, Mref)  ->
+                      Pid = gun,
+                      Mref = mref,
+                      ok
               end,
-    ok = meck:new(gun),
-    ok = meck:expect(gun, open, OpenFun),
-    ok = meck:expect(gun, await_up, fun(_) -> {ok, tcp} end),
-    ok = meck:expect(gun, get, GetFun),
-    ok = meck:expect(gun, shutdown, fun(_) -> ok end),
-    ok = meck:expect(gun, await, AwaitFun),
+
+    ok = meck:new(oidcc_http_util),
+    ok = meck:expect(oidcc_http_util, async_http, HttpFun),
+    ok = meck:expect(oidcc_http_util, async_close, CloseFun),
+    ok = meck:expect(oidcc_http_util, uncompress_body_if_needed, fun(B,_) ->
+                                                                         {ok,B}
+                                                                 end),
 
     {ok, Pid} = oidcc_openid_provider:start_link(Id),
     ok = oidcc_openid_provider:set_config_endpoint(ConfigEndpoint,Pid),
@@ -99,8 +96,8 @@ fetch_config_test() ->
     ok = oidcc_openid_provider:stop(Pid),
     ok = test_util:wait_for_process_to_die(Pid, 100),
 
-    true = meck:validate(gun),
-    meck:unload(gun),
+    true = meck:validate(oidcc_http_util),
+    meck:unload(oidcc_http_util),
     ok.
 
 

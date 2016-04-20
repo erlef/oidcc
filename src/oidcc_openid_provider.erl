@@ -37,6 +37,7 @@
           local_endpoint = undefined,
 
           gun_pid = undefined,
+          config_tries = 0,
           mref = undefined,
           sref = undefined,
           http = #{},
@@ -86,6 +87,7 @@ set_local_endpoint(Url, Pid) ->
 get_config( Pid) ->
     gen_server:call(Pid, get_config).
 %% gen_server.
+-define(MAX_TRIES, 5).
 
 init(Id) ->
     {ok, #state{id = Id}}.
@@ -107,7 +109,7 @@ handle_call({set_config_endpoint, ConfigEndpoint}, _From, State) ->
     {reply, ok, State#state{config_ep=ConfigEndpoint}};
 handle_call(update_config, _From, State) ->
     ok = trigger_config_retrieval(),
-    {reply, ok, State};
+    {reply, ok, State#state{config_tries=0}};
 handle_call(_Request, _From, State) ->
     {reply, ignored, State}.
 
@@ -157,8 +159,7 @@ handle_info({gun_data, ConPid, StreamRef, fin, Data},
     {noreply, NewState};
 handle_info({'DOWN', MRef, process, ConPid, Reason},
             #state{gun_pid=ConPid, mref = MRef} = State) ->
-    State2 = handle_http_client_crash(Reason, State),
-    {stop, normal, State2};
+    handle_http_client_crash(Reason, State);
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -188,9 +189,9 @@ handle_http_result(_Status, _Header, _Body, _Retrieve, State) ->
 
 handle_http_result(#state{ retrieving = Retrieve, http =Http} = State) ->
     #{header := Header, status := Status, body := InBody} = Http,
-    State2 = State#state{gun_pid=undefined, retrieving=undefined, http=#{}},
+    NewState = stop_gun(State),
     {ok, Body} = uncompress_body_if_needed(InBody, Header),
-    handle_http_result(Status, Header, Body, Retrieve, State2).
+    handle_http_result(Status, Header, Body, Retrieve, NewState).
 
 
 create_config(#state{id = Id, desc = Desc, client_id = ClientId,
@@ -240,9 +241,14 @@ extract_supported_keys([_H|T], List) ->
 
 
 
-handle_http_client_crash(_Reason, State) ->
-    trigger_config_retrieval(10000),
-    State#state{gun_pid=undefined, retrieving=undefined, http=#{}}.
+handle_http_client_crash(_Reason, #state{config_tries=?MAX_TRIES} = State) ->
+    {noreply, State};
+handle_http_client_crash(_Reason, #state{config_tries=Tries} = State) ->
+    trigger_config_retrieval(30000),
+    NewState = State#state{gun_pid=undefined, retrieving=undefined, http=#{},
+               config_tries=Tries+1},
+    {noreply, NewState}.
+
 
 trigger_config_retrieval() ->
     gen_server:cast(self(), retrieve_config).
@@ -271,8 +277,12 @@ gun_get(Url, Header) ->
     MRef = monitor(process, ConPid),
     {ok, _Protocol} = gun:await_up(ConPid),
     StreamRef = gun:get(ConPid, Path, Header),
-    ok = gun:shutdown(ConPid),
     {ok, ConPid, MRef, StreamRef}.
+
+stop_gun(#state{gun_pid = Pid, mref = MonitorRef} =State) ->
+    true = demonitor(MonitorRef),
+    ok = gun:shutdown(Pid),
+    State#state{gun_pid=undefined, retrieving=undefined, http=#{}}.
 
 scheme_to_map(<<"http">>) ->
     #{};

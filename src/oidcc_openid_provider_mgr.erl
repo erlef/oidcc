@@ -73,6 +73,11 @@ handle_cast(stop, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
+
+handle_info({'DOWN', MRef, process, _Object, _Info},
+            #state{provider=Provider} = State) ->
+    NewProvider = lists:keydelete(MRef, 3, Provider),
+    {noreply, State#state{provider = NewProvider}};
 handle_info(_Info, State) ->
     {noreply, State}.
 

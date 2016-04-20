@@ -7,12 +7,8 @@
 
 
 sync_http(Method, Url, Header, InBody) ->
-    {ok, ConPid, Path} = start_connection(Url),
-    {ok, _Protocol} = gun:await_up(ConPid),
-    StreamRef = case Method of
-                    get -> gun:get(ConPid, Path, Header);
-                    post -> gun:post(ConPid, Path, Header, InBody)
-                end,
+    {ok, ConPid, undefined, StreamRef} = async_http(Method, Url, Header, InBody,
+                                               false),
     {Status, Headers, Body} =
     case gun:await(ConPid, StreamRef) of
         {response, fin, S, H} ->
@@ -26,21 +22,9 @@ sync_http(Method, Url, Header, InBody) ->
     {ok, #{status => Status, header => Headers, body => Body }}.
 
 async_http(Method, Url, Header, Body) ->
-    {ok, ConPid, Path} = start_connection(Url),
-    MRef = monitor(process, ConPid),
-    {ok, _Protocol} = gun:await_up(ConPid),
-    StreamRef = case Method of
-                    get -> gun:get(ConPid, Path, Header);
-                    post -> gun:post(ConPid, Path, Header, Body)
-                end,
-    {ok, ConPid, MRef, StreamRef}.
+    async_http(Method, Url, Header, Body, true).
 
-async_close(Pid,MRef) ->
-    true = demonitor(MRef),
-    ok = gun:shutdown(Pid),
-    ok.
-
-start_connection(Url) ->
+async_http(Method, Url, Header, Body, Monitor) ->
     Uri = uri:from_string(Url),
     Host= binary:bin_to_list(uri:host(Uri)),
     Port0 = uri:port(Uri),
@@ -49,9 +33,21 @@ start_connection(Url) ->
     Path = binary:bin_to_list(uri:path(Uri)),
     Port = ensure_port(Port0, Scheme),
     {ok, ConPid} = gun:open(Host, Port, Config),
-    {ok, ConPid, Path}.
+    MRef =  case Monitor of
+                true -> monitor(process, ConPid);
+                _ -> undefined
+            end,
+    {ok, _Protocol} = gun:await_up(ConPid),
+    StreamRef = case Method of
+                    get -> gun:get(ConPid, Path, Header);
+                    post -> gun:post(ConPid, Path, Header, Body)
+                end,
+    {ok, ConPid, MRef, StreamRef}.
 
-
+async_close(Pid, MRef) ->
+    true = demonitor(MRef),
+    ok = gun:shutdown(Pid),
+    ok.
 
 uncompress_body_if_needed(Body, Header) when is_list(Header) ->
     Encoding = lists:keyfind(<<"content-encoding">>, 1, Header),

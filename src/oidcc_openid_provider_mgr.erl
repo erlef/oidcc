@@ -7,6 +7,7 @@
 -export([add_openid_provider/1]).
 -export([add_openid_provider/0]).
 -export([get_openid_provider/1]).
+-export([find_openid_provider/1]).
 -export([get_openid_provider_list/0]).
 
 
@@ -52,6 +53,11 @@ get_openid_provider(Id) ->
 get_openid_provider_list() ->
     gen_server:call(?MODULE, get_provider_list).
 
+-spec find_openid_provider(Issuer::binary()) -> {ok, pid()}
+                                                | {error, not_found}.
+find_openid_provider(Issuer) ->
+    gen_server:call(?MODULE, {find_provider, Issuer}).
+
 %% gen_server.
 
 init([]) ->
@@ -65,6 +71,8 @@ handle_call({get_provider, Id}, _From, State) ->
     get_provider(Id, State);
 handle_call(get_provider_list, _From, State) ->
     get_provider_list(State);
+handle_call({find_provider, Issuer}, _From, State) ->
+    find_provider(Issuer, State);
 handle_call(_Request, _From, State) ->
     {reply, ignored, State}.
 
@@ -115,7 +123,14 @@ get_provider(Id, #state{provider=Provider}=State) ->
         {Id, Pid, _MRef} -> {reply, {ok, Pid}, State}
     end.
 
-
+find_provider(Issuer, #state{provider=Provider}=State) ->
+    Filter = fun({_Id, Pid, _Mref}) ->
+                     oidcc_openid_provider:is_issuer(Issuer, Pid)
+             end,
+    case lists:filter(Filter, Provider) of
+        [Pid | _ ] -> {reply, {ok, Pid}, State};
+        [] -> {reply, {error, not_found}, State}
+    end.
 
 start_provider(Id) ->
     oidcc_openid_provider_sup:add_openid_provider(Id).

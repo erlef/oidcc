@@ -93,6 +93,8 @@ fetch_config_test() ->
        jwks_uri := <<"https://my.provider/keys">>
      } = Config2,
 
+    true = oidcc_openid_provider:is_issuer(<<"https://my.provider">>, Pid),
+    false = oidcc_openid_provider:is_issuer(<<"https://other.provider">>, Pid),
     ok = oidcc_openid_provider:stop(Pid),
     ok = test_util:wait_for_process_to_die(Pid, 100),
 

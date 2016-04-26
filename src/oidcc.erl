@@ -2,6 +2,7 @@
 
 -export([add_openid_provider/6]).
 -export([add_openid_provider/7]).
+-export([find_openid_provider/1]).
 -export([get_openid_provider_info/1]).
 -export([get_openid_provider_list/0]).
 -export([create_redirect_url/1]).
@@ -43,6 +44,11 @@ add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
     update_provider_or_error(OidcProvider, Name, Description, ClientId,
                              ClientSecret, ConfigEndpoint, LocalEndpoint).
 
+
+-spec find_openid_provider(Issuer::binary()) -> {ok, pid()}
+                                                | {error, not_found}.
+find_openid_provider(Issuer) ->
+    oidcc_openid_provider_mgr:find_openid_provider(Issuer).
 
 %% @doc
 %% get information from a given OpenId Connect Provider
@@ -173,7 +179,7 @@ retrieve_user_info(#{token := Token}, OpenIdProvider) ->
     retrieve_user_info(Token, OpenIdProvider);
 retrieve_user_info(Token, #{userinfo_endpoint := Endpoint})
   when is_binary(Token) ->
-    Header = [{<<"authorization">>, << <<"Bearer ">>/binary, Token/binary >>}],
+    Header = [{<<"Authorization">>, << <<"Bearer ">>/binary, Token/binary >>}],
     HttpResult = oidcc_http_util:sync_http(get, Endpoint, Header, undefined),
     return_user_info(HttpResult);
 retrieve_user_info(Token, OpenIdProvider) ->
@@ -245,7 +251,7 @@ add_authentication(Body, Header, [<<"client_secret_basic">>|_], ClientId,
     RawData = <<ClientId/binary, <<":">>/binary, ClientSecret/binary>>,
     AuthData = base64:encode(RawData),
     BasicAuth = << <<"Basic ">>/binary, AuthData/binary >>,
-    NewHeader = [{<<"authorization">>, BasicAuth} | Header ],
+    NewHeader = [{<<"Authorization">>, BasicAuth} | Header ],
     {Body, NewHeader};
 add_authentication(B, H, [], CI, CS) ->
     add_authentication(B, H, [<<"client_secret_basic">>], CI, CS);

@@ -10,6 +10,7 @@
 -export([set_client_secret/2]).
 -export([set_config_endpoint/2]).
 -export([update_config/1]).
+-export([is_issuer/2]).
 %% -export([force_update_config/1]).
 -export([set_local_endpoint/2]).
 -export([get_config/1]).
@@ -79,6 +80,10 @@ set_config_endpoint(ConfigEndpoint, Pid) ->
 update_config(Pid) ->
     gen_server:call(Pid, update_config).
 
+-spec is_issuer(Issuer :: binary(), Pid :: pid() ) -> true | false.
+is_issuer(Issuer, Pid) ->
+    gen_server:call(Pid, {is_issuer, Issuer}).
+
 -spec set_local_endpoint(Url :: binary(), Pid :: pid() ) -> ok.
 set_local_endpoint(Url, Pid) ->
     gen_server:call(Pid, {set_local_endpoint, Url}).
@@ -110,6 +115,9 @@ handle_call({set_config_endpoint, ConfigEndpoint}, _From, State) ->
 handle_call(update_config, _From, State) ->
     ok = trigger_config_retrieval(),
     {reply, ok, State#state{config_tries=0}};
+handle_call({is_issuer, Issuer}, _From, #state{config=Config}=State) ->
+    Result = (Issuer == maps:get(issuer, Config, undefined)),
+    {reply, Result , State};
 handle_call(_Request, _From, State) ->
     {reply, ignored, State}.
 

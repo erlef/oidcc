@@ -242,6 +242,15 @@ extract_supported_keys([#{ kty := <<"RSA">>,
     E = binary:decode_unsigned(base64url:decode(E0)),
     Key = #{kty => rsa, alg => rs256, use => sign, key => [E, N], kid => Kid },
     extract_supported_keys(T, [Key | List]);
+extract_supported_keys([#{ kty := <<"RSA">>,
+                           n := N0,
+                           e := E0
+                         } = Map|T], List) ->
+    Kid = maps:get(kid, Map, undefined),
+    N = binary:decode_unsigned(base64url:decode(N0)),
+    E = binary:decode_unsigned(base64url:decode(E0)),
+    Key = #{kty => rsa, key => [E, N], kid => Kid },
+    extract_supported_keys(T, [Key | List]);
 extract_supported_keys([_H|T], List) ->
     extract_supported_keys(T, List).
 

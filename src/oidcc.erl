@@ -137,8 +137,14 @@ retrieve_token(AuthCode, OpenIdProviderId) ->
               <<"&redirect_uri=">>/binary, LeEncoded/binary >>,
     Header0 = [ {<<"content-type">>, <<"application/x-www-form-urlencoded">>}],
 
-    {Body, Header} = add_authentication(Body0, Header0, AuthMethods, ClientId,
-                                        Secret),
+    NewAuthMethods=case lists:member(<<"client_secret_basic">>, AuthMethods) of
+                       true ->
+                           [<<"client_secret_basic">>];
+                       false ->
+                           AuthMethods
+                   end,
+    {Body, Header} = add_authentication(Body0, Header0, NewAuthMethods,
+                                        ClientId, Secret),
     return_token(oidcc_http_util:sync_http(post, Endpoint, Header, Body)).
 
 %% @doc

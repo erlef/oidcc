@@ -189,15 +189,17 @@ create_redirect_url_if_ready(Info, OidcState, OidcNonce) ->
        client_id := ClientId,
        authorization_endpoint := AuthEndpoint
      } = Info,
-    CiEncoded = cow_qs:urlencode(ClientId),
-    LeEncoded = cow_qs:urlencode(LocalEndpoint),
-    Static1 = <<"?response_type=code&scope=openid&client_id=">>,
-    Static2 = <<"&redirect_uri=">>,
-    Url = << AuthEndpoint/binary, Static1/binary, CiEncoded/binary,
-             Static2/binary, LeEncoded/binary >>,
-    Url1 = append_state(OidcState, Url),
-    Url2 = append_nonce(OidcNonce, Url1),
-    {ok, Url2}.
+    UrlList = [
+               {<<"response_type">>, <<"code">>},
+               {<<"scope">>, <<"openid profile email">>},
+               {<<"client_id">>, ClientId},
+               {<<"redirect_uri">>, LocalEndpoint}
+              ],
+    UrlList1 = append_state(OidcState, UrlList),
+    UrlList2 = append_nonce(OidcNonce, UrlList1),
+    Qs = cow_qs:qs(UrlList2),
+    Url = << AuthEndpoint/binary, <<"?">>/binary, Qs/binary>>,
+    {ok, Url}.
 
 update_provider_or_error({error, Reason}, _Name, _Description, _ClientId,
                          _ClientSecret, _ConfigEndpoint, _LocalEndpoint) ->
@@ -220,20 +222,16 @@ update_openid_provider(Name, Description, ClientId, ClientSecret,
     ok.
 
 
-append_state(State, Url) when is_binary(State) ->
-    Encoded = cow_qs:urlencode(State),
-    Static = <<"&state=">>,
-    << Url/binary, Static/binary, Encoded/binary >>;
-append_state(_, Url)  ->
-    Url.
+append_state(State, UrlList) when is_binary(State) ->
+    [{<<"state">>, State} | UrlList];
+append_state(_, UrlList)  ->
+    UrlList.
 
 
-append_nonce(Nonce, Url) when is_binary(Nonce) ->
-    Encoded = cow_qs:urlencode(Nonce),
-    Static = <<"&nonce=">>,
-    << Url/binary, Static/binary, Encoded/binary >>;
-append_nonce(_, Url) ->
-    Url.
+append_nonce(Nonce, UrlList) when is_binary(Nonce) ->
+    [{<<"nonce">>, Nonce} | UrlList];
+append_nonce(_, UrlList) ->
+    UrlList.
 
 
 select_preferred_auth(AuthMethodsSupported) ->

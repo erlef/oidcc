@@ -125,26 +125,15 @@ retrieve_token(AuthCode, OpenIdProviderId) ->
        token_endpoint_auth_methods_supported := AuthMethods,
        local_endpoint := LocalEndpoint
      } = Info,
-
-    CiEncoded = cow_qs:urlencode(ClientId),
-    AcEncoded = cow_qs:urlencode(AuthCode),
-    LeEncoded = cow_qs:urlencode(LocalEndpoint),
-
-
-    Body0 = << <<"grant_type=authorization_code">>/binary,
-              <<"&client_id=">>/binary, CiEncoded/binary,
-              <<"&code=">>/binary, AcEncoded/binary,
-              <<"&redirect_uri=">>/binary, LeEncoded/binary >>,
+    AuthMethod = select_preferred_auth(AuthMethods),
+    QsBody0 = [ {<<"grant_type">>, <<"authorization_code">>},
+                   {<<"code">>, AuthCode},
+                   {<<"redirect_uri">>, LocalEndpoint}
+                 ],
     Header0 = [ {<<"content-type">>, <<"application/x-www-form-urlencoded">>}],
-
-    NewAuthMethods=case lists:member(<<"client_secret_basic">>, AuthMethods) of
-                       true ->
-                           [<<"client_secret_basic">>];
-                       false ->
-                           AuthMethods
-                   end,
-    {Body, Header} = add_authentication(Body0, Header0, NewAuthMethods,
-                                        ClientId, Secret),
+    {QsBody, Header} = add_authentication(QsBody0, Header0, AuthMethod,
+                                          ClientId, Secret),
+    Body = cow_qs:qs(QsBody),
     return_token(oidcc_http_util:sync_http(post, Endpoint, Header, Body)).
 
 %% @doc
@@ -246,23 +235,35 @@ append_nonce(Nonce, Url) when is_binary(Nonce) ->
 append_nonce(_, Url) ->
     Url.
 
-add_authentication(Body, Header, [<<"client_secret_post">>|_], _ClientId,
-                   ClientSecret) ->
-    CsEncoded = cow_qs:urlencode(ClientSecret),
-    Secret = << <<"&client_secret=">>/binary, CsEncoded/binary >>,
-    NewBody = << Body/binary, Secret/binary >>,
-    {NewBody, Header};
-add_authentication(Body, Header, [<<"client_secret_basic">>|_], ClientId,
-                   ClientSecret) ->
-    RawData = <<ClientId/binary, <<":">>/binary, ClientSecret/binary>>,
-    AuthData = base64:encode(RawData),
+
+select_preferred_auth(AuthMethodsSupported) ->
+    Selector = fun(Method, Current) ->
+                       case {Method, Current} of
+                           {_, basic} -> basic;
+                           {<<"client_secret_basic">>, _} -> basic;
+                           {<<"client_secret_post">>, _} -> post;
+                           {_, Current} -> Current
+                       end
+               end,
+    lists:foldl(Selector, undefined, AuthMethodsSupported).
+
+
+add_authentication(QsBodyList, Header, basic, ClientId, Secret) ->
+    ClientIdEnc = cow_qs:urlencode(ClientId),
+    SecretEnc = cow_qs:urlencode(Secret),
+    RawAuth = <<ClientIdEnc/binary, <<":">>/binary, SecretEnc/binary>>,
+    AuthData = base64:encode(RawAuth),
     BasicAuth = << <<"Basic ">>/binary, AuthData/binary >>,
-    NewHeader = [{<<"Authorization">>, BasicAuth} | Header ],
-    {Body, NewHeader};
-add_authentication(B, H, [], CI, CS) ->
-    add_authentication(B, H, [<<"client_secret_basic">>], CI, CS);
-add_authentication(B, H, [_|T], CI, CS) ->
-    add_authentication(B, H, T, CI, CS).
+    NewHeader = [{<<"authorization">>, BasicAuth} | Header ],
+    {QsBodyList, NewHeader};
+add_authentication(QsBodyList, Header, post, ClientId, ClientSecret) ->
+    NewBodyList = [ {<<"client_id">>, ClientId},
+                    {<<"client_secret">>, ClientSecret} | QsBodyList ],
+    {NewBodyList, Header};
+add_authentication(B, H, undefined, CI, CS) ->
+    add_authentication(B, H, basic, CI, CS).
+
+
 
 return_token( {error, Reason} ) ->
     {error, Reason};

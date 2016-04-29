@@ -174,7 +174,7 @@ retrieve_user_info(#{token := Token}, OpenIdProvider) ->
     retrieve_user_info(Token, OpenIdProvider);
 retrieve_user_info(Token, #{userinfo_endpoint := Endpoint})
   when is_binary(Token) ->
-    Header = [{<<"Authorization">>, << <<"Bearer ">>/binary, Token/binary >>}],
+    Header = [{<<"authorization">>, << <<"Bearer ">>/binary, Token/binary >>}],
     HttpResult = oidcc_http_util:sync_http(get, Endpoint, Header, undefined),
     return_user_info(HttpResult);
 retrieve_user_info(Token, OpenIdProvider) ->

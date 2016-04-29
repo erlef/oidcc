@@ -130,16 +130,15 @@ create_redirect_url_test() ->
     {ok, Url2} = oidcc:create_redirect_url(ProviderId,State),
     {ok, Url3} = oidcc:create_redirect_url(ProviderId,State,Nonce),
 
-    ExpUrl1 =
-    <<"https://my.provider/auth?response_type=code&scope=openid&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
+    ExpUrl1 = <<"https://my.provider/auth?response_type=code&scope=openid+profile+email&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
     Url1 = ExpUrl1,
 
     ExpUrl2 =
-    <<"https://my.provider/auth?response_type=code&scope=openid&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&state=someimportantstate">>,
+    <<"https://my.provider/auth?state=someimportantstate&response_type=code&scope=openid+profile+email&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
     Url2 = ExpUrl2,
 
     ExpUrl3 =
-    <<"https://my.provider/auth?response_type=code&scope=openid&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&state=someimportantstate&nonce=noncenonce">>,
+    <<"https://my.provider/auth?nonce=noncenonce&state=someimportantstate&response_type=code&scope=openid+profile+email&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
     Url3 = ExpUrl3,
 
     true = meck:validate(oidcc_openid_provider),

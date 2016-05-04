@@ -82,20 +82,29 @@ get_openid_provider_list() ->
 
 
 %% @doc
-%% same as create_redirect_url/3 but with State and Nonce being undefined
+%% same as create_redirect_url/4 but with State and Nonce being undefined and
+%% scope being openid
 %% @end
 -spec create_redirect_url(binary()) ->
     {ok, binary()} | {error, provider_not_ready}.
 create_redirect_url(OpenIdProviderId) ->
-    create_redirect_url(OpenIdProviderId, undefined, undefined).
+    create_redirect_url(OpenIdProviderId, [<<"openid">>], undefined, undefined).
 
 %% @doc
-%% same as create_redirect_url/3 but with Nonce being undefined
+%% same as create_redirect_url/4 but with State and Nonce being undefined
 %% @end
--spec create_redirect_url(binary(), binary()) ->
+-spec create_redirect_url(binary(), list()) ->
     {ok, binary()} | {error, provider_not_ready}.
-create_redirect_url(OpenIdProviderId, OidcState) ->
-    create_redirect_url(OpenIdProviderId, OidcState, undefined).
+create_redirect_url(OpenIdProviderId, Scopes) ->
+    create_redirect_url(OpenIdProviderId, Scopes, undefined, undefined).
+
+%% @doc
+%% same as create_redirect_url/4 but with Nonce being undefined
+%% @end
+-spec create_redirect_url(binary(), list(), binary()) ->
+    {ok, binary()} | {error, provider_not_ready}.
+create_redirect_url(OpenIdProviderId, Scopes, OidcState) ->
+    create_redirect_url(OpenIdProviderId, Scopes, OidcState, undefined).
 
 %% @doc
 %% create a redirection for the given OpenId Connect provider
@@ -103,11 +112,11 @@ create_redirect_url(OpenIdProviderId, OidcState) ->
 %% this can be used to redirect the useragent of the ressource owner
 %% to the OpenId Connect Provider
 %% @end
--spec create_redirect_url(binary(), binary(), binary()) ->
+-spec create_redirect_url(binary(), list(), binary(), binary()) ->
     {ok, binary()} | {error, provider_not_ready}.
-create_redirect_url(OpenIdProviderId, OidcState, OidcNonce ) ->
+create_redirect_url(OpenIdProviderId, Scopes, OidcState, OidcNonce ) ->
     {ok, Info} = get_openid_provider_info(OpenIdProviderId),
-    create_redirect_url_if_ready(Info, OidcState, OidcNonce).
+    create_redirect_url_if_ready(Info, Scopes, OidcState, OidcNonce).
 
 %% @doc
 %% retrieve the token using the authcode received before
@@ -182,16 +191,17 @@ retrieve_user_info(Token, OpenIdProvider) ->
     retrieve_user_info(Token, Config).
 
 
-create_redirect_url_if_ready(#{ready := false}, _, _) ->
+create_redirect_url_if_ready(#{ready := false}, _, _, _) ->
     {error, provider_not_ready};
-create_redirect_url_if_ready(Info, OidcState, OidcNonce) ->
+create_redirect_url_if_ready(Info, Scopes, OidcState, OidcNonce) ->
     #{ local_endpoint := LocalEndpoint,
        client_id := ClientId,
        authorization_endpoint := AuthEndpoint
      } = Info,
+    Scope = scopes_to_bin(Scopes, <<>>),
     UrlList = [
                {<<"response_type">>, <<"code">>},
-               {<<"scope">>, <<"openid profile email">>},
+               {<<"scope">>, Scope},
                {<<"client_id">>, ClientId},
                {<<"redirect_uri">>, LocalEndpoint}
               ],
@@ -200,6 +210,23 @@ create_redirect_url_if_ready(Info, OidcState, OidcNonce) ->
     Qs = cow_qs:qs(UrlList2),
     Url = << AuthEndpoint/binary, <<"?">>/binary, Qs/binary>>,
     {ok, Url}.
+
+
+scopes_to_bin([], Bin) ->
+    Bin;
+scopes_to_bin([H | T], <<>>) when is_binary(H) ->
+    scopes_to_bin(T, H);
+scopes_to_bin([H | T], Bin) when is_binary(H) ->
+    NewBin = << H/binary, <<" ">>/binary, Bin/binary>>,
+    scopes_to_bin(T, NewBin);
+scopes_to_bin([H | T], Bin) when is_list(H) ->
+    List = [ list_to_binary(H) | T],
+    scopes_to_bin(List, Bin).
+
+
+
+
+
 
 update_provider_or_error({error, Reason}, _Name, _Description, _ClientId,
                          _ClientSecret, _ConfigEndpoint, _LocalEndpoint) ->

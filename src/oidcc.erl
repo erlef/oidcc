@@ -8,6 +8,7 @@
 -export([create_redirect_url/1]).
 -export([create_redirect_url/2]).
 -export([create_redirect_url/3]).
+-export([create_redirect_url/4]).
 -export([retrieve_token/2]).
 -export([parse_and_validate_token/2]).
 -export([parse_and_validate_token/3]).
@@ -219,6 +220,9 @@ scopes_to_bin([H | T], <<>>) when is_binary(H) ->
 scopes_to_bin([H | T], Bin) when is_binary(H) ->
     NewBin = << H/binary, <<" ">>/binary, Bin/binary>>,
     scopes_to_bin(T, NewBin);
+scopes_to_bin([H | T], Bin) when is_atom(H) ->
+    List = [ atom_to_binary(H, utf8) | T],
+    scopes_to_bin(List, Bin);
 scopes_to_bin([H | T], Bin) when is_list(H) ->
     List = [ list_to_binary(H) | T],
     scopes_to_bin(List, Bin).

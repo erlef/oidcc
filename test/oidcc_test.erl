@@ -243,7 +243,9 @@ retrieve_user_info_test() ->
     MyPid = self(),
     ProviderId = <<"6">>,
     UserInfoEndpoint = <<"http://my.provider/info">>,
-    HttpBody = <<"{\"name\":\"joe\"}">>,
+    HttpBody = <<"{\"name\":\"joe\", \"subject\":\"123456\"}">>,
+    GoodSub = <<"123456">>,
+    BadSub =  <<"123789">>,
 
     ConfigFun = fun(Pid)->
                         Pid = MyPid,
@@ -271,6 +273,9 @@ retrieve_user_info_test() ->
     Token = #{access => #{token => <<"opensesame">> }},
 
     {ok, #{name := <<"joe">>} } = oidcc:retrieve_user_info(Token,ProviderId),
+    {error, bad_subject } = oidcc:retrieve_user_info(Token,ProviderId,BadSub),
+    {ok, #{name := <<"joe">>} } =
+    oidcc:retrieve_user_info(Token,ProviderId,GoodSub),
 
     true = meck:validate(oidcc_openid_provider),
     true = meck:validate(oidcc_openid_provider_mgr),

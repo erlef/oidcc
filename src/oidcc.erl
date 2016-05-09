@@ -13,6 +13,7 @@
 -export([parse_and_validate_token/2]).
 -export([parse_and_validate_token/3]).
 -export([retrieve_user_info/2]).
+-export([retrieve_user_info/3]).
 
 %% @doc
 %% add an OpenID Connect Provider to the list of possible Providers
@@ -177,19 +178,26 @@ parse_and_validate_token(Token, OpenIdProvider, Nonce) ->
 %% @end
 -spec retrieve_user_info(map() | binary(), binary()) ->
     {ok, map()} | {error, any()}.
-retrieve_user_info(#{access := AccessToken}, OpenIdProvider) ->
+retrieve_user_info(Token, OpenIdProvider) ->
+    retrieve_user_info(Token, OpenIdProvider, undefined).
+
+
+
+-spec retrieve_user_info(map() | binary(), binary(), binary()|undefined) ->
+    {ok, map()} | {error, any()}.
+retrieve_user_info(#{access := AccessToken}, OpenIdProvider, Subject) ->
     #{token := Token} = AccessToken,
-    retrieve_user_info(Token, OpenIdProvider);
-retrieve_user_info(#{token := Token}, OpenIdProvider) ->
-    retrieve_user_info(Token, OpenIdProvider);
-retrieve_user_info(Token, #{userinfo_endpoint := Endpoint})
+    retrieve_user_info(Token, OpenIdProvider, Subject);
+retrieve_user_info(#{token := Token}, OpenIdProvider, Subject) ->
+    retrieve_user_info(Token, OpenIdProvider, Subject);
+retrieve_user_info(Token, #{userinfo_endpoint := Endpoint}, Subject)
   when is_binary(Token) ->
     Header = [{<<"authorization">>, << <<"Bearer ">>/binary, Token/binary >>}],
     HttpResult = oidcc_http_util:sync_http(get, Endpoint, Header, undefined),
-    return_user_info(HttpResult);
-retrieve_user_info(Token, OpenIdProvider) ->
+    return_validated_user_info(HttpResult, Subject);
+retrieve_user_info(Token, OpenIdProvider, Subject) ->
     {ok, Config} = get_openid_provider_info(OpenIdProvider),
-    retrieve_user_info(Token, Config).
+    retrieve_user_info(Token, Config, Subject).
 
 
 create_redirect_url_if_ready(#{ready := false}, _, _, _) ->
@@ -302,6 +310,15 @@ return_token( {ok, #{body := Body, status := Status}} ) ->
     {error, {http_error, Status, Body}}.
 
 
+
+return_validated_user_info(HttpData, undefined) ->
+    return_user_info(HttpData);
+return_validated_user_info(HttpData, Subject) ->
+    case return_user_info(HttpData) of
+        {ok, #{ subject := Subject } = Map} -> {ok, Map};
+        {ok, _} -> {error, bad_subject};
+        Other -> Other
+    end.
 
 return_user_info({ok, #{status := 200, body := Data}}) ->
     try jsx:decode(Data, [{labels, attempt_atom}, return_maps])

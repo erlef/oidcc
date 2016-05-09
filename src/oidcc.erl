@@ -315,7 +315,7 @@ return_validated_user_info(HttpData, undefined) ->
     return_user_info(HttpData);
 return_validated_user_info(HttpData, Subject) ->
     case return_user_info(HttpData) of
-        {ok, #{ subject := Subject } = Map} -> {ok, Map};
+        {ok, #{ sub := Subject } = Map} -> {ok, Map};
         {ok, _} -> {error, bad_subject};
         Other -> Other
     end.

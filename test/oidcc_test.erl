@@ -243,7 +243,7 @@ retrieve_user_info_test() ->
     MyPid = self(),
     ProviderId = <<"6">>,
     UserInfoEndpoint = <<"http://my.provider/info">>,
-    HttpBody = <<"{\"name\":\"joe\", \"subject\":\"123456\"}">>,
+    HttpBody = <<"{\"name\":\"joe\", \"sub\":\"123456\"}">>,
     GoodSub = <<"123456">>,
     BadSub =  <<"123789">>,
 

@@ -66,12 +66,15 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
 
     % 4. If the ID Token contains multiple audiences, the Client SHOULD verify
     % that an azp Claim is present.
-    % TODO: maybe later
-
-
     % 5.  If an azp (authorized party) Claim is present, the Client SHOULD
     % verify that its client_id is the Claim Value.
-    % TODO: maybe later
+    case {is_list(Audience), maps:get(azp, Claims, undefined)} of
+        {false, _} ->  ok;
+        {true, ClientId} -> ok;
+        {true, Azp} when is_binary(Azp) -> throw(azp_bad);
+        {true, undefined} -> throw(azp_missing)
+    end,
+
 
     % 7. The alg value SHOULD be the default of RS256 or the algorithm sent by
     % the Client in the id_token_signed_response_alg parameter during
@@ -155,6 +158,8 @@ is_part_of_audience(ClientId, Audience) when is_binary(Audience) ->
     Audience == ClientId;
 is_part_of_audience(ClientId, Audience) when is_list(Audience) ->
     lists:member(ClientId, Audience).
+
+
 
 get_needed_key([], _) ->
     throw(no_key);

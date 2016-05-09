@@ -153,6 +153,7 @@ generate_id_token(missing_field,ClientId,Nonce,Issuer) ->
 generate_id_token(valid_group,ClientId,Nonce,Issuer) ->
     ClaimSetMap = #{iss => Issuer,
                     aud => [ClientId, <<"someotherid">>],
+                    azp => ClientId,
                     nonce => Nonce,
                     sub => <<"joe">>,
                     iat => 123

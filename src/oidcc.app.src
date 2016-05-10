@@ -1,7 +1,7 @@
 {application, 
  oidcc, [
          {description, "an easy to use OpenID Connect client library"},
-         {vsn, "rolling"},
+         {vsn, "git"},
          {id, "git"},
          {modules, []},
          {registered, [oidcc_sup]},

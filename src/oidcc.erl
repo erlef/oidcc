@@ -42,9 +42,14 @@ add_openid_provider(Name, Description, ClientId, ClientSecret, ConfigEndpoint,
     {ok, Id::binary(), Pid::pid()} | {error, id_already_used}.
 add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
                     ConfigEndpoint, LocalEndpoint) ->
-    OidcProvider = oidcc_openid_provider_mgr:add_openid_provider(IdIn),
-    update_provider_or_error(OidcProvider, Name, Description, ClientId,
-                             ClientSecret, ConfigEndpoint, LocalEndpoint).
+    Config = #{name => Name,
+               description => Description,
+               client_id => ClientId,
+               client_secrect => ClientSecret,
+               config_endpoint => ConfigEndpoint,
+               local_endpoint => LocalEndpoint
+              },
+    oidcc_openid_provider_mgr:add_openid_provider(IdIn, Config).
 
 
 -spec find_openid_provider(Issuer::binary()) -> {ok, pid()}
@@ -236,29 +241,6 @@ scopes_to_bin([H | T], Bin) when is_list(H) ->
     scopes_to_bin(List, Bin).
 
 
-
-
-
-
-update_provider_or_error({error, Reason}, _Name, _Description, _ClientId,
-                         _ClientSecret, _ConfigEndpoint, _LocalEndpoint) ->
-    {error, Reason};
-update_provider_or_error({ok, Id, Pid}, Name, Description, ClientId,
-                         ClientSecret, ConfigEndpoint, LocalEndpoint) ->
-    ok = update_openid_provider(Name, Description, ClientId, ClientSecret,
-                           ConfigEndpoint, LocalEndpoint, Pid),
-    {ok, Id, Pid}.
-
-update_openid_provider(Name, Description, ClientId, ClientSecret,
-                       ConfigEndpoint, LocalEndpoint, Pid) ->
-    ok = oidcc_openid_provider:set_name(Name, Pid),
-    ok = oidcc_openid_provider:set_description(Description, Pid),
-    ok = oidcc_openid_provider:set_client_id(ClientId, Pid),
-    ok = oidcc_openid_provider:set_client_secret(ClientSecret, Pid),
-    ok = oidcc_openid_provider:set_config_endpoint(ConfigEndpoint, Pid),
-    ok = oidcc_openid_provider:set_local_endpoint(LocalEndpoint, Pid),
-    ok = oidcc_openid_provider:update_config(Pid),
-    ok.
 
 
 append_state(State, UrlList) when is_binary(State) ->

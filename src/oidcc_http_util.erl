@@ -1,14 +1,16 @@
 -module(oidcc_http_util).
 
--export([async_http/4]).
+-export([start_http/1]).
+-export([async_http/5]).
 -export([async_close/2]).
 -export([sync_http/4]).
 -export([uncompress_body_if_needed/2]).
 
 
 sync_http(Method, Url, Header, InBody) ->
-    {ok, ConPid, undefined, StreamRef} = async_http(Method, Url, Header, InBody,
-                                               false),
+    {ok, ConPid, undefined, Path} = start_http(Url, false),
+    {ok, _Protocol} = gun:await_up(ConPid),
+    {ok, StreamRef} = async_http(Method, Path, Header, InBody, ConPid),
     {Status, Headers, Body} =
     case gun:await(ConPid, StreamRef) of
         {response, fin, S, H} ->
@@ -21,10 +23,17 @@ sync_http(Method, Url, Header, InBody) ->
     ok = gun:shutdown(ConPid),
     {ok, #{status => Status, header => Headers, body => Body }}.
 
-async_http(Method, Url, Header, Body) ->
-    async_http(Method, Url, Header, Body, true).
+start_http(Url) ->
+    start_http(Url,  true).
 
-async_http(Method, Url, Header, Body, Monitor) ->
+async_http(Method, Path, Header, Body, ConPid) ->
+    StreamRef = case Method of
+                    get -> gun:get(ConPid, Path, Header);
+                    post -> gun:post(ConPid, Path, Header, Body)
+                end,
+    {ok, StreamRef}.
+
+start_http(Url, Monitor) ->
     Uri = uri:from_string(Url),
     Host= binary:bin_to_list(uri:host(Uri)),
     Port0 = uri:port(Uri),
@@ -37,12 +46,7 @@ async_http(Method, Url, Header, Body, Monitor) ->
                 true -> monitor(process, ConPid);
                 _ -> undefined
             end,
-    {ok, _Protocol} = gun:await_up(ConPid),
-    StreamRef = case Method of
-                    get -> gun:get(ConPid, Path, Header);
-                    post -> gun:post(ConPid, Path, Header, Body)
-                end,
-    {ok, ConPid, MRef, StreamRef}.
+    {ok, ConPid, MRef, Path}.
 
 async_close(Pid, MRef) ->
     true = demonitor(MRef),

@@ -4,8 +4,8 @@
 %% API.
 -export([start_link/0]).
 -export([stop/0]).
+-export([add_openid_provider/2]).
 -export([add_openid_provider/1]).
--export([add_openid_provider/0]).
 -export([get_openid_provider/1]).
 -export([find_openid_provider/1]).
 -export([get_openid_provider_list/0]).
@@ -35,16 +35,14 @@ start_link() ->
 stop() ->
     gen_server:cast(?MODULE, stop).
 
--spec add_openid_provider() -> {ok, Id::binary(), pid()}.
-add_openid_provider() ->
-    gen_server:call(?MODULE, add_provider).
+-spec add_openid_provider(Config::map()) -> {ok, Id::binary(), pid()}.
+add_openid_provider(Config) ->
+    add_openid_provider(undefined, Config).
 
--spec add_openid_provider(Id::binary() | undefined) ->
+-spec add_openid_provider(Id::binary() | undefined, Config::map()) ->
     {ok, Id::binary(), pid()} | {error, Reason::atom()}.
-add_openid_provider(undefined) ->
-    gen_server:call(?MODULE, add_provider);
-add_openid_provider(Id) ->
-    gen_server:call(?MODULE, {add_provider, Id}).
+add_openid_provider(Id, Config) ->
+    gen_server:call(?MODULE, {add_provider, Id, Config}).
 
 
 get_openid_provider(Id) ->
@@ -63,10 +61,10 @@ find_openid_provider(Issuer) ->
 init([]) ->
     {ok, #state{}}.
 
-handle_call(add_provider, _From, State) ->
-    add_provider(State);
-handle_call({add_provider, Id}, _From, State) ->
-    try_adding_provider(Id, State);
+handle_call({add_provider, undefined, Config}, _From, State) ->
+    add_provider(Config, State);
+handle_call({add_provider, Id, Config}, _From, State) ->
+    try_adding_provider(Id, Config, State);
 handle_call({get_provider, Id}, _From, State) ->
     get_provider(Id, State);
 handle_call(get_provider_list, _From, State) ->
@@ -95,18 +93,18 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-try_adding_provider(Id, State) ->
+try_adding_provider(Id, Config, State) ->
     case is_unique_id(Id, State) of
-        true -> add_provider(Id, State);
+        true -> add_provider(Id, Config, State);
         false -> {reply, {error, id_already_used}, State}
     end.
 
-add_provider(State) ->
+add_provider(Config, State) ->
     Id = get_unique_id(State),
-    add_provider(Id, State).
+    add_provider(Id, Config, State).
 
-add_provider(Id, State) ->
-    {ok, Pid} = start_provider(Id),
+add_provider(Id, Config, State) ->
+    {ok, Pid} = start_provider(Id, Config),
     NewState = insert_provider(Id, Pid, State),
     {reply, {ok, Id, Pid}, NewState}.
 
@@ -132,8 +130,8 @@ find_provider(Issuer, #state{provider=Provider}=State) ->
         [] -> {reply, {error, not_found}, State}
     end.
 
-start_provider(Id) ->
-    oidcc_openid_provider_sup:add_openid_provider(Id).
+start_provider(Id, Config) ->
+    oidcc_openid_provider_sup:add_openid_provider(Id, Config).
 
 insert_provider(Id, Pid, #state{provider=Provider} = State) ->
     MRef = monitor(process, Pid),

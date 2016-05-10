@@ -115,12 +115,15 @@ async_test() ->
     ok = meck:expect(gun, post, PostFun),
     ok = meck:expect(gun, shutdown, fun(_) -> ok end),
 
-    {ok, GetPid, GetMRef, get_stream} =
-    oidcc_http_util:async_http(get,GetEndpoint,[],undefined),
+    {ok, GetPid, GetMRef, GetPath} =
+    oidcc_http_util:start_http(GetEndpoint),
     GetPid = Pid,
-    {ok, PostPid, PostMRef, post_stream} =
-    oidcc_http_util:async_http(post,PostEndpoint,[],<<"somedata">>),
+    {ok, get_stream} = oidcc_http_util:async_http(get,GetPath,[],<<>>,GetPid),
+
+    {ok, PostPid, PostMRef, PostPath} =
+    oidcc_http_util:start_http(PostEndpoint),
     PostPid = Pid,
+    {ok, post_stream} = oidcc_http_util:async_http(post,PostPath,[],<<"some data">>,GetPid),
     ok = oidcc_http_util:async_close(GetPid,GetMRef),
     ok = oidcc_http_util:async_close(PostPid,PostMRef),
 

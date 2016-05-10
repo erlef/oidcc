@@ -4,6 +4,7 @@ log/
 relx
 deps/
 _rel/
+_build/
 doc/
 .erlang.mk/
 .tts.plt
@@ -13,3 +14,4 @@ cover/
 *.coverdata
 test/ct.cover.spec
 *.beam
+rebar.lock

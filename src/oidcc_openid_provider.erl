@@ -163,6 +163,7 @@ handle_cast(_Msg, State) ->
 
 handle_info({gun_up, ConPid, _Protocol},
             #state{path=Path, header=Header, gun_pid=ConPid} = State) ->
+    io:format("sending async get~n"),
     {ok, StreamRef} = oidcc_http_util:async_http(get, Path, Header,
                                                  <<>>, ConPid),
     {noreply, State#state{sref=StreamRef}};
@@ -215,8 +216,10 @@ retrieve_keys(#state{config = Config}) ->
     oidcc_http_util:start_http(KeyEndpoint).
 
 handle_http_result(200, Header, Body, config, State) ->
+    io:format("got config~n"),
     handle_config(Body, Header, State);
 handle_http_result(200, Header, Body, keys, State) ->
+    io:format("got keys~n"),
     handle_keys(Body, Header, State);
 handle_http_result(_Status, _Header, _Body, _Retrieve, State) ->
     State.
@@ -246,7 +249,7 @@ handle_config(Data, _Header, State) ->
     %TODO: implement update at expire data/time
     Config = jsx:decode(Data, [return_maps, {labels, attempt_atom}]),
     ok = trigger_key_retrieval(),
-    timer:apply_after(3600000, ?MODULE, update_config, [self()]),
+    trigger_config_retrieval(3600000),
     State#state{config = Config}.
 
 handle_keys(Data, _Header, State) ->

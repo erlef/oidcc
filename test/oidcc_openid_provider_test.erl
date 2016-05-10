@@ -161,4 +161,40 @@ fetch_config_test() ->
 
 
 
+real_config_fetch_test() ->
+    Id = <<"some id">>,
+
+    ConfigEndpoint = <<"https://accounts.google.com/.well-known/openid-configuration">>,
+
+    Config = #{name => <<"some name">>,
+               description => <<"some description">>,
+               client_id => <<"123">>,
+               client_secrect => <<"dont tell">>,
+               config_endpoint => ConfigEndpoint,
+               local_endpoint => <<"/here">>
+              },
+
+
+    {ok, Pid} = oidcc_openid_provider:start_link(Id, Config),
+    ok = wait_till_ready(Pid),
+
+    {ok, Config2} = oidcc_openid_provider:get_config(Pid),
+    #{ config_endpoint := ConfigEndpoint,
+       keys := Keys,
+       issuer := <<"https://accounts.google.com">>,
+       jwks_uri := <<"https://www.googleapis.com/oauth2/v3/certs">>
+     } = Config2,
+    2 = length(Keys),
+    ok = oidcc_openid_provider:stop(Pid),
+    ok = test_util:wait_for_process_to_die(Pid, 100).
+
+
+wait_till_ready(Pid) ->
+    case oidcc_openid_provider:get_config(Pid) of
+        #{ready := true} -> ok;
+        _ ->
+            timer:sleep(1000),
+            wait_till_ready(Pid)
+    end.
+
 

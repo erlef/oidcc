@@ -11,6 +11,7 @@
 -export([set_config_endpoint/2]).
 -export([update_config/1]).
 -export([is_issuer/2]).
+-export([is_ready/1]).
 %% -export([force_update_config/1]).
 -export([set_local_endpoint/2]).
 -export([get_config/1]).
@@ -87,6 +88,10 @@ update_config(Pid) ->
 is_issuer(Issuer, Pid) ->
     gen_server:call(Pid, {is_issuer, Issuer}).
 
+-spec is_ready(Pid :: pid() ) -> true | false.
+is_ready(Pid) ->
+    gen_server:call(Pid, is_ready).
+
 -spec set_local_endpoint(Url :: binary(), Pid :: pid() ) -> ok.
 set_local_endpoint(Url, Pid) ->
     gen_server:call(Pid, {set_local_endpoint, Url}).
@@ -132,6 +137,8 @@ handle_call(update_config, _From, State) ->
 handle_call({is_issuer, Issuer}, _From, #state{config=Config}=State) ->
     Result = (Issuer == maps:get(issuer, Config, undefined)),
     {reply, Result , State};
+handle_call(is_ready, _From, #state{ready=Ready}=State) ->
+    {reply, Ready, State};
 handle_call(_Request, _From, State) ->
     {reply, ignored, State}.
 
@@ -163,7 +170,6 @@ handle_cast(_Msg, State) ->
 
 handle_info({gun_up, ConPid, _Protocol},
             #state{path=Path, header=Header, gun_pid=ConPid} = State) ->
-    io:format("sending async get~n"),
     {ok, StreamRef} = oidcc_http_util:async_http(get, Path, Header,
                                                  <<>>, ConPid),
     {noreply, State#state{sref=StreamRef}};
@@ -216,10 +222,8 @@ retrieve_keys(#state{config = Config}) ->
     oidcc_http_util:start_http(KeyEndpoint).
 
 handle_http_result(200, Header, Body, config, State) ->
-    io:format("got config~n"),
     handle_config(Body, Header, State);
 handle_http_result(200, Header, Body, keys, State) ->
-    io:format("got keys~n"),
     handle_keys(Body, Header, State);
 handle_http_result(_Status, _Header, _Body, _Retrieve, State) ->
     State.

@@ -12,19 +12,8 @@ add_openid_provider_test() ->
                              {ok, Id, MyPid}
                      end
                 end,
-    UpdateFun = fun(_Value,Pid) ->
-                        Pid = MyPid,
-                        ok
-                end,
     ok = meck:new(oidcc_openid_provider),
     ok = meck:new(oidcc_openid_provider_mgr),
-
-    ok = meck:expect(oidcc_openid_provider, set_name, UpdateFun),
-    ok = meck:expect(oidcc_openid_provider, set_description, UpdateFun),
-    ok = meck:expect(oidcc_openid_provider, set_client_id, UpdateFun),
-    ok = meck:expect(oidcc_openid_provider, set_client_secret, UpdateFun),
-    ok = meck:expect(oidcc_openid_provider, set_config_endpoint, UpdateFun),
-    ok = meck:expect(oidcc_openid_provider, set_local_endpoint, UpdateFun),
     ok = meck:expect(oidcc_openid_provider, update_config, fun(_) -> ok end),
 
     ok = meck:expect(oidcc_openid_provider_mgr, add_openid_provider, AddFun),

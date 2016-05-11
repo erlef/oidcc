@@ -43,39 +43,6 @@ set_test() ->
     ok = oidcc_openid_provider:stop(Pid),
     ok = test_util:wait_for_process_to_die(Pid, 100).
 
-manual_set_test() ->
-    Id = <<"some id">>,
-    Name = <<"my Name">>,
-    Description = <<"some test oidc">>,
-    ClientId = <<"234">>,
-    ClientSecret = <<"secret">>,
-    ConfigEndpoint = <<"https://my.provider/config">>,
-    LocalEndpoint = <<"https://my.server/return">>,
-
-    ConfigOne = #{name => <<"some name">>,
-               description => <<"some description">>,
-               client_id => <<"123">>,
-               client_secrect => <<"dont tell">>,
-               config_endpoint => ConfigEndpoint,
-               local_endpoint => <<"/here">>
-              },
-    {ok, Pid} = oidcc_openid_provider:start_link(Id, ConfigOne),
-    ok = oidcc_openid_provider:set_name(Name,Pid),
-    ok = oidcc_openid_provider:set_description(Description,Pid),
-    ok = oidcc_openid_provider:set_client_id(ClientId,Pid),
-    ok = oidcc_openid_provider:set_client_secret(ClientSecret,Pid),
-    ok = oidcc_openid_provider:set_config_endpoint(ConfigEndpoint,Pid),
-    ok = oidcc_openid_provider:set_local_endpoint(LocalEndpoint,Pid),
-    {ok, Config} = oidcc_openid_provider:get_config(Pid),
-    #{id := Id,
-      name := Name,
-      description := Description,
-      client_id := ClientId,
-      client_secret := ClientSecret,
-      config_endpoint := ConfigEndpoint,
-      local_endpoint := LocalEndpoint } = Config,
-    ok = oidcc_openid_provider:stop(Pid),
-    ok = test_util:wait_for_process_to_die(Pid, 100).
 
 fetch_config_test() ->
     Id = <<"some id">>,

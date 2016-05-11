@@ -14,6 +14,7 @@
 -export([parse_and_validate_token/3]).
 -export([retrieve_user_info/2]).
 -export([retrieve_user_info/3]).
+-export([introspect_token/2]).
 
 %% @doc
 %% add an OpenID Connect Provider to the list of possible Providers
@@ -187,22 +188,51 @@ retrieve_user_info(Token, OpenIdProvider) ->
     retrieve_user_info(Token, OpenIdProvider, undefined).
 
 
-
 -spec retrieve_user_info(map() | binary(), binary(), binary()|undefined) ->
     {ok, map()} | {error, any()}.
-retrieve_user_info(#{access := AccessToken}, OpenIdProvider, Subject) ->
-    #{token := Token} = AccessToken,
-    retrieve_user_info(Token, OpenIdProvider, Subject);
-retrieve_user_info(#{token := Token}, OpenIdProvider, Subject) ->
-    retrieve_user_info(Token, OpenIdProvider, Subject);
-retrieve_user_info(Token, #{userinfo_endpoint := Endpoint}, Subject)
-  when is_binary(Token) ->
-    Header = [{<<"authorization">>, << <<"Bearer ">>/binary, Token/binary >>}],
+retrieve_user_info(Token, #{userinfo_endpoint := Endpoint}, Subject) ->
+    AccessToken = extract_access_token(Token),
+    Header = [bearer_auth(AccessToken)],
     HttpResult = oidcc_http_util:sync_http(get, Endpoint, Header, undefined),
     return_validated_user_info(HttpResult, Subject);
 retrieve_user_info(Token, OpenIdProvider, Subject) ->
     {ok, Config} = get_openid_provider_info(OpenIdProvider),
     retrieve_user_info(Token, Config, Subject).
+
+
+%% @doc
+%% introspect the given token at the given provider
+%%
+%% this is done by looking up the IntrospectionEndpoint from the configuration
+%% and then requesting info, using the client credentials as authentication
+%% @end
+-spec introspect_token(map() | binary(), binary()) -> {ok, map()} |
+                                                      {error, any()}.
+introspect_token(Token, #{introspection_endpoint := Endpoint,
+                          client_id := ClientId,
+                          client_secret := ClientSecret}) ->
+    AccessToken = extract_access_token(Token),
+    Header = [
+              {<<"accept">>, <<"application/json">>},
+              {<<"content-type">>, <<"application/x-www-form-urlencoded">>},
+              basic_auth(ClientId, ClientSecret)
+             ],
+    BodyQs = cow_qs:qs([{<<"token">>, AccessToken}]),
+    HttpResult = oidcc_http_util:sync_http(post, Endpoint, Header, BodyQs),
+    return_json_info(HttpResult);
+introspect_token(Token, ProviderId) ->
+    {ok, Config} = get_openid_provider_info(ProviderId),
+    introspect_token(Token, Config).
+
+
+extract_access_token(#{access := AccessToken}) ->
+    #{token := Token} = AccessToken,
+    Token;
+extract_access_token(#{token := Token}) ->
+    Token;
+extract_access_token(Token) when is_binary(Token) ->
+    Token.
+
 
 
 create_redirect_url_if_ready(#{ready := false}, _, _, _) ->
@@ -268,12 +298,7 @@ select_preferred_auth(AuthMethodsSupported) ->
 
 
 add_authentication(QsBodyList, Header, basic, ClientId, Secret) ->
-    ClientIdEnc = cow_qs:urlencode(ClientId),
-    SecretEnc = cow_qs:urlencode(Secret),
-    RawAuth = <<ClientIdEnc/binary, <<":">>/binary, SecretEnc/binary>>,
-    AuthData = base64:encode(RawAuth),
-    BasicAuth = << <<"Basic ">>/binary, AuthData/binary >>,
-    NewHeader = [{<<"authorization">>, BasicAuth} | Header ],
+    NewHeader = [basic_auth(ClientId, Secret)| Header ],
     {QsBodyList, NewHeader};
 add_authentication(QsBodyList, Header, post, ClientId, ClientSecret) ->
     NewBodyList = [ {<<"client_id">>, ClientId},
@@ -294,21 +319,33 @@ return_token( {ok, #{body := Body, status := Status}} ) ->
 
 
 return_validated_user_info(HttpData, undefined) ->
-    return_user_info(HttpData);
+    return_json_info(HttpData);
 return_validated_user_info(HttpData, Subject) ->
-    case return_user_info(HttpData) of
+    case return_json_info(HttpData) of
         {ok, #{ sub := Subject } = Map} -> {ok, Map};
         {ok, _} -> {error, bad_subject};
         Other -> Other
     end.
 
-return_user_info({ok, #{status := 200, body := Data}}) ->
+return_json_info({ok, #{status := 200, body := Data}}) ->
     try jsx:decode(Data, [{labels, attempt_atom}, return_maps])
     of Map -> {ok, Map}
     catch Error -> {error, Error}
     end;
-return_user_info({ok, Map}) ->
+return_json_info({ok, Map}) ->
     {error, {bad_status, Map}};
-return_user_info({error, _}=Error) ->
+return_json_info({error, _}=Error) ->
     Error.
+
+
+basic_auth(User, Secret) ->
+    UserEnc = cow_qs:urlencode(User),
+    SecretEnc = cow_qs:urlencode(Secret),
+    RawAuth = <<UserEnc/binary, <<":">>/binary, SecretEnc/binary>>,
+    AuthData = base64:encode(RawAuth),
+    BasicAuth = << <<"Basic ">>/binary, AuthData/binary >>,
+    {<<"authorization">>, BasicAuth}.
+
+bearer_auth(Token) ->
+    {<<"authorization">>, << <<"Bearer ">>/binary, Token/binary >>}.
 

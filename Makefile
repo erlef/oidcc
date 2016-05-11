@@ -1,17 +1,22 @@
-PROJECT = oidcc
+REBAR = $(shell pwd)/rebar3
+APP=oidcc
 
-DEPS = ejwt uri gun
-BUILD_DEPS = elvis_mk
-DEP_PLUGINS = elvis_mk
-TEST_DEPS = meck
+.PHONY: all ct test clean elvis compile 
 
-dep_gun = git https://github.com/ninenines/gun.git d88f367
-dep_uri = git https://github.com/erlware/uri.git 91f6b71 
-dep_ejwt = git https://github.com/indigo-dc/ejwt.git ba89eee
-dep_meck = git https://github.com/eproxus/meck 0.8.4
+all: compile
 
-# dep_elvis_mk = git https://github.com/inaka/elvis.mk.git 1.0.0
-dep_elvis_mk = git https://github.com/inaka/elvis.mk.git 215616a
+clean:
+	$(REBAR) clean
 
-COVER = 1
-include erlang.mk
+eunit:
+	$(REBAR) eunit
+
+ct:
+	$(REBAR) ct
+
+elvis:
+	$(REBAR) lint
+
+compile:
+	$(REBAR) compile
+

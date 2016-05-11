@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 %% API.
--export([start_link/1]).
+-export([start_link/2]).
 -export([stop/1]).
 -export([set_name/2]).
 -export([set_description/2]).
@@ -11,6 +11,7 @@
 -export([set_config_endpoint/2]).
 -export([update_config/1]).
 -export([is_issuer/2]).
+-export([is_ready/1]).
 %% -export([force_update_config/1]).
 -export([set_local_endpoint/2]).
 -export([get_config/1]).
@@ -41,15 +42,18 @@
           config_tries = 0,
           mref = undefined,
           sref = undefined,
+          header = [],
+          body = <<>>,
+          path = undefined,
           http = #{},
           retrieving = undefined
          }).
 
 %% API.
 
--spec start_link(Id :: binary()) -> {ok, pid()}.
-start_link(Id) ->
-    gen_server:start_link(?MODULE, Id, []).
+-spec start_link(Id :: binary(), Config::map()) -> {ok, pid()}.
+start_link(Id, Config) ->
+    gen_server:start_link(?MODULE, {Id, Config}, []).
 
 -spec stop(Pid ::pid()) -> ok.
 stop(Pid) ->
@@ -84,6 +88,10 @@ update_config(Pid) ->
 is_issuer(Issuer, Pid) ->
     gen_server:call(Pid, {is_issuer, Issuer}).
 
+-spec is_ready(Pid :: pid() ) -> true | false.
+is_ready(Pid) ->
+    gen_server:call(Pid, is_ready).
+
 -spec set_local_endpoint(Url :: binary(), Pid :: pid() ) -> ok.
 set_local_endpoint(Url, Pid) ->
     gen_server:call(Pid, {set_local_endpoint, Url}).
@@ -94,8 +102,19 @@ get_config( Pid) ->
 %% gen_server.
 -define(MAX_TRIES, 5).
 
-init(Id) ->
-    {ok, #state{id = Id}}.
+init({Id, Config}) ->
+
+    #{name := Name,
+      description := Description,
+      client_id := ClientId,
+      client_secrect := ClientSecret,
+      config_endpoint := ConfigEndpoint,
+      local_endpoint := LocalEndpoint
+     } = Config,
+    trigger_config_retrieval(),
+    {ok, #state{id = Id, name = Name, desc = Description, client_id = ClientId,
+               client_secret = ClientSecret, config_ep = ConfigEndpoint,
+               local_endpoint = LocalEndpoint}}.
 
 handle_call(get_config, _From, State) ->
     Conf = create_config(State),
@@ -118,22 +137,28 @@ handle_call(update_config, _From, State) ->
 handle_call({is_issuer, Issuer}, _From, #state{config=Config}=State) ->
     Result = (Issuer == maps:get(issuer, Config, undefined)),
     {reply, Result , State};
+handle_call(is_ready, _From, #state{ready=Ready}=State) ->
+    {reply, Ready, State};
 handle_call(_Request, _From, State) ->
     {reply, ignored, State}.
 
 
 handle_cast(retrieve_config, #state{gun_pid = undefined} = State) ->
-    {ok, ConPid, MRef, StreamRef} = retrieve_config(State),
+    {ok, ConPid, MRef, Path} = retrieve_config(State),
     NewState = State#state{gun_pid = ConPid,
                            mref=MRef,
-                           sref=StreamRef,
+                           sref=undefined,
+                           path=Path,
                            retrieving=config},
     {noreply, NewState};
 handle_cast(retrieve_keys, State) ->
-    {ok, ConPid, MRef, StreamRef} = retrieve_keys(State),
+    {ok, ConPid, MRef, Path} = retrieve_keys(State),
+    Header = [{<<"accept">>, "application/json"}],
     NewState = State#state{gun_pid = ConPid,
                            mref=MRef,
-                           sref=StreamRef,
+                           sref=undefined,
+                           path=Path,
+                           header = Header,
                            retrieving=keys},
     {noreply, NewState};
 handle_cast(stop, State) ->
@@ -143,6 +168,11 @@ handle_cast(_Msg, State) ->
 
 
 
+handle_info({gun_up, ConPid, _Protocol},
+            #state{path=Path, header=Header, gun_pid=ConPid} = State) ->
+    {ok, StreamRef} = oidcc_http_util:async_http(get, Path, Header,
+                                                 <<>>, ConPid),
+    {noreply, State#state{sref=StreamRef}};
 handle_info({gun_response, ConPid, StreamRef, fin, Status, Header},
             #state{gun_pid=ConPid, sref=StreamRef} = State) ->
     Http = #{status => Status, header => Header, body => <<>>},
@@ -165,6 +195,10 @@ handle_info({gun_data, ConPid, StreamRef, fin, Data},
     Body = << OldBody/binary, Data/binary >>,
     NewState = handle_http_result(State#state{http=maps:put(body, Body, Http)}),
     {noreply, NewState};
+handle_info({gun_error, ConPid, Reason}, #state{gun_pid=ConPid}= State ) ->
+    handle_http_client_crash(Reason, State);
+handle_info({gun_error, ConPid, _SRef, Reason}, #state{gun_pid=ConPid}=State)->
+    handle_http_client_crash(Reason, State);
 handle_info({'DOWN', MRef, process, ConPid, Reason},
             #state{gun_pid=ConPid, mref = MRef} = State) ->
     handle_http_client_crash(Reason, State);
@@ -173,19 +207,19 @@ handle_info(_Info, State) ->
 
 
 
-terminate(_Reason, _State) ->
+terminate(_Reason, #state{gun_pid=GunPid}) ->
+    gun:close(GunPid),
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 retrieve_config(#state{config_ep = ConfigEndpoint}) ->
-    oidcc_http_util:async_http(get, ConfigEndpoint, [], undefined).
+    oidcc_http_util:start_http(ConfigEndpoint).
 
 retrieve_keys(#state{config = Config}) ->
     KeyEndpoint = maps:get(jwks_uri, Config, undefined),
-    Header = [{<<"accept">>, "application/json"}],
-    oidcc_http_util:async_http(get, KeyEndpoint, Header, undefined).
+    oidcc_http_util:start_http(KeyEndpoint).
 
 handle_http_result(200, Header, Body, config, State) ->
     handle_config(Body, Header, State);
@@ -219,7 +253,7 @@ handle_config(Data, _Header, State) ->
     %TODO: implement update at expire data/time
     Config = jsx:decode(Data, [return_maps, {labels, attempt_atom}]),
     ok = trigger_key_retrieval(),
-    timer:apply_after(3600000, ?MODULE, update_config, [self()]),
+    trigger_config_retrieval(3600000),
     State#state{config = Config}.
 
 handle_keys(Data, _Header, State) ->
@@ -276,7 +310,6 @@ trigger_key_retrieval() ->
 
 timestamp() ->
     erlang:system_time(seconds).
-
 
 stop_gun(#state{gun_pid = Pid, mref = MonitorRef} =State) ->
     ok = oidcc_http_util:async_close(Pid, MonitorRef),

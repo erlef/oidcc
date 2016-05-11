@@ -4,7 +4,7 @@
 add_openid_provider_test() ->
     MyPid = self(),
     RandomId = <<"6">>,
-    AddFun = fun(Id) ->
+    AddFun = fun(Id, _Config) ->
                      case Id of
                          undefined ->
                              {ok, RandomId, MyPid};

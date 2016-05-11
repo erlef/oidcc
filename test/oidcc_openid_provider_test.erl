@@ -184,16 +184,16 @@ real_config_fetch_test() ->
        issuer := <<"https://accounts.google.com">>,
        jwks_uri := <<"https://www.googleapis.com/oauth2/v3/certs">>
      } = Config2,
-    2 = length(Keys),
+    true = (length(Keys) >= 1),
     ok = oidcc_openid_provider:stop(Pid),
     ok = test_util:wait_for_process_to_die(Pid, 100).
 
 
 wait_till_ready(Pid) ->
-    case oidcc_openid_provider:get_config(Pid) of
-        #{ready := true} -> ok;
-        _ ->
-            timer:sleep(1000),
+    case oidcc_openid_provider:is_ready(Pid) of
+        true -> ok;
+        false ->
+            timer:sleep(100),
             wait_till_ready(Pid)
     end.
 

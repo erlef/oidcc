@@ -4,17 +4,11 @@
 %% API.
 -export([start_link/2]).
 -export([stop/1]).
--export([set_name/2]).
--export([set_description/2]).
--export([set_client_id/2]).
--export([set_client_secret/2]).
--export([set_config_endpoint/2]).
--export([update_config/1]).
 -export([is_issuer/2]).
 -export([is_ready/1]).
-%% -export([force_update_config/1]).
--export([set_local_endpoint/2]).
 -export([get_config/1]).
+-export([update_config/1]).
+
 
 %% gen_server.
 -export([init/1]).
@@ -59,27 +53,6 @@ start_link(Id, Config) ->
 stop(Pid) ->
     gen_server:cast(Pid, stop).
 
--spec set_name(Name :: binary(), Pid :: pid() ) -> ok.
-set_name(Name, Pid) ->
-    gen_server:call(Pid, {set_name, Name}).
-
--spec set_description(Description :: binary(), Pid :: pid() ) -> ok.
-set_description(Description, Pid) ->
-    gen_server:call(Pid, {set_description, Description}).
-
--spec set_client_id(ClientId :: binary(), Pid :: pid() ) -> ok.
-set_client_id(ClientId, Pid) ->
-    gen_server:call(Pid, {set_client_id, ClientId}).
-
--spec set_client_secret(ClientSecret :: binary(), Pid :: pid() ) -> ok.
-set_client_secret(ClientSecret, Pid) ->
-    gen_server:call(Pid, {set_client_secret, ClientSecret}).
-
-
--spec set_config_endpoint(ConfigEndpoint :: binary(), Pid :: pid() ) -> ok.
-set_config_endpoint(ConfigEndpoint, Pid) ->
-    gen_server:call(Pid, {set_config_endpoint, ConfigEndpoint}).
-
 -spec update_config(Pid :: pid() ) -> ok.
 update_config(Pid) ->
     gen_server:call(Pid, update_config).
@@ -91,10 +64,6 @@ is_issuer(Issuer, Pid) ->
 -spec is_ready(Pid :: pid() ) -> true | false.
 is_ready(Pid) ->
     gen_server:call(Pid, is_ready).
-
--spec set_local_endpoint(Url :: binary(), Pid :: pid() ) -> ok.
-set_local_endpoint(Url, Pid) ->
-    gen_server:call(Pid, {set_local_endpoint, Url}).
 
 -spec get_config( Pid :: pid() ) -> {ok, Config :: map()}.
 get_config( Pid) ->
@@ -119,18 +88,6 @@ init({Id, Config}) ->
 handle_call(get_config, _From, State) ->
     Conf = create_config(State),
     {reply, {ok, Conf}, State};
-handle_call({set_name, Name}, _From, State) ->
-    {reply, ok, State#state{name = Name}};
-handle_call({set_description, Description}, _From, State) ->
-    {reply, ok, State#state{desc = Description}};
-handle_call({set_client_id, ClientId}, _From, State) ->
-    {reply, ok, State#state{client_id=ClientId}};
-handle_call({set_client_secret, ClientSecret}, _From, State) ->
-    {reply, ok, State#state{client_secret=ClientSecret}};
-handle_call({set_local_endpoint, Url}, _From, State) ->
-    {reply, ok, State#state{local_endpoint=Url}};
-handle_call({set_config_endpoint, ConfigEndpoint}, _From, State) ->
-    {reply, ok, State#state{config_ep=ConfigEndpoint}};
 handle_call(update_config, _From, State) ->
     ok = trigger_config_retrieval(),
     {reply, ok, State#state{config_tries=0}};

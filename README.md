@@ -89,7 +89,7 @@ gathered by inspecting the `TokenMap`.
 * To check e.g. the scopes of an access token the function `oidcc:introspect_token` can be used.
 
 
-# LICENSE
+## LICENSE
 This library was written as part of the INDIGO DataCould project and is realease
 under the Apache License.
 

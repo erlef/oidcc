@@ -122,10 +122,13 @@ get_provider(Id, #state{provider=Provider}=State) ->
     end.
 
 find_provider(Issuer, #state{provider=Provider}=State) ->
-    Filter = fun({_Id, Pid, _Mref}) ->
-                     oidcc_openid_provider:is_issuer(Issuer, Pid)
+    Filter = fun({_Id, Pid, _Mref}, List) ->
+                     case oidcc_openid_provider:is_issuer(Issuer, Pid) of
+                         true -> [ Pid | List];
+                         _ -> List
+                     end
              end,
-    case lists:filter(Filter, Provider) of
+    case lists:foldl(Filter, [], Provider) of
         [Pid | _ ] -> {reply, {ok, Pid}, State};
         [] -> {reply, {error, not_found}, State}
     end.

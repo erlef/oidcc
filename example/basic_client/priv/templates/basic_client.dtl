@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="en">
+    <body>
+        {% if session %}
+	   you are logged in
+        {% else %}
+	   you are not yet logged in, please do so by following 
+	   <a href="/oidc?provider=google">this link</a>
+        {% endif %}
+    </body>
+</html>
+
+

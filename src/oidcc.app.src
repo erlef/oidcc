@@ -11,6 +11,7 @@
                          crypto,
                          ejwt,
                          uri,
+			 base64url,
                          gun
                         ]},
          {mod, {oidcc_app, []}}

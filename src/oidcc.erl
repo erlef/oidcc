@@ -1,5 +1,6 @@
 -module(oidcc).
 
+-export([login_with/1]).
 -export([add_openid_provider/6]).
 -export([add_openid_provider/7]).
 -export([find_openid_provider/1]).
@@ -9,12 +10,19 @@
 -export([create_redirect_url/2]).
 -export([create_redirect_url/3]).
 -export([create_redirect_url/4]).
+-export([create_redirect_for_session/2]).
 -export([retrieve_token/2]).
 -export([parse_and_validate_token/2]).
 -export([parse_and_validate_token/3]).
 -export([retrieve_user_info/2]).
 -export([retrieve_user_info/3]).
 -export([introspect_token/2]).
+
+
+login_with(_OpenIdProviderId) ->
+    ok.
+
+
 
 %% @doc
 %% add an OpenID Connect Provider to the list of possible Providers
@@ -39,8 +47,9 @@ add_openid_provider(Name, Description, ClientId, ClientSecret, ConfigEndpoint,
 %% ID Tokens.
 %% @end
 -spec add_openid_provider(binary(), binary(), binary(), binary(), binary()
-                          , binary(), binary()) ->
-    {ok, Id::binary(), Pid::pid()} | {error, id_already_used}.
+                         , binary(), binary()) ->
+                                 {ok, Id::binary(), Pid::pid()}|
+                                 {error, id_already_used}.
 add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
                     ConfigEndpoint, LocalEndpoint) ->
     Config = #{name => Name,
@@ -54,7 +63,7 @@ add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
 
 
 -spec find_openid_provider(Issuer::binary()) -> {ok, pid()}
-                                                | {error, not_found}.
+                                                    | {error, not_found}.
 find_openid_provider(Issuer) ->
     oidcc_openid_provider_mgr:find_openid_provider(Issuer).
 
@@ -88,13 +97,25 @@ get_openid_provider_info(OpenIdProviderId) when is_binary(OpenIdProviderId) ->
 get_openid_provider_list() ->
     oidcc_openid_provider_mgr:get_openid_provider_list().
 
+%% @doc
+%% same as create_redirect_url/4 but with all parameters being fetched
+%% from the given session, except the provider
+%% @end
+-spec create_redirect_for_session(pid(), binary()) ->
+                                         {ok, binary()} |
+                                         {error, provider_not_ready}.
+create_redirect_for_session(Session, OpenIdProviderId) ->
+    {ok, Scopes} = oidcc_session:get_scopes(Session),
+    {ok, State} = oidcc_session:get_state(Session),
+    {ok, Nonce} = oidcc_session:get_nonce(Session),
+    create_redirect_url(OpenIdProviderId, Scopes, State, Nonce).
 
 %% @doc
 %% same as create_redirect_url/4 but with State and Nonce being undefined and
 %% scope being openid
 %% @end
 -spec create_redirect_url(binary()) ->
-    {ok, binary()} | {error, provider_not_ready}.
+                                 {ok, binary()} | {error, provider_not_ready}.
 create_redirect_url(OpenIdProviderId) ->
     create_redirect_url(OpenIdProviderId, [<<"openid">>], undefined, undefined).
 
@@ -102,7 +123,7 @@ create_redirect_url(OpenIdProviderId) ->
 %% same as create_redirect_url/4 but with State and Nonce being undefined
 %% @end
 -spec create_redirect_url(binary(), list()) ->
-    {ok, binary()} | {error, provider_not_ready}.
+                                 {ok, binary()} | {error, provider_not_ready}.
 create_redirect_url(OpenIdProviderId, Scopes) ->
     create_redirect_url(OpenIdProviderId, Scopes, undefined, undefined).
 
@@ -110,7 +131,7 @@ create_redirect_url(OpenIdProviderId, Scopes) ->
 %% same as create_redirect_url/4 but with Nonce being undefined
 %% @end
 -spec create_redirect_url(binary(), list(), binary()) ->
-    {ok, binary()} | {error, provider_not_ready}.
+                                 {ok, binary()} | {error, provider_not_ready}.
 create_redirect_url(OpenIdProviderId, Scopes, OidcState) ->
     create_redirect_url(OpenIdProviderId, Scopes, OidcState, undefined).
 
@@ -121,7 +142,7 @@ create_redirect_url(OpenIdProviderId, Scopes, OidcState) ->
 %% to the OpenId Connect Provider
 %% @end
 -spec create_redirect_url(binary(), list(), binary(), binary()) ->
-    {ok, binary()} | {error, provider_not_ready}.
+                                 {ok, binary()} | {error, provider_not_ready}.
 create_redirect_url(OpenIdProviderId, Scopes, OidcState, OidcNonce ) ->
     {ok, Info} = get_openid_provider_info(OpenIdProviderId),
     create_redirect_url_if_ready(Info, Scopes, OidcState, OidcNonce).
@@ -144,9 +165,9 @@ retrieve_token(AuthCode, OpenIdProviderId) ->
      } = Info,
     AuthMethod = select_preferred_auth(AuthMethods),
     QsBody0 = [ {<<"grant_type">>, <<"authorization_code">>},
-                   {<<"code">>, AuthCode},
-                   {<<"redirect_uri">>, LocalEndpoint}
-                 ],
+                {<<"code">>, AuthCode},
+                {<<"redirect_uri">>, LocalEndpoint}
+              ],
     Header0 = [ {<<"content-type">>, <<"application/x-www-form-urlencoded">>}],
     {QsBody, Header} = add_authentication(QsBody0, Header0, AuthMethod,
                                           ClientId, Secret),
@@ -157,7 +178,7 @@ retrieve_token(AuthCode, OpenIdProviderId) ->
 %% like parse_and_validate_token/3 yet without checking the nonce
 %% @end
 -spec parse_and_validate_token(binary(), binary()) ->
-    {ok, map()} | {error, any()}.
+                                      {ok, map()} | {error, any()}.
 parse_and_validate_token(Token, OpenIdProvider) ->
     parse_and_validate_token(Token, OpenIdProvider, undefined).
 %% @doc
@@ -166,13 +187,13 @@ parse_and_validate_token(Token, OpenIdProvider) ->
 %% source of oidcc_token:validate_id_token/1 for more information
 %% @end
 -spec parse_and_validate_token(binary(), binary(), binary()) ->
-    {ok, map()} | {error, any()}.
+                                      {ok, map()} | {error, any()}.
 parse_and_validate_token(Token, OpenIdProvider, Nonce) ->
     TokenMap = oidcc_token:extract_token_map(Token),
     #{id := IdToken0 } = TokenMap,
     case oidcc_token:validate_id_token(IdToken0, OpenIdProvider, Nonce) of
         {ok, IdToken} ->
-           {ok, maps:put(id, IdToken, TokenMap)};
+            {ok, maps:put(id, IdToken, TokenMap)};
         Other -> Other
     end.
 
@@ -183,13 +204,13 @@ parse_and_validate_token(Token, OpenIdProvider, Nonce) ->
 %% then requesting info, using the access token as bearer token
 %% @end
 -spec retrieve_user_info(map() | binary(), binary()) ->
-    {ok, map()} | {error, any()}.
+                                {ok, map()} | {error, any()}.
 retrieve_user_info(Token, OpenIdProvider) ->
     retrieve_user_info(Token, OpenIdProvider, undefined).
 
 
 -spec retrieve_user_info(map() | binary(), binary(), binary()|undefined) ->
-    {ok, map()} | {error, any()}.
+                                {ok, map()} | {error, any()}.
 retrieve_user_info(Token, #{userinfo_endpoint := Endpoint}, Subject) ->
     AccessToken = extract_access_token(Token),
     Header = [bearer_auth(AccessToken)],

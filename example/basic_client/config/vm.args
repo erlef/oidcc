@@ -1,0 +1,4 @@
+-name basic_client@127.0.0.1
+-mode embedded
+-smp enable
+-setcookie basic_client

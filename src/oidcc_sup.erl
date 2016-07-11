@@ -10,7 +10,9 @@ start_link() ->
 init([]) ->
     Procs = [
              openid_provider_manager(),
-             openid_provider_supervisor()
+             openid_session_manager(),
+             openid_provider_supervisor(),
+             session_supervisor()
             ],
     {ok, {{one_for_one, 1, 5}, Procs}}.
 
@@ -21,8 +23,20 @@ openid_provider_supervisor() ->
        type => supervisor
      }.
 
+session_supervisor() ->
+    #{ id => session_sup,
+       start => {oidcc_session_sup, start_link, []},
+       type => supervisor
+     }.
+
 openid_provider_manager() ->
     #{ id => op_mgr,
        start => {oidcc_openid_provider_mgr, start_link, []},
+       type => worker
+     }.
+
+openid_session_manager() ->
+    #{ id => session_mgr,
+       start => {oidcc_session_mgr, start_link, []},
        type => worker
      }.

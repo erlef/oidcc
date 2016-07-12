@@ -1,6 +1,8 @@
 -module(oidcc_token).
 
 -export([extract_token_map/1]).
+-export([validate_token_map/3]).
+-export([verify_access_token_map_hash/2]).
 -export([validate_id_token/3]).
 
 extract_token_map(Token) ->
@@ -9,14 +11,58 @@ extract_token_map(Token) ->
     AccessToken = maps:get(<<"access_token">>, TokenMap, none),
     AccessExpire = maps:get(<<"expires_in">>, TokenMap, undefined),
     RefreshToken = maps:get(<<"refresh_token">>, TokenMap, none),
-    #{id => IDToken,
-      access => #{token => AccessToken, expires => AccessExpire },
-      refresh => RefreshToken
+    #{id => #{token => IDToken, claims => undefined},
+      access => #{token => AccessToken, expires => AccessExpire,
+                  hash => undefined},
+      refresh => #{token => RefreshToken}
      }.
+
+
+validate_token_map(TokenMap, OpenIdProvider, Nonce) ->
+    #{id := IdTokenMap,
+      access := AccessTokenMap} = TokenMap,
+
+    case validate_id_token_map(IdTokenMap, OpenIdProvider, Nonce) of
+        {ok, NewIdTokenMap} ->
+            NewAccessTokenMap = verify_access_token_map_hash(AccessTokenMap,
+                                                             NewIdTokenMap),
+            TokenMap1 = maps:put(id, NewIdTokenMap, TokenMap),
+            Result = maps:put(access, NewAccessTokenMap, TokenMap1),
+            {ok, Result};
+        Other ->
+            Other
+    end.
+
+
+verify_access_token_map_hash(AccessTokenMap, IdTokenMap) ->
+    try int_verify_access_token_hash(AccessTokenMap, IdTokenMap) of
+        Result -> Result
+    catch
+        _:_ -> maps:put(hash, internal_error, AccessTokenMap)
+    end.
+
+int_verify_access_token_hash(#{token := AccessToken} = Map,
+                             #{claims := Claims}) ->
+    << BinHash:16/binary, _Rest/binary>> = crypto:hash(sha256, AccessToken),
+    Hash = base64url:encode(BinHash),
+    Result = case maps:get(at_hash, Claims, undefined) of
+        undefined -> no_hash;
+        Hash ->  verified;
+        _OtherHash -> bad_hash
+    end,
+    maps:put(hash, Result, Map).
+
+validate_id_token_map(#{token := IdToken} = IdTokenMap,
+                      OpenIdProviderId, Nonce) ->
+    case validate_id_token(IdToken, OpenIdProviderId, Nonce) of
+        {ok, Claims} ->
+            {ok, maps:put(claims, Claims, IdTokenMap)};
+        Other -> Other
+    end.
 
 validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     try int_validate_id_token(IdToken, OpenIdProviderId, Nonce) of
-        Result -> {ok, Result}
+        Claims -> {ok, Claims}
     catch
         Exception -> {error, Exception}
     end.

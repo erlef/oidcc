@@ -33,7 +33,44 @@ Example:
                                            <<"https://accounts.google.com/.well-known/openid-configuration">>,
                                            <<"https://my.domain/return">>),
 ```
-### Login Users 
+### Using the Callbacks and Cowboy handler
+Oidcc implements a cowboy handler for redirecting a user agent (browser) to an OpenId Connect provider and to handle its response automatically. The handler calls a callback, once finished.
+
+The cowboy handler implements the steps described in the chapter "Login Users manually".
+
+An example using the callbacks is in the examples/basic_client directory.
+
+Basically three things need to be done:
+1. Define a path to use for the cowboy handler
+```
+Dispatch = cowboy_router:compile( [{'_',
+					[
+					 {"/", basic_client_http, []},
+                     %% add the oidcc_http_handler to a path
+					 {"/oidc", oidcc_http_handler, []}
+					]}]),
+%% and start cowboy
+{ok, _} = cowboy:start_http( http_handler
+			       , 100
+			       , [ {port, 8080} ]
+			       , [{env, [{dispatch, Dispatch}]}]
+			       )
+```
+2. Implement the oidcc_client behaviour, see 
+[`basic_client.erl`](https://github.com/indigo-dc/oidcc/blob/master/example/basic_client/src/basic_client.erl) for this.
+
+3. Register the behaviour as your client module
+```
+application:set_env(oidcc, client_mod, <your module name>).
+```
+
+Now within your web application all you need to do is redirect the user agent 
+to the `oidcc_http_handler` path passing the OpenId Connect provider id in the
+query string, e.g. `/oidc?provider=123`.
+
+Once the login has either succeeded or failed the registered module gets called.
+
+### Login Users manually 
 #### Create Redirection to Login Page 
 Creating a redirection is done with one of the `oidcc:create_redirect_url`
 functions. 
@@ -53,7 +90,7 @@ Example:
                                        <<"random nonce, 4">>),
 ```
 
-#### Retriving the Tokens
+#### Retrieving the Tokens
 When the user has been redirected back an auth code and ,if provided in the
 redirection, the state will be given. For fetching the Tokens only the first
 will be needed, yet the 2nd should be compared to the state used before.

@@ -26,9 +26,12 @@ init(_, Req, _Opts) ->
 handle(Req, #state{session = Session } = State) ->
     {ok, Body} = basic_client_dtl:render([{session, Session}]),
     Status = 200,
-    Req2 = cowboy_req:set_resp_body(Body, Req),
-    {ok, Req3} = cowboy_req:reply(Status, Req2),
-    {ok, Req3, State}.
+    %% clear the cookie again, so after a page reload one can retest it.
+    Opts = [{max_age, 0},{http_only, true},{path, <<"/">>}],
+    Req2 = cowboy_req:set_resp_cookie(?COOKIE, <<"deleted">>, Opts, Req),
+    Req3 = cowboy_req:set_resp_body(Body, Req2),
+    {ok, Req4} = cowboy_req:reply(Status, Req3),
+    {ok, Req4, State}.
 
 terminate(_Reason, _Req, _State) ->
     ok.

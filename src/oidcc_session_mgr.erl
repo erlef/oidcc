@@ -159,16 +159,19 @@ session_list(#state{sessions=Sessions}) ->
 
 create_new_session(State) ->
     ID = get_unique_id(State),
+    create_new_session(ID, State).
+
+create_new_session(ID, State) ->
     Pid = start_session(ID),
     {ok, NewState} = set_session_for_id(ID, Pid, State),
     {ok, Pid, NewState}.
 
-lookup_or_create_session({ok, Pid}, State) ->
-    {ok, Pid, State};
-lookup_or_create_session({error, _}, State) ->
-    create_new_session(State);
 lookup_or_create_session(ID, State) ->
-    lookup_or_create_session(lookup_session(ID, State), State).
+    lookup_or_create_session(lookup_session(ID, State), ID, State).
+lookup_or_create_session({ok, Pid}, _ID, State) ->
+    {ok, Pid, State};
+lookup_or_create_session({error, _}, ID, State) ->
+    create_new_session(ID, State).
 
 random_string(Length) ->
     base64url:encode(crypto:strong_rand_bytes(Length)).

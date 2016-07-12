@@ -42,7 +42,7 @@ start_link(Id, Nonce, State, Scopes) ->
 
 -spec close(Pid ::pid()) -> ok.
 close(Pid) ->
-    gen_server:call(Pid, close).
+    gen_server:cast(Pid, close).
 
 get_id(Pid) ->
     gen_server:call(Pid, get_id).
@@ -89,12 +89,12 @@ handle_call(get_nonce, _From, #state{nonce=Nonce, timeout=To} = State) ->
     {reply, {ok, Nonce}, State, To};
 handle_call({set_provider, Provider}, _From, #state{timeout=To} = State) ->
     {reply, ok, State#state{provider=Provider}, To};
-handle_call(close, _From, #state{id = Id} = State) ->
-    ok = oidcc_session_mgr:session_terminating(Id),
-    {stop, normal, ok, State};
 handle_call(_Request, _From, #state{timeout=To} = State) ->
     {reply, ignored, State, To}.
 
+handle_cast(close, #state{id = Id} = State) ->
+    ok = oidcc_session_mgr:session_terminating(Id),
+    {stop, normal, State};
 handle_cast(_Request, #state{timeout = To} = State) ->
     {noreply, State, To}.
 

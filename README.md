@@ -5,6 +5,15 @@ OpenId Connect client library in Erlang
 The purpose is to enable Erlang applications to rely on OpenId Connect Provider
 for authentication purposes.
 
+
+## Quickstart / Demo
+```
+git clone https://github.com/indigo-dc/oidcc
+cd oidcc/example/basic_client
+make run
+```
+browse to [your example](http://localhost:8080) and log in.
+
 ## Usage 
 ### Setup an Openid Connect Provider 
 First an OpenId Connect Provider needs to be added, this is done by either
@@ -42,6 +51,9 @@ An example using the callbacks is in the examples/basic_client directory.
 
 Basically three things need to be done:
 1. Define a path to use for the cowboy handler
+2. Implement the oidcc_client behaviour, see [`basic_client.erl`](https://github.com/indigo-dc/oidcc/blob/master/example/basic_client/src/basic_client.erl) for this.
+3. Register the implementation of the behaviour
+#### Define a path to user for the cowboy handler
 ```
 Dispatch = cowboy_router:compile( [{'_',
 					[
@@ -56,14 +68,12 @@ Dispatch = cowboy_router:compile( [{'_',
 			       , [{env, [{dispatch, Dispatch}]}]
 			       )
 ```
-2. Implement the oidcc_client behaviour, see 
-[`basic_client.erl`](https://github.com/indigo-dc/oidcc/blob/master/example/basic_client/src/basic_client.erl) for this.
-
-3. Register the behaviour as your client module
+#### Register the implementation of the behaviour 
 ```
-application:set_env(oidcc, client_mod, <your module name>).
+application:set_env(oidcc, client_mod, <module name>).
 ```
 
+#### Logging in ...
 Now within your web application all you need to do is redirect the user agent 
 to the `oidcc_http_handler` path passing the OpenId Connect provider id in the
 query string, e.g. `/oidc?provider=123`.

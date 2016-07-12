@@ -53,6 +53,7 @@ Basically three things need to be done:
  * Define a path to use for the cowboy handler
  * Implement the oidcc_client behaviour, see [`basic_client.erl`](https://github.com/indigo-dc/oidcc/blob/master/example/basic_client/src/basic_client.erl) for this.
  * Register the implementation of the behaviour
+
 #### Define a path to user for the cowboy handler
 ```
 Dispatch = cowboy_router:compile( [{'_',

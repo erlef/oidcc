@@ -33,10 +33,10 @@ Example:
                                            <<"https://accounts.google.com/.well-known/openid-configuration">>,
                                            <<"https://my.domain/return">>),
 ```
-### Using the Callbacks and Cowboy handler
+### Login Users: Using the Callbacks and Cowboy handler
 Oidcc implements a cowboy handler for redirecting a user agent (browser) to an OpenId Connect provider and to handle its response automatically. The handler calls a callback, once finished.
 
-The cowboy handler implements the steps described in the chapter "Login Users manually".
+The cowboy handler implements the steps described in the chapter "Login Users: by hand".
 
 An example using the callbacks is in the examples/basic_client directory.
 
@@ -70,7 +70,7 @@ query string, e.g. `/oidc?provider=123`.
 
 Once the login has either succeeded or failed the registered module gets called.
 
-### Login Users manually 
+### Login Users: by hand 
 #### Create Redirection to Login Page 
 Creating a redirection is done with one of the `oidcc:create_redirect_url`
 functions. 

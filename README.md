@@ -50,9 +50,9 @@ The cowboy handler implements the steps described in the chapter "Login Users: b
 An example using the callbacks is in the examples/basic_client directory.
 
 Basically three things need to be done:
-1. Define a path to use for the cowboy handler
-2. Implement the oidcc_client behaviour, see [`basic_client.erl`](https://github.com/indigo-dc/oidcc/blob/master/example/basic_client/src/basic_client.erl) for this.
-3. Register the implementation of the behaviour
+ * Define a path to use for the cowboy handler
+ * Implement the oidcc_client behaviour, see [`basic_client.erl`](https://github.com/indigo-dc/oidcc/blob/master/example/basic_client/src/basic_client.erl) for this.
+ * Register the implementation of the behaviour
 #### Define a path to user for the cowboy handler
 ```
 Dispatch = cowboy_router:compile( [{'_',

@@ -212,15 +212,15 @@ parse_and_validate_token_test() ->
                          Data = TokenData,
                          #{id => IdToken}
                  end,
-    ValidateFun = fun(Data,Provider,_Nonce) ->
+    ValidateFun = fun(TokenMap,Provider,_Nonce) ->
                           Provider = ProviderId,
-                          Data = IdToken,
-                          {ok,#{}}
+                          #{id := IdToken} = TokenMap,
+                          {ok,#{ id => #{}}}
                   end,
 
     ok = meck:new(oidcc_token),
     ok = meck:expect(oidcc_token, extract_token_map, ExtractFun),
-    ok = meck:expect(oidcc_token, validate_id_token, ValidateFun),
+    ok = meck:expect(oidcc_token, validate_token_map, ValidateFun),
 
     {ok, #{id := #{}}} = oidcc:parse_and_validate_token(TokenData, ProviderId),
 

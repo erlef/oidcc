@@ -77,7 +77,8 @@ redirect_and_maybe_set_cookie(undefined, undefined, Path, Req, State) ->
     {ok, Req2} = cowboy_req:reply(302, Header, Req),
     {ok, Req2, State};
 redirect_and_maybe_set_cookie(CookieName, CookieData, Path, Req, State) ->
-    Opts = cookie_opts(60),
+    CookieTimeout = application:get_env(oidcc, cookie_timeout, 10),
+    Opts = cookie_opts(CookieTimeout),
     Req2 = cowboy_req:set_resp_cookie(CookieName, CookieData, Opts, Req),
     redirect_and_maybe_set_cookie(undefined, undefined, Path, Req2, State).
 

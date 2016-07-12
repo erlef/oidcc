@@ -190,12 +190,7 @@ parse_and_validate_token(Token, OpenIdProvider) ->
                                       {ok, map()} | {error, any()}.
 parse_and_validate_token(Token, OpenIdProvider, Nonce) ->
     TokenMap = oidcc_token:extract_token_map(Token),
-    #{id := IdToken0 } = TokenMap,
-    case oidcc_token:validate_id_token(IdToken0, OpenIdProvider, Nonce) of
-        {ok, IdToken} ->
-            {ok, maps:put(id, IdToken, TokenMap)};
-        Other -> Other
-    end.
+    oidcc_token:validate_token_map(TokenMap, OpenIdProvider, Nonce).
 
 %% @doc
 %% retrieve the informations of a user given by its token map

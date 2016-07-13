@@ -6,7 +6,7 @@
 -export([login_failed/2]).
 
 init() ->
-    application:set_env(oidcc, client_mod, ?MODULE).
+    oidcc_client:register(?MODULE).
 
 login_succeeded(Token) ->
     io:format("~n~n*************************************~nthe user logged in with~n ~p~n", [Token]),
@@ -15,12 +15,17 @@ login_succeeded(Token) ->
     CookieName = basic_client_http:cookie_name(),
     CookieData = SessionId,
     Path = <<"/">>,
-    {ok, CookieName, CookieData, Path}.
+    Updates = [
+               {redirect, Path}, 
+               {cookie, CookieName, CookieData, [{max_age, 30}]}
+              ],
+    {ok, Updates}.
 
 
 login_failed(_Error, _Description) ->
     Path = <<"/">>,
-    {ok, Path}.
+    Updates = [{redirect, Path}],
+    {ok, Updates}.
 
 
 

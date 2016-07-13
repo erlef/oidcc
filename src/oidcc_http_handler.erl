@@ -5,8 +5,6 @@
 -export([handle/2]).
 -export([terminate/3]).
 
--define(COOKIE, <<"oidcc_session">>).
-
 -record(state, {
           request_type = bad,
           code = undefined,
@@ -15,9 +13,10 @@
           provider = undefined,
 
           session = undefined,
-          peer = undefined,
+          peer_ip = undefined,
           user_agent = undefined,
-          referer = undefined
+          referer = undefined,
+          client_mod = undefined
          }).
 
 
@@ -30,61 +29,72 @@ init(_, Req, _Opts) ->
 
 handle(Req, #state{request_type = redirect,
                    provider = ProviderId,
-                   session = Session
+                   session = Session,
+                   user_agent = UserAgent,
+                   peer_ip = PeerIp,
+                   client_mod = ClientMod
                   } = State) ->
     %% redirect the client to the given provider Id
     %% set the cookie
-    {ok, Url} = oidcc:create_redirect_for_session(Session, ProviderId),
-    Header = [{<<"location">>, Url}],
-    {ok, Req2} = cookie(update, Req, Session),
-    {ok, Req3} = cowboy_req:reply(302, Header, Req2),
-    {ok, Req3, State};
+    {ok, Req2} = handle_redirect(ProviderId, Session, UserAgent, PeerIp,
+                                 ClientMod, Req),
+    {ok, Req2, State};
 handle(Req, #state{request_type = return,
                    error = undefined,
                    code = AuthCode,
                    session = Session,
-                   state = OidcState} = State) ->
-
-    try handle_return(AuthCode, Session, OidcState, State, Req) of
-        {ok, Req2, State} -> {ok, Req2, State}
-    catch _:_ ->
-            Error = internal,
-            Desc = <<"an internal error occured">>,
-            handle_fail(Error, Desc, Req, State)
-    end;
-handle(Req, #state{request_type = return} = State) ->
-    %% the user comes back from the OpenId Provider with an error
+                   user_agent = UserAgent,
+                   peer_ip = PeerIp
+                  } = State) ->
+    %% the user comes back from the OpenId Connect Provider
+    {ok, UpdateList} = handle_return(AuthCode, Session, UserAgent, PeerIp),
+    {ok, Req2} = apply_updates(UpdateList, Req),
+    {ok, Req2, State};
+handle(Req, #state{request_type = return, error=Desc} = State) ->
+    %% the user comes back from the OpenId Connect Provider with an error
     %% redirect him to the
     Error = oidc_provider_error,
-    Desc = <<"the oidc provider returned an error">>,
     handle_fail(Error, Desc, Req, State).
 
-handle_return(AuthCode, Session, OidcState, State, Req) ->
-    true = oidcc_session:is_state(OidcState, Session),
+handle_redirect(ProviderId, Session, UserAgent, PeerIp, ClientMod, Req) ->
+    ok = oidcc_session:set_user_agent(UserAgent, Session),
+    ok = oidcc_session:set_peer_ip(PeerIp, Session),
+    ok = oidcc_session:set_client_mod(ClientMod, Session),
+    {ok, Url} = oidcc:create_redirect_for_session(Session, ProviderId),
+    Header = [{<<"location">>, Url}],
+    cowboy_req:reply(302, Header, Req).
+
+handle_return(AuthCode, Session, UserAgent, PeerIp) ->
     {ok, Provider} = oidcc_session:get_provider(Session),
     {ok, Token} = oidcc:retrieve_token(AuthCode, Provider),
     {ok, Nonce} = oidcc_session:get_nonce(Session),
+    IsUserAgent = oidcc_session:is_user_agent(UserAgent, Session),
+    CheckUserAgent = application:get_env(oidcc, check_user_agent, true),
+    true = ((not CheckUserAgent) or IsUserAgent),
+    IsPeerIp = oidcc_session:is_peer_ip(PeerIp, Session),
+    CheckPeerIp = application:get_env(oidcc, check_peer_ip, true),
+    true = ((not CheckPeerIp) or IsPeerIp),
     {ok, VerifiedToken} = oidcc:parse_and_validate_token(Token, Provider,
                                                          Nonce),
-    {ok, Req2} = cookie(clear, Req, Session),
+    {ok, ClientMod} = oidcc_session:get_client_mod(Session),
     ok = oidcc_session:close(Session),
-    {ok, CookieName, CookieData, Path} = oidcc_client:succeeded(VerifiedToken),
-    redirect_and_maybe_set_cookie(CookieName, CookieData, Path, Req2, State).
-
-
-redirect_and_maybe_set_cookie(undefined, undefined, Path, Req, State) ->
-    Header = [{<<"location">>, Path}],
-    {ok, Req2} = cowboy_req:reply(302, Header, Req),
-    {ok, Req2, State};
-redirect_and_maybe_set_cookie(CookieName, CookieData, Path, Req, State) ->
-    CookieTimeout = application:get_env(oidcc, cookie_timeout, 10),
-    Opts = cookie_opts(CookieTimeout),
-    Req2 = cowboy_req:set_resp_cookie(CookieName, CookieData, Opts, Req),
-    redirect_and_maybe_set_cookie(undefined, undefined, Path, Req2, State).
+    oidcc_client:succeeded(VerifiedToken, ClientMod).
 
 handle_fail(Error, Desc, Req, State) ->
-    {ok, CookieName, CookieData, Path} = oidcc_client:failed(Error, Desc),
-    redirect_and_maybe_set_cookie(CookieName, CookieData, Path, Req, State).
+    {ok, UpdateList} = oidcc_client:failed(Error, Desc),
+    {ok, Req2} = apply_updates(UpdateList, Req),
+    {ok, Req2, State}.
+
+apply_updates([], Req) ->
+    {ok, Req};
+apply_updates([{redirect, Url}|T], Req) ->
+    Header = [{<<"location">>, Url}],
+    {ok, Req2} = cowboy_req:reply(302, Header, Req),
+    apply_updates(T, Req2);
+apply_updates([{cookie, Name, Data, Options} | T], Req) ->
+    Req2 = cowboy_req:set_resp_cookie(Name, Data, Options, Req),
+    apply_updates(T, Req2).
+
 
 
 terminate(_Reason, _Req, _State) ->
@@ -92,18 +102,19 @@ terminate(_Reason, _Req, _State) ->
 
 extract_args(Req) ->
     {QsList, Req1} = cowboy_req:qs_vals(Req),
-    {CookieSessionId, Req2} = cowboy_req:cookie(?COOKIE, Req1),
-    {Headers, Req3} = cowboy_req:headers(Req2),
-    {<<"GET">>, Req4} = cowboy_req:method(Req3),
-    {{PeerIP, _Port}, Req99} = cowboy_req:peer(Req4),
+    {Headers, Req2} = cowboy_req:headers(Req1),
+    {<<"GET">>, Req3} = cowboy_req:method(Req2),
+    {{PeerIP, _Port}, Req99} = cowboy_req:peer(Req3),
 
-    {ok, Session} = oidcc_session_mgr:get_session(CookieSessionId),
     QsMap = create_map_from_proplist(QsList),
+    SessionId = maps:get(state, QsMap, undefined),
+    {ok, Session} = oidcc_session_mgr:get_session(SessionId),
+
     UserAgent = get_header(<<"user-agent">>, Headers),
     Referer = get_header(<<"referer">>, Headers),
     NewState = #state{
                   session = Session,
-                  peer = PeerIP,
+                  peer_ip = PeerIP,
                   user_agent = UserAgent,
                   referer = Referer
                  },
@@ -112,42 +123,25 @@ extract_args(Req) ->
             Code = maps:get(code, QsMap, undefined),
             Error = maps:get(error, QsMap, undefined),
             State = maps:get(state, QsMap, undefined),
+            ClientMod = maps:get(client_mod, QsMap, undefined),
             {ok, Req99, NewState#state{request_type=return,
                                        code = Code,
                                        error = Error,
-                                       state = State}};
+                                       state = State,
+                                       client_mod = ClientMod
+                                      }};
         Value ->
             oidcc_session:set_provider(Value, Session),
             {ok, Req99, NewState#state{request_type = redirect,
                                        provider = Value}}
     end.
 
-cookie(clear, Req, _Session) ->
-    Opts = cookie_opts(0),
-    Req2 = cowboy_req:set_resp_cookie(?COOKIE, <<"deleted">>, Opts, Req),
-    {ok, Req2};
-cookie(update, Req, Session) ->
-    MaxAge = application:get_env(oidcc, session_max_age, 600),
-    {ok, ID} = oidcc_session:get_id(Session),
-    Opts = cookie_opts(MaxAge),
-    Req2 = cowboy_req:set_resp_cookie(?COOKIE, ID, Opts, Req),
-    {ok, Req2}.
-
-cookie_opts(MaxAge) ->
-    BasicOpts = [ {http_only, true}, {max_age, MaxAge}, {path, <<"/">>}],
-    add_secure(application:get_env(oidcc, secure_cookie), BasicOpts).
-
-add_secure(true, BasicOpts) ->
-    [{secure, true} | BasicOpts];
-add_secure(_, BasicOpts) ->
-    BasicOpts.
-
-
 -define(QSMAPPING, [
                     {<<"code">>, code},
                     {<<"error">>, error},
                     {<<"state">>, state},
-                    {<<"provider">>, provider}
+                    {<<"provider">>, provider},
+                    {<<"client_mod">>, client_mod}
                    ]).
 
 create_map_from_proplist(List) ->

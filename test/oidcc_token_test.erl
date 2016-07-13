@@ -39,7 +39,6 @@ validate_pass_test() ->
     ok.
 
 
-
 validate_group_pass_test() ->
     Nonce = <<"some random noce">>,
     ClientId = <<"234234211">>,

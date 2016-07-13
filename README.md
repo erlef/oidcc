@@ -30,7 +30,8 @@ The parameter are:
   This url is used to receive the configuration and set up the client, no
   configuration needs to be done. 
 * LocalEndpoint: The local URL where the user will be redirected back to once
-  logged in at the OpenId Connect provider.
+  logged in at the OpenId Connect provider, this MUST be the same as the path the 
+  `oidcc_http_handler` is running at, if you use the oidcc_client behaviour.
 
 
 Example:
@@ -40,7 +41,7 @@ Example:
                                            <<"234890982343">>,
                                            <<"my client secret">>,
                                            <<"https://accounts.google.com/.well-known/openid-configuration">>,
-                                           <<"https://my.domain/return">>),
+                                           <<"https://my.domain/oidc">>),
 ```
 ### Login Users: Using the Callbacks and Cowboy handler
 Oidcc implements a cowboy handler for redirecting a user agent (browser) to an OpenId Connect provider and to handle its response automatically. The handler calls a callback, once finished.
@@ -55,6 +56,7 @@ Basically three things need to be done:
  * Register the implementation of the behaviour
 
 #### Define a path to user for the cowboy handler
+The path MUST be the same as the local endpoint provided when adding the OpenId Connect provider.
 ```
 Dispatch = cowboy_router:compile( [{'_',
 					[
@@ -71,13 +73,15 @@ Dispatch = cowboy_router:compile( [{'_',
 ```
 #### Register the implementation of the behaviour 
 ```
-application:set_env(oidcc, client_mod, <module name>).
+{ok, ModuleId} = oidcc_client:register(<module name>).
 ```
 
 #### Logging in ...
 Now within your web application all you need to do is redirect the user agent 
 to the `oidcc_http_handler` path passing the OpenId Connect provider id in the
 query string, e.g. `/oidc?provider=123`.
+It is also possible to specify the module to use by passing its id: 
+`/oidc?provider=123&client_mod=456`.
 
 Once the login has either succeeded or failed the registered module gets called.
 

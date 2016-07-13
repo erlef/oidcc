@@ -11,6 +11,7 @@ init([]) ->
     Procs = [
              openid_provider_manager(),
              openid_session_manager(),
+             openid_client(),
              openid_provider_supervisor(),
              session_supervisor()
             ],
@@ -38,5 +39,11 @@ openid_provider_manager() ->
 openid_session_manager() ->
     #{ id => session_mgr,
        start => {oidcc_session_mgr, start_link, []},
+       type => worker
+     }.
+
+openid_client() ->
+    #{ id => client,
+       start => {oidcc_client, start_link, []},
        type => worker
      }.

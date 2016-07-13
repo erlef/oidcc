@@ -10,8 +10,8 @@ start_stop_test() ->
 basic_session_test() ->
     MeckModules = [oidcc_session_sup],
     test_util:meck_new(MeckModules),
-    NewSession = fun(Id, Nonce, State) ->
-                         oidcc_session:start_link(Id, Nonce, State)
+    NewSession = fun(Id, Nonce) ->
+                         oidcc_session:start_link(Id, Nonce)
                  end,
     meck:expect(oidcc_session_sup, new_session, NewSession),
 
@@ -35,8 +35,8 @@ basic_session_test() ->
 advanced_session_test() ->
     MeckModules = [oidcc_session_sup],
     test_util:meck_new(MeckModules),
-    NewSession = fun(Id, Nonce, State) ->
-                         oidcc_session:start_link(Id, Nonce, State)
+    NewSession = fun(Id, Nonce) ->
+                         oidcc_session:start_link(Id, Nonce)
                  end,
     meck:expect(oidcc_session_sup, new_session, NewSession),
 

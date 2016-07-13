@@ -8,7 +8,6 @@
 -export([is_peer_ip/2]).
 -export([get_id/1]).
 -export([get_provider/1]).
--export([get_state/1]).
 -export([get_scopes/1]).
 -export([get_nonce/1]).
 -export([get_client_mod/1]).
@@ -62,9 +61,6 @@ get_id(Pid) ->
 
 get_provider(Pid) ->
     gen_server:call(Pid, get_provider).
-
-get_state(Pid) ->
-    gen_server:call(Pid, get_state).
 
 get_scopes(Pid) ->
     gen_server:call(Pid, get_scopes).

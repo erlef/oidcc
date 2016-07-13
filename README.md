@@ -55,6 +55,7 @@ Basically three things need to be done:
  * Register the implementation of the behaviour
 
 #### Define a path to user for the cowboy handler
+The path MUST be the same as the local endpoint provided when adding the OpenIdProvider.
 ```
 Dispatch = cowboy_router:compile( [{'_',
 					[

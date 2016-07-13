@@ -71,13 +71,15 @@ Dispatch = cowboy_router:compile( [{'_',
 ```
 #### Register the implementation of the behaviour 
 ```
-application:set_env(oidcc, client_mod, <module name>).
+{ok, ModuleId} = oidcc_client:register(<module name>).
 ```
 
 #### Logging in ...
 Now within your web application all you need to do is redirect the user agent 
 to the `oidcc_http_handler` path passing the OpenId Connect provider id in the
 query string, e.g. `/oidc?provider=123`.
+It is also possible to specify the module to use by passing its id: 
+`/oidc?provider=123&client_mod=456`.
 
 Once the login has either succeeded or failed the registered module gets called.
 

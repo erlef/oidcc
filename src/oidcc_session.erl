@@ -2,15 +2,20 @@
 -behaviour(gen_server).
 
 %% API.
+-export([start_link/2]).
 -export([start_link/3]).
--export([start_link/4]).
--export([is_state/2]).
+-export([is_user_agent/2]).
+-export([is_peer_ip/2]).
 -export([get_id/1]).
 -export([get_provider/1]).
 -export([get_state/1]).
 -export([get_scopes/1]).
 -export([get_nonce/1]).
+-export([get_client_mod/1]).
 -export([set_provider/2]).
+-export([set_user_agent/2]).
+-export([set_peer_ip/2]).
+-export([set_client_mod/2]).
 -export([close/1]).
 
 
@@ -25,24 +30,32 @@
 -record(state, {
           id = undefined,
           provider = undefined,
+          user_agent = undefined,
+          peer_ip = undefined,
           nonce = undefined,
-          state = undefined,
           scopes = undefined,
-          timeout = undefined
+          timeout = undefined,
+          client_mod = undefined
          }).
 
 %% API.
 
-start_link(Id, Nonce, State) ->
+start_link(Id, Nonce) ->
     Scopes = application:get_env(oidcc, scopes, [openid]),
-    start_link(Id, Nonce, State, Scopes).
+    start_link(Id, Nonce, Scopes).
 
-start_link(Id, Nonce, State, Scopes) ->
-    gen_server:start_link(?MODULE, {Id, Nonce, State, Scopes}, []).
+start_link(Id, Nonce, Scopes) ->
+    gen_server:start_link(?MODULE, {Id, Nonce, Scopes}, []).
 
 -spec close(Pid ::pid()) -> ok.
 close(Pid) ->
     gen_server:cast(Pid, close).
+
+is_user_agent(UserAgent, Pid) ->
+    gen_server:call(Pid, {is_user_agent, UserAgent}).
+
+is_peer_ip(PeerIp, Pid) ->
+    gen_server:call(Pid, {is_peer_ip, PeerIp}).
 
 get_id(Pid) ->
     gen_server:call(Pid, get_id).
@@ -59,16 +72,25 @@ get_scopes(Pid) ->
 get_nonce(Pid) ->
     gen_server:call(Pid, get_nonce).
 
+get_client_mod(Pid) ->
+    gen_server:call(Pid, get_client_mod).
+
 set_provider(Provider, Pid) ->
     gen_server:call(Pid, {set_provider, Provider}).
 
-is_state(State, Pid) ->
-    gen_server:call(Pid, {is_state, State}).
+set_user_agent(UserAgent, Pid) ->
+    gen_server:call(Pid, {set_user_agent, UserAgent}).
+
+set_peer_ip(PeerIp, Pid) ->
+    gen_server:call(Pid, {set_peer_ip, PeerIp }).
+
+set_client_mod(ClientMod, Pid) ->
+    gen_server:call(Pid, {set_client_mod, ClientMod }).
 %% gen_server.
 
-init({Id, Nonce, State, Scopes}) ->
+init({Id, Nonce, Scopes}) ->
     Timeout = application:get_env(oidcc, session_timeout, 300000),
-    {ok, #state{id = Id, nonce = Nonce, state = State, scopes = Scopes,
+    {ok, #state{id = Id, nonce = Nonce, scopes = Scopes,
                 timeout=Timeout}, Timeout}.
 
 handle_call(get_id, _From, #state{id=Id, timeout=To} = State) ->
@@ -76,19 +98,27 @@ handle_call(get_id, _From, #state{id=Id, timeout=To} = State) ->
 handle_call(get_provider, _From, #state{provider=Provider,
                                         timeout=To} = State) ->
     {reply, {ok, Provider}, State, To};
-handle_call(get_state, _From, #state{state=OidcState, timeout=To} = State) ->
-    {reply, {ok, OidcState}, State, To};
-handle_call({is_state, OidcState}, _From, #state{state=OidcState,
-                                                 timeout=To} = State) ->
-    {reply, true, State, To};
-handle_call({is_state, _}, _From, #state{timeout=To} = State) ->
-    {reply, false, State, To};
 handle_call(get_scopes, _From, #state{scopes=Scopes, timeout=To} = State) ->
     {reply, {ok, Scopes}, State, To};
 handle_call(get_nonce, _From, #state{nonce=Nonce, timeout=To} = State) ->
     {reply, {ok, Nonce}, State, To};
+handle_call(get_client_mod, _From, #state{client_mod=ClientMod,
+                                          timeout=To} = State) ->
+    {reply, {ok, ClientMod}, State, To};
+handle_call({is_user_agent, UserAgentIn}, _From, #state{user_agent = UserAgent,
+                                                      timeout=To} = State) ->
+    {reply, UserAgentIn == UserAgent, State, To};
+handle_call({is_peer_ip, PeerIpIn}, _From, #state{peer_ip = PeerIp,
+                                                      timeout=To} = State) ->
+    {reply, PeerIpIn == PeerIp, State, To};
 handle_call({set_provider, Provider}, _From, #state{timeout=To} = State) ->
     {reply, ok, State#state{provider=Provider}, To};
+handle_call({set_user_agent, UserAgent}, _From, #state{timeout=To} = State) ->
+    {reply, ok, State#state{user_agent=UserAgent}, To};
+handle_call({set_peer_ip, PeerIp}, _From, #state{timeout=To} = State) ->
+    {reply, ok, State#state{peer_ip=PeerIp}, To};
+handle_call({set_client_mod, ClientMod}, _From, #state{timeout=To} = State) ->
+    {reply, ok, State#state{client_mod=ClientMod}, To};
 handle_call(_Request, _From, #state{timeout=To} = State) ->
     {reply, ignored, State, To}.
 

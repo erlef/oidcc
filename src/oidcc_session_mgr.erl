@@ -137,8 +137,7 @@ get_unique_id(List) ->
 
 start_session(Id) ->
     Nonce = random_string(128),
-    State = random_string(64),
-    {ok, Pid} = oidcc_session_sup:new_session(Id, Nonce, State),
+    {ok, Pid} = oidcc_session_sup:new_session(Id, Nonce),
     Pid.
 
 repeat_id_gen_if_needed(ID, false, _) ->

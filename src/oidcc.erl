@@ -17,6 +17,7 @@
 -export([retrieve_user_info/2]).
 -export([retrieve_user_info/3]).
 -export([introspect_token/2]).
+-export([register_module/1]).
 
 
 login_with(_OpenIdProviderId) ->
@@ -106,7 +107,7 @@ get_openid_provider_list() ->
                                          {error, provider_not_ready}.
 create_redirect_for_session(Session, OpenIdProviderId) ->
     {ok, Scopes} = oidcc_session:get_scopes(Session),
-    {ok, State} = oidcc_session:get_state(Session),
+    {ok, State} = oidcc_session:get_id(Session),
     {ok, Nonce} = oidcc_session:get_nonce(Session),
     create_redirect_url(OpenIdProviderId, Scopes, State, Nonce).
 
@@ -239,6 +240,9 @@ introspect_token(Token, #{introspection_endpoint := Endpoint,
 introspect_token(Token, ProviderId) ->
     {ok, Config} = get_openid_provider_info(ProviderId),
     introspect_token(Token, Config).
+
+register_module(Module) ->
+    oidcc_client:register(Module).
 
 
 extract_access_token(#{access := AccessToken}) ->

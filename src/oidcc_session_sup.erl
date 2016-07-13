@@ -1,13 +1,17 @@
 -module(oidcc_session_sup).
 -behaviour(supervisor).
 
+-export([new_session/2]).
 -export([new_session/3]).
 
 -export([start_link/0]).
 -export([init/1]).
 
-new_session(Id, Nonce, State) ->
-    supervisor:start_child(?MODULE, [Id, Nonce, State]).
+new_session(Id, Nonce) ->
+    supervisor:start_child(?MODULE, [Id, Nonce]).
+
+new_session(Id, Nonce, Scopes) ->
+    supervisor:start_child(?MODULE, [Id, Nonce, Scopes]).
 
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).

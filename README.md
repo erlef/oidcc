@@ -30,7 +30,8 @@ The parameter are:
   This url is used to receive the configuration and set up the client, no
   configuration needs to be done. 
 * LocalEndpoint: The local URL where the user will be redirected back to once
-  logged in at the OpenId Connect provider.
+  logged in at the OpenId Connect provider, this MUST be the same as the path the 
+  `oidcc_http_handler` is running at, if you use the oidcc_client behaviour.
 
 
 Example:
@@ -40,7 +41,7 @@ Example:
                                            <<"234890982343">>,
                                            <<"my client secret">>,
                                            <<"https://accounts.google.com/.well-known/openid-configuration">>,
-                                           <<"https://my.domain/return">>),
+                                           <<"https://my.domain/oidc">>),
 ```
 ### Login Users: Using the Callbacks and Cowboy handler
 Oidcc implements a cowboy handler for redirecting a user agent (browser) to an OpenId Connect provider and to handle its response automatically. The handler calls a callback, once finished.
@@ -55,7 +56,7 @@ Basically three things need to be done:
  * Register the implementation of the behaviour
 
 #### Define a path to user for the cowboy handler
-The path MUST be the same as the local endpoint provided when adding the OpenIdProvider.
+The path MUST be the same as the local endpoint provided when adding the OpenId Connect provider.
 ```
 Dispatch = cowboy_router:compile( [{'_',
 					[

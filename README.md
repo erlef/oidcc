@@ -85,6 +85,16 @@ It is also possible to specify the module to use by passing its id:
 
 Once the login has either succeeded or failed the registered module gets called.
 
+During the login process the oidcc library ensures the user agent and the 
+remote ip stay the same. 
+
+These checks can be disabled by updating the oidcc settings:
+```
+%% disable user agent check
+application:set_env(oidcc, check_user_agent, false).
+%% disable remote ip check
+application:set_env(oidcc, check_peer_ip, false).
+```
 ### Login Users: by hand 
 #### Create Redirection to Login Page 
 Creating a redirection is done with one of the `oidcc:create_redirect_url`

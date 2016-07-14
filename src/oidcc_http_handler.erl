@@ -32,56 +32,79 @@ handle(Req, #state{request_type = redirect,
                    session = Session,
                    user_agent = UserAgent,
                    peer_ip = PeerIp,
-                   client_mod = ClientMod
+                   client_mod = ClientModId
                   } = State) ->
     %% redirect the client to the given provider Id
     %% set the cookie
     {ok, Req2} = handle_redirect(ProviderId, Session, UserAgent, PeerIp,
-                                 ClientMod, Req),
+                                 ClientModId, Req),
     {ok, Req2, State};
 handle(Req, #state{request_type = return,
-                   error = undefined,
-                   code = AuthCode,
-                   session = Session,
-                   user_agent = UserAgent,
-                   peer_ip = PeerIp
+                   error = undefined
                   } = State) ->
     %% the user comes back from the OpenId Connect Provider
-    {ok, UpdateList} = handle_return(AuthCode, Session, UserAgent, PeerIp),
-    {ok, Req2} = apply_updates(UpdateList, Req),
-    {ok, Req2, State};
+    handle_return(Req, State);
 handle(Req, #state{request_type = return, error=Desc} = State) ->
     %% the user comes back from the OpenId Connect Provider with an error
     %% redirect him to the
     Error = oidc_provider_error,
     handle_fail(Error, Desc, Req, State).
 
-handle_redirect(ProviderId, Session, UserAgent, PeerIp, ClientMod, Req) ->
+handle_redirect(ProviderId, Session, UserAgent, PeerIp, ClientModId, Req) ->
     ok = oidcc_session:set_user_agent(UserAgent, Session),
     ok = oidcc_session:set_peer_ip(PeerIp, Session),
-    ok = oidcc_session:set_client_mod(ClientMod, Session),
+    ok = oidcc_session:set_client_mod(ClientModId, Session),
     {ok, Url} = oidcc:create_redirect_for_session(Session, ProviderId),
     Header = [{<<"location">>, Url}],
     cowboy_req:reply(302, Header, Req).
 
-handle_return(AuthCode, Session, UserAgent, PeerIp) ->
+handle_return(Req, #state{code = AuthCode,
+                          session = Session,
+                          user_agent = UserAgent,
+                          peer_ip = PeerIp
+                         } = State) ->
     {ok, Provider} = oidcc_session:get_provider(Session),
     {ok, Token} = oidcc:retrieve_token(AuthCode, Provider),
     {ok, Nonce} = oidcc_session:get_nonce(Session),
     IsUserAgent = oidcc_session:is_user_agent(UserAgent, Session),
     CheckUserAgent = application:get_env(oidcc, check_user_agent, true),
-    true = ((not CheckUserAgent) or IsUserAgent),
     IsPeerIp = oidcc_session:is_peer_ip(PeerIp, Session),
     CheckPeerIp = application:get_env(oidcc, check_peer_ip, true),
-    true = ((not CheckPeerIp) or IsPeerIp),
-    {ok, VerifiedToken} = oidcc:parse_and_validate_token(Token, Provider,
-                                                         Nonce),
-    {ok, ClientMod} = oidcc_session:get_client_mod(Session),
-    ok = oidcc_session:close(Session),
-    oidcc_client:succeeded(VerifiedToken, ClientMod).
+    {ok, ClientModId} = oidcc_session:get_client_mod(Session),
 
-handle_fail(Error, Desc, Req, State) ->
-    {ok, UpdateList} = oidcc_client:failed(Error, Desc),
+    UserAgentValid = ((not CheckUserAgent) or IsUserAgent),
+    PeerIpValid = ((not CheckPeerIp) or IsPeerIp),
+    TokenResult = oidcc:parse_and_validate_token(Token, Provider,
+                                                         Nonce),
+    try check_token_and_fingerprint(TokenResult, UserAgentValid,
+                                    PeerIpValid) of
+        {ok, VerifiedToken} ->
+            ok = oidcc_session:close(Session),
+            {ok, UpdateList} = oidcc_client:succeeded(VerifiedToken,
+                                                      ClientModId),
+            {ok, Req2} = apply_updates(UpdateList, Req),
+            {ok, Req2, State}
+    catch Error ->
+            handle_fail(internal, Error, Req, State)
+    end.
+
+
+check_token_and_fingerprint({ok, VerifiedToken}, true, true) ->
+    {ok, VerifiedToken};
+check_token_and_fingerprint(_, true, true) ->
+    throw(token_invalid);
+check_token_and_fingerprint(_, false, _) ->
+    throw(bad_user_agent);
+check_token_and_fingerprint(_, _, false) ->
+    throw(bad_peer_ip).
+
+
+handle_fail(Error, Desc, Req, #state{
+                                 session = Session
+                                } = State) ->
+    {ok, ClientModId} = oidcc_session:get_client_mod(Session),
+    ok = oidcc_session:close(Session),
+    {ok, UpdateList} = oidcc_client:failed(Error, Desc, ClientModId),
     {ok, Req2} = apply_updates(UpdateList, Req),
     {ok, Req2, State}.
 
@@ -123,12 +146,12 @@ extract_args(Req) ->
             Code = maps:get(code, QsMap, undefined),
             Error = maps:get(error, QsMap, undefined),
             State = maps:get(state, QsMap, undefined),
-            ClientMod = maps:get(client_mod, QsMap, undefined),
+            ClientModId = maps:get(client_mod, QsMap, undefined),
             {ok, Req99, NewState#state{request_type=return,
                                        code = Code,
                                        error = Error,
                                        state = State,
-                                       client_mod = ClientMod
+                                       client_mod = ClientModId
                                       }};
         Value ->
             oidcc_session:set_provider(Value, Session),

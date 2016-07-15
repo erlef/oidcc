@@ -16,9 +16,12 @@
           peer_ip = undefined,
           user_agent = undefined,
           referer = undefined,
-          client_mod = undefined
+          client_mod = undefined,
+          use_cookie = undefined,
+          cookie_data = undefined
          }).
 
+-define(COOKIE, <<"oidcc_session">>).
 
 init(_, Req, _Opts) ->
     try extract_args(Req) of
@@ -27,18 +30,10 @@ init(_, Req, _Opts) ->
         _:_ -> {ok, Req, #state{}}
     end.
 
-handle(Req, #state{request_type = redirect,
-                   provider = ProviderId,
-                   session = Session,
-                   user_agent = UserAgent,
-                   peer_ip = PeerIp,
-                   client_mod = ClientModId
-                  } = State) ->
+handle(Req, #state{request_type = redirect} = State) ->
     %% redirect the client to the given provider Id
     %% set the cookie
-    {ok, Req2} = handle_redirect(ProviderId, Session, UserAgent, PeerIp,
-                                 ClientModId, Req),
-    {ok, Req2, State};
+    handle_redirect(State, Req);
 handle(Req, #state{request_type = return,
                    error = undefined
                   } = State) ->
@@ -50,18 +45,29 @@ handle(Req, #state{request_type = return, error=Desc} = State) ->
     Error = oidc_provider_error,
     handle_fail(Error, Desc, Req, State).
 
-handle_redirect(ProviderId, Session, UserAgent, PeerIp, ClientModId, Req) ->
+handle_redirect(#state{
+                   provider = ProviderId,
+                   session = Session,
+                   user_agent = UserAgent,
+                   peer_ip = PeerIp,
+                   client_mod = ClientModId,
+                   use_cookie = UseCookie
+                  } = State, Req) ->
     ok = oidcc_session:set_user_agent(UserAgent, Session),
     ok = oidcc_session:set_peer_ip(PeerIp, Session),
     ok = oidcc_session:set_client_mod(ClientModId, Session),
     {ok, Url} = oidcc:create_redirect_for_session(Session, ProviderId),
-    Header = [{<<"location">>, Url}],
-    cowboy_req:reply(302, Header, Req).
+    CookieUpdate = cookie_update_if_requested(UseCookie, Session),
+    Redirect = {redirect, Url},
+    Updates = [CookieUpdate, Redirect],
+    {ok, Req2} = apply_updates(Updates, Req),
+    {ok, Req2, State}.
 
 handle_return(Req, #state{code = AuthCode,
                           session = Session,
                           user_agent = UserAgent,
-                          peer_ip = PeerIp
+                          peer_ip = PeerIp,
+                          cookie_data = CookieData
                          } = State) ->
     {ok, Provider} = oidcc_session:get_provider(Session),
     {ok, Token} = oidcc:retrieve_token(AuthCode, Provider),
@@ -70,6 +76,7 @@ handle_return(Req, #state{code = AuthCode,
     CheckUserAgent = application:get_env(oidcc, check_user_agent, true),
     IsPeerIp = oidcc_session:is_peer_ip(PeerIp, Session),
     CheckPeerIp = application:get_env(oidcc, check_peer_ip, true),
+    CookieValid = oidcc_session:is_cookie_data(CookieData, Session),
     {ok, ClientModId} = oidcc_session:get_client_mod(Session),
 
     UserAgentValid = ((not CheckUserAgent) or IsUserAgent),
@@ -77,36 +84,38 @@ handle_return(Req, #state{code = AuthCode,
     TokenResult = oidcc:parse_and_validate_token(Token, Provider,
                                                          Nonce),
     try check_token_and_fingerprint(TokenResult, UserAgentValid,
-                                    PeerIpValid) of
+                                    PeerIpValid, CookieValid) of
         {ok, VerifiedToken} ->
-            ok = oidcc_session:close(Session),
+            {ok, Req2} = close_session_delete_cookie(Session, Req),
             {ok, UpdateList} = oidcc_client:succeeded(VerifiedToken,
                                                       ClientModId),
-            {ok, Req2} = apply_updates(UpdateList, Req),
-            {ok, Req2, State}
+            {ok, Req3} = apply_updates(UpdateList, Req2),
+            {ok, Req3, State}
     catch Error ->
             handle_fail(internal, Error, Req, State)
     end.
 
 
-check_token_and_fingerprint({ok, VerifiedToken}, true, true) ->
+check_token_and_fingerprint({ok, VerifiedToken}, true, true, true) ->
     {ok, VerifiedToken};
-check_token_and_fingerprint(_, true, true) ->
+check_token_and_fingerprint(_, true, true, true) ->
     throw(token_invalid);
-check_token_and_fingerprint(_, false, _) ->
+check_token_and_fingerprint(_, false, _, _) ->
     throw(bad_user_agent);
-check_token_and_fingerprint(_, _, false) ->
-    throw(bad_peer_ip).
+check_token_and_fingerprint(_, _, false, _) ->
+    throw(bad_peer_ip);
+check_token_and_fingerprint(_, _, _, false) ->
+    throw(bad_cookie).
 
 
 handle_fail(Error, Desc, Req, #state{
                                  session = Session
                                 } = State) ->
     {ok, ClientModId} = oidcc_session:get_client_mod(Session),
-    ok = oidcc_session:close(Session),
+    {ok, Req2} = close_session_delete_cookie(Session, Req),
     {ok, UpdateList} = oidcc_client:failed(Error, Desc, ClientModId),
-    {ok, Req2} = apply_updates(UpdateList, Req),
-    {ok, Req2, State}.
+    {ok, Req3} = apply_updates(UpdateList, Req2),
+    {ok, Req3, State}.
 
 apply_updates([], Req) ->
     {ok, Req};
@@ -116,9 +125,41 @@ apply_updates([{redirect, Url}|T], Req) ->
     apply_updates(T, Req2);
 apply_updates([{cookie, Name, Data, Options} | T], Req) ->
     Req2 = cowboy_req:set_resp_cookie(Name, Data, Options, Req),
-    apply_updates(T, Req2).
+    apply_updates(T, Req2);
+apply_updates([{none} | T], Req) ->
+    apply_updates(T, Req).
 
 
+cookie_update_if_requested(true, Session) ->
+    CookieData =  base64url:encode(crypto:strong_rand_bytes(32)),
+    ok = oidcc_session:set_cookie_data(CookieData, Session),
+    MaxAge = application:get_env(oidcc, session_max_age, 600),
+    {cookie, ?COOKIE, CookieData, cookie_opts(MaxAge)};
+cookie_update_if_requested(_, _Session) ->
+    {none}.
+
+
+close_session_delete_cookie(Session, Req) ->
+    HasCookie = not oidcc_session:is_cookie_data(undefined, Session),
+    ok = oidcc_session:close(Session),
+    case HasCookie of
+        true ->
+            apply_updates([clear_cookie()], Req);
+        false ->
+            {ok, Req}
+    end.
+
+clear_cookie() ->
+    {cookie, ?COOKIE, <<"deleted">>, cookie_opts(0)}.
+
+cookie_opts(MaxAge) ->
+    BasicOpts = [ {http_only, true}, {max_age, MaxAge}, {path, <<"/">>}],
+    add_secure(application:get_env(oidcc, secure_cookie, false), BasicOpts).
+
+add_secure(true, BasicOpts) ->
+    [{secure, true} | BasicOpts];
+add_secure(_, BasicOpts) ->
+    BasicOpts.
 
 terminate(_Reason, _Req, _State) ->
     ok.
@@ -127,13 +168,15 @@ extract_args(Req) ->
     {QsList, Req1} = cowboy_req:qs_vals(Req),
     {Headers, Req2} = cowboy_req:headers(Req1),
     {<<"GET">>, Req3} = cowboy_req:method(Req2),
-    {{PeerIP, _Port}, Req99} = cowboy_req:peer(Req3),
+    {CookieData, Req4} = cowboy_req:cookie(?COOKIE, Req3),
+    {{PeerIP, _Port}, Req99} = cowboy_req:peer(Req4),
 
     QsMap = create_map_from_proplist(QsList),
     SessionId = maps:get(state, QsMap, undefined),
     {ok, Session} = oidcc_session_mgr:get_session(SessionId),
 
     UserAgent = get_header(<<"user-agent">>, Headers),
+    Referer = get_header(<<"referer">>, Headers),
     Referer = get_header(<<"referer">>, Headers),
     NewState = #state{
                   session = Session,
@@ -151,11 +194,15 @@ extract_args(Req) ->
                                        code = Code,
                                        error = Error,
                                        state = State,
-                                       client_mod = ClientModId
+                                       client_mod = ClientModId,
+                                       cookie_data = CookieData
                                       }};
         Value ->
+            CookieDefault = application:get_env(oidcc, use_cookie, false),
+            UseCookie = maps:is_key(use_cookie, QsMap) or CookieDefault,
             oidcc_session:set_provider(Value, Session),
             {ok, Req99, NewState#state{request_type = redirect,
+                                       use_cookie = UseCookie,
                                        provider = Value}}
     end.
 
@@ -164,29 +211,23 @@ extract_args(Req) ->
                     {<<"error">>, error},
                     {<<"state">>, state},
                     {<<"provider">>, provider},
-                    {<<"client_mod">>, client_mod}
+                    {<<"client_mod">>, client_mod},
+                    {<<"use_cookie">>, use_cookie}
                    ]).
 
 create_map_from_proplist(List) ->
     KeyToAtom = fun({Key, Value}, Map) ->
-                        {NewKey, NewVal} = map_to_atoms(Key, Value, ?QSMAPPING),
-                        maps:put(NewKey, NewVal, Map)
+                        NewKey = map_to_atom(Key, ?QSMAPPING),
+                        maps:put(NewKey, Value, Map)
                 end,
     lists:foldl(KeyToAtom, #{}, List).
 
-map_to_atoms(Key, Value, Mapping) ->
+map_to_atom(Key, Mapping) ->
     case lists:keyfind(Key, 1, Mapping) of
-        {Key, AKey, value} ->
-            case lists:keyfind(Value, 1, Mapping) of
-                {Value, AValue} ->
-                    {AKey, AValue};
-                _ ->
-                    {AKey, Value}
-            end;
         {Key, AKey} ->
-            {AKey, Value};
+            AKey;
         _ ->
-            {Key, Value}
+            Key
     end.
 
 get_header(Key, Headers) ->

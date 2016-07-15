@@ -22,7 +22,8 @@ login_succeeded(Token) ->
     {ok, Updates}.
 
 
-login_failed(_Error, _Description) ->
+login_failed(Error, Desc) ->
+    io:format("~n~n*************************************~nlogin failed with~n ~p:~p~n", [Error, Desc]),
     Path = <<"/">>,
     Updates = [{redirect, Path}],
     {ok, Updates}.

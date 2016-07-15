@@ -5,7 +5,10 @@
 	   you are logged in
         {% else %}
 	   you are not yet logged in, please do so by following 
-	   <a href="/oidc?provider=google">this link</a>
+	   <a href="/oidc?provider=google">going without cookie</a>
+           </br>
+	   you can also login  
+	   <a href="/oidc?provider=google&use_cookie">with using a cookie</a>
         {% endif %}
     </body>
 </html>

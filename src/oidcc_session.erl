@@ -2,8 +2,8 @@
 -behaviour(gen_server).
 
 %% API.
--export([start_link/2]).
 -export([start_link/3]).
+-export([start_link/4]).
 -export([is_user_agent/2]).
 -export([is_cookie_data/2]).
 -export([is_peer_ip/2]).
@@ -11,8 +11,8 @@
 -export([get_provider/1]).
 -export([get_scopes/1]).
 -export([get_nonce/1]).
+-export([get_pkce/1]).
 -export([get_client_mod/1]).
--export([set_provider/2]).
 -export([set_user_agent/2]).
 -export([set_cookie_data/2]).
 -export([set_peer_ip/2]).
@@ -36,12 +36,13 @@
 
 %% API.
 
-start_link(Id, Nonce) ->
+start_link(Id, Nonce, ProviderId) ->
     Scopes = application:get_env(oidcc, scopes, [openid]),
-    start_link(Id, Nonce, Scopes).
+    start_link(Id, Nonce, ProviderId, Scopes).
 
-start_link(Id, Nonce, Scopes) ->
-    gen_server:start_link(?MODULE, {Id, Nonce, Scopes}, []).
+start_link(Id, Nonce, ProviderId, Scopes) ->
+    Pkce = generate_pkce_if_supported(ProviderId),
+    gen_server:start_link(?MODULE, {Id, Nonce, Pkce, ProviderId, Scopes}, []).
 
 -spec close(Pid ::pid()) -> ok.
 close(Pid) ->
@@ -68,11 +69,11 @@ get_scopes(Pid) ->
 get_nonce(Pid) ->
     gen_server:call(Pid, {get, nonce}).
 
+get_pkce(Pid) ->
+    gen_server:call(Pid, {get, pkce}).
+
 get_client_mod(Pid) ->
     gen_server:call(Pid, {get, client_mod}).
-
-set_provider(Provider, Pid) ->
-    gen_server:call(Pid, {set, provider, Provider}).
 
 set_user_agent(UserAgent, Pid) ->
     gen_server:call(Pid, {set, user_agent, UserAgent}).
@@ -87,9 +88,10 @@ set_client_mod(ClientMod, Pid) ->
     gen_server:call(Pid, {set, client_mod, ClientMod }).
 %% gen_server.
 
-init({Id, Nonce, Scopes}) ->
+init({Id, Nonce, Pkce, ProviderId, Scopes}) ->
     Timeout = application:get_env(oidcc, session_timeout, 300000),
-    Map = #{nonce => Nonce, scopes => Scopes},
+    Map = #{nonce => Nonce, scopes => Scopes, pkce => Pkce,
+            provider => ProviderId},
     {ok, #state{id = Id, data = Map, timeout=Timeout}, Timeout}.
 
 handle_call({get, Field}, _From, #state{data=Map, timeout=To} = State) ->
@@ -129,4 +131,33 @@ terminate(_Reason, #state{id = Id}) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+generate_pkce_if_supported(ProviderId) ->
+    {ok, Config} = oidcc:get_openid_provider_info(ProviderId),
+    UsePkce = maps:is_key(code_challenge_methods_supported, Config),
+    Methods = maps:get(code_challenge_methods_supported, Config, [<<"S256">>]),
+    generate_pkce(UsePkce, Methods).
+
+generate_pkce(true, Methods) ->
+    CodeVerifier = gen_code_verifier(),
+    UseS256 = lists:member(<<"S256">>, Methods),
+    apply_s256(UseS256, CodeVerifier);
+generate_pkce(_, _) ->
+    undefined.
+
+apply_s256(true, CodeVerifier) ->
+    #{
+       verifier => CodeVerifier,
+       challenge => base64url:encode(crypto:hash(sha256, CodeVerifier)),
+       method => 'S256'
+     };
+apply_s256(_, CodeVerifier) ->
+    #{
+       verifier => CodeVerifier,
+       challenge => CodeVerifier,
+       method => plain
+     }.
+
+gen_code_verifier() ->
+    base64:encode(crypto:strong_rand_bytes(64)).
 

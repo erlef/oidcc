@@ -8,17 +8,19 @@ start_stop_test() ->
     ok.
 
 basic_session_test() ->
-    MeckModules = [oidcc_session_sup],
+    MeckModules = [oidcc_session_sup, oidcc],
     test_util:meck_new(MeckModules),
-    NewSession = fun(Id, Nonce) ->
-                         oidcc_session:start_link(Id, Nonce)
+    ProviderId = <<"oidcc_provider">>,
+    NewSession = fun(Id, Nonce, PId) ->
+                         oidcc_session:start_link(Id, Nonce, PId)
                  end,
     meck:expect(oidcc_session_sup, new_session, NewSession),
+    meck:expect(oidcc, get_openid_provider_info, fun(_) -> {ok, #{}} end),
 
     {ok, Pid} = oidcc_session_mgr:start_link(),
     {ok, []} = oidcc_session_mgr:get_session_list(),
     
-    {ok, SessPid} = oidcc_session_mgr:new_session(),
+    {ok, SessPid} = oidcc_session_mgr:new_session(ProviderId),
     
     {ok, List} = oidcc_session_mgr:get_session_list(),
     ?assertEqual(1, length(List)),
@@ -33,32 +35,35 @@ basic_session_test() ->
     ok.
 
 advanced_session_test() ->
-    MeckModules = [oidcc_session_sup],
+    MeckModules = [oidcc, oidcc_session_sup],
     test_util:meck_new(MeckModules),
-    NewSession = fun(Id, Nonce) ->
-                         oidcc_session:start_link(Id, Nonce)
+    NewSession = fun(Id, Nonce, PId) ->
+                         oidcc_session:start_link(Id, Nonce, PId)
                  end,
     meck:expect(oidcc_session_sup, new_session, NewSession),
+    meck:expect(oidcc, get_openid_provider_info, fun(_) -> {ok, #{}} end),
 
-    SessionId = <<"123">>,
+    ProviderId = <<"oidcc_provider">>,
+
     {ok, Pid} = oidcc_session_mgr:start_link(),
     {ok, []} = oidcc_session_mgr:get_session_list(),
     
-    {ok, Sess1} = oidcc_session_mgr:get_session(SessionId),
+    {ok, Sess1} = oidcc_session_mgr:new_session(ProviderId),
+    {ok, SessId} = oidcc_session:get_id(Sess1),
     {ok, List1} = oidcc_session_mgr:get_session_list(),
     ?assertEqual(1, length(List1)),
     
     
-    {ok, Sess2} = oidcc_session_mgr:get_session(SessionId),
+    {ok, Sess2} = oidcc_session_mgr:get_session(SessId),
     ?assertEqual(Sess1, Sess2),
     {ok, List2} = oidcc_session_mgr:get_session_list(),
     ?assertEqual(List1, List2),
   
-    {ok, Sess3} = oidcc_session_mgr:get_session(undefined),
+    {ok, Sess3} = oidcc_session_mgr:new_session(ProviderId),
     {ok, List3} = oidcc_session_mgr:get_session_list(),
     ?assertEqual(2, length(List3)),
    
-    {ok, Sess4} = oidcc_session_mgr:get_session(undefined),
+    {ok, Sess4} = oidcc_session_mgr:new_session(ProviderId),
     {ok, List4} = oidcc_session_mgr:get_session_list(),
     ?assertEqual(3, length(List4)),
     

@@ -46,7 +46,6 @@ handle(Req, #state{request_type = return, error=Desc} = State) ->
     handle_fail(Error, Desc, Req, State).
 
 handle_redirect(#state{
-                   provider = ProviderId,
                    session = Session,
                    user_agent = UserAgent,
                    peer_ip = PeerIp,
@@ -56,7 +55,7 @@ handle_redirect(#state{
     ok = oidcc_session:set_user_agent(UserAgent, Session),
     ok = oidcc_session:set_peer_ip(PeerIp, Session),
     ok = oidcc_session:set_client_mod(ClientModId, Session),
-    {ok, Url} = oidcc:create_redirect_for_session(Session, ProviderId),
+    {ok, Url} = oidcc:create_redirect_for_session(Session),
     CookieUpdate = cookie_update_if_requested(UseCookie, Session),
     Redirect = {redirect, Url},
     Updates = [CookieUpdate, Redirect],
@@ -70,7 +69,8 @@ handle_return(Req, #state{code = AuthCode,
                           cookie_data = CookieData
                          } = State) ->
     {ok, Provider} = oidcc_session:get_provider(Session),
-    {ok, Token} = oidcc:retrieve_token(AuthCode, Provider),
+    {ok, Pkce} = oidcc_session:get_pkce(Session),
+    {ok, Token} = oidcc:retrieve_token(AuthCode, Pkce, Provider),
     {ok, Nonce} = oidcc_session:get_nonce(Session),
     IsUserAgent = oidcc_session:is_user_agent(UserAgent, Session),
     CheckUserAgent = application:get_env(oidcc, check_user_agent, true),
@@ -173,37 +173,37 @@ extract_args(Req) ->
 
     QsMap = create_map_from_proplist(QsList),
     SessionId = maps:get(state, QsMap, undefined),
-    {ok, Session} = oidcc_session_mgr:get_session(SessionId),
 
     UserAgent = get_header(<<"user-agent">>, Headers),
     Referer = get_header(<<"referer">>, Headers),
     Referer = get_header(<<"referer">>, Headers),
     NewState = #state{
-                  session = Session,
                   peer_ip = PeerIP,
                   user_agent = UserAgent,
                   referer = Referer
                  },
     case maps:get(provider, QsMap, undefined) of
         undefined ->
+            {ok, Session} = oidcc_session_mgr:get_session(SessionId),
             Code = maps:get(code, QsMap, undefined),
             Error = maps:get(error, QsMap, undefined),
             State = maps:get(state, QsMap, undefined),
             ClientModId = maps:get(client_mod, QsMap, undefined),
             {ok, Req99, NewState#state{request_type=return,
+                                       session = Session,
                                        code = Code,
                                        error = Error,
                                        state = State,
                                        client_mod = ClientModId,
                                        cookie_data = CookieData
                                       }};
-        Value ->
+        ProviderId ->
+            {ok, Session} = oidcc_session_mgr:new_session(ProviderId),
             CookieDefault = application:get_env(oidcc, use_cookie, false),
             UseCookie = maps:is_key(use_cookie, QsMap) or CookieDefault,
-            oidcc_session:set_provider(Value, Session),
             {ok, Req99, NewState#state{request_type = redirect,
-                                       use_cookie = UseCookie,
-                                       provider = Value}}
+                                       session = Session,
+                                       use_cookie = UseCookie}}
     end.
 
 -define(QSMAPPING, [

@@ -10,8 +10,10 @@
 -export([create_redirect_url/2]).
 -export([create_redirect_url/3]).
 -export([create_redirect_url/4]).
--export([create_redirect_for_session/2]).
+-export([create_redirect_url/5]).
+-export([create_redirect_for_session/1]).
 -export([retrieve_token/2]).
+-export([retrieve_token/3]).
 -export([parse_and_validate_token/2]).
 -export([parse_and_validate_token/3]).
 -export([retrieve_user_info/2]).
@@ -102,14 +104,14 @@ get_openid_provider_list() ->
 %% same as create_redirect_url/4 but with all parameters being fetched
 %% from the given session, except the provider
 %% @end
--spec create_redirect_for_session(pid(), binary()) ->
-                                         {ok, binary()} |
-                                         {error, provider_not_ready}.
-create_redirect_for_session(Session, OpenIdProviderId) ->
+-spec create_redirect_for_session(pid()) -> {ok, binary()}.
+create_redirect_for_session(Session) ->
     {ok, Scopes} = oidcc_session:get_scopes(Session),
     {ok, State} = oidcc_session:get_id(Session),
     {ok, Nonce} = oidcc_session:get_nonce(Session),
-    create_redirect_url(OpenIdProviderId, Scopes, State, Nonce).
+    {ok, Pkce} = oidcc_session:get_pkce(Session),
+    {ok, OpenIdProviderId} = oidcc_session:get_provider(Session),
+    create_redirect_url(OpenIdProviderId, Scopes, State, Nonce, Pkce).
 
 %% @doc
 %% same as create_redirect_url/4 but with State and Nonce being undefined and
@@ -146,7 +148,17 @@ create_redirect_url(OpenIdProviderId, Scopes, OidcState) ->
                                  {ok, binary()} | {error, provider_not_ready}.
 create_redirect_url(OpenIdProviderId, Scopes, OidcState, OidcNonce ) ->
     {ok, Info} = get_openid_provider_info(OpenIdProviderId),
-    create_redirect_url_if_ready(Info, Scopes, OidcState, OidcNonce).
+    create_redirect_url_if_ready(Info, Scopes, OidcState, OidcNonce, undefined).
+
+
+%% @doc
+%% create a redirection for the given OpenId Connect provider
+%%
+%% also setting the Pkce Map to perform a code challenge
+%% @end
+create_redirect_url(OpenIdProviderId, Scopes, OidcState, OidcNonce, Pkce ) ->
+    {ok, Info} = get_openid_provider_info(OpenIdProviderId),
+    create_redirect_url_if_ready(Info, Scopes, OidcState, OidcNonce, Pkce).
 
 %% @doc
 %% retrieve the token using the authcode received before
@@ -157,6 +169,10 @@ create_redirect_url(OpenIdProviderId, Scopes, OidcState, OidcNonce ) ->
 %% @end
 -spec retrieve_token(binary(), binary()) -> {ok, binary()}.
 retrieve_token(AuthCode, OpenIdProviderId) ->
+    retrieve_token(AuthCode, undefined, OpenIdProviderId).
+
+-spec retrieve_token(binary(), map() | undefined, binary()) -> {ok, binary()}.
+retrieve_token(AuthCode, Pkce, OpenIdProviderId) ->
     {ok, Info} = get_openid_provider_info(OpenIdProviderId),
     #{ client_id := ClientId,
        client_secret := Secret,
@@ -170,10 +186,12 @@ retrieve_token(AuthCode, OpenIdProviderId) ->
                 {<<"redirect_uri">>, LocalEndpoint}
               ],
     Header0 = [ {<<"content-type">>, <<"application/x-www-form-urlencoded">>}],
-    {QsBody, Header} = add_authentication(QsBody0, Header0, AuthMethod,
-                                          ClientId, Secret),
+    {QsBody, Header} = add_authentication_code_verifier(QsBody0, Header0,
+                                                        AuthMethod, ClientId,
+                                                        Secret, Pkce),
     Body = cow_qs:qs(QsBody),
     return_token(oidcc_http_util:sync_http(post, Endpoint, Header, Body)).
+
 
 %% @doc
 %% like parse_and_validate_token/3 yet without checking the nonce
@@ -255,9 +273,9 @@ extract_access_token(Token) when is_binary(Token) ->
 
 
 
-create_redirect_url_if_ready(#{ready := false}, _, _, _) ->
+create_redirect_url_if_ready(#{ready := false}, _, _, _, _) ->
     {error, provider_not_ready};
-create_redirect_url_if_ready(Info, Scopes, OidcState, OidcNonce) ->
+create_redirect_url_if_ready(Info, Scopes, OidcState, OidcNonce, Pkce) ->
     #{ local_endpoint := LocalEndpoint,
        client_id := ClientId,
        authorization_endpoint := AuthEndpoint
@@ -271,7 +289,8 @@ create_redirect_url_if_ready(Info, Scopes, OidcState, OidcNonce) ->
               ],
     UrlList1 = append_state(OidcState, UrlList),
     UrlList2 = append_nonce(OidcNonce, UrlList1),
-    Qs = cow_qs:qs(UrlList2),
+    UrlList3 = append_code_challenge(Pkce, UrlList2),
+    Qs = cow_qs:qs(UrlList3),
     Url = << AuthEndpoint/binary, <<"?">>/binary, Qs/binary>>,
     {ok, Url}.
 
@@ -304,6 +323,16 @@ append_nonce(Nonce, UrlList) when is_binary(Nonce) ->
 append_nonce(_, UrlList) ->
     UrlList.
 
+append_code_challenge(#{challenge := Challenge} = Pkce, UrlList) ->
+    NewUrlList = [{<<"code_challenge">>, Challenge} | UrlList],
+    append_code_challenge_method(Pkce, NewUrlList);
+append_code_challenge(_, UrlList) ->
+    UrlList.
+
+append_code_challenge_method(#{method := 'S256'}, UrlList) ->
+    [{<<"code_challenge_method">>, <<"S256">>} | UrlList];
+append_code_challenge_method(_, UrlList) ->
+    [{<<"code_challenge_method">>, <<"plain">>} | UrlList].
 
 select_preferred_auth(AuthMethodsSupported) ->
     Selector = fun(Method, Current) ->
@@ -317,15 +346,22 @@ select_preferred_auth(AuthMethodsSupported) ->
     lists:foldl(Selector, undefined, AuthMethodsSupported).
 
 
-add_authentication(QsBodyList, Header, basic, ClientId, Secret) ->
+add_authentication_code_verifier(QsBodyList, Header, basic, ClientId, Secret,
+                                 undefined) ->
     NewHeader = [basic_auth(ClientId, Secret)| Header ],
     {QsBodyList, NewHeader};
-add_authentication(QsBodyList, Header, post, ClientId, ClientSecret) ->
+add_authentication_code_verifier(QsBodyList, Header, post, ClientId,
+                                 ClientSecret, undefined) ->
     NewBodyList = [ {<<"client_id">>, ClientId},
                     {<<"client_secret">>, ClientSecret} | QsBodyList ],
     {NewBodyList, Header};
-add_authentication(B, H, undefined, CI, CS) ->
-    add_authentication(B, H, basic, CI, CS).
+add_authentication_code_verifier(B, H, undefined, CI, CS, undefined) ->
+    add_authentication_code_verifier(B, H, basic, CI, CS, undefined);
+add_authentication_code_verifier(BodyQs, Header, AuthMethod, CI, CS,
+                                 #{verifier:=CV}) ->
+    BodyQs1 = [{<<"code_verifier">>, CV} | BodyQs],
+    add_authentication_code_verifier(BodyQs1, Header, AuthMethod, CI, CS,
+                                     undefined).
 
 
 

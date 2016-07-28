@@ -22,7 +22,7 @@
 -export([start_link/0]).
 -export([stop/0]).
 
--export([new_session/0]).
+-export([new_session/1]).
 -export([get_session/1]).
 -export([close_all_sessions/0]).
 -export([get_session_list/0]).
@@ -50,15 +50,13 @@ start_link() ->
 stop() ->
     gen_server:cast(?MODULE, stop).
 
--spec new_session() -> {ok, pid()}.
-new_session() ->
-    gen_server:call(?MODULE, new_session).
+-spec new_session(binary()) -> {ok, pid()}.
+new_session(ProviderId) ->
+    gen_server:call(?MODULE, {new_session, ProviderId}).
 
--spec get_session(ID :: uuid:uuid() | undefined) -> {ok, pid()}.
-get_session(undefined) ->
-    new_session();
+-spec get_session(ID :: uuid:uuid()) -> {ok, pid()}.
 get_session(ID) ->
-    gen_server:call(?MODULE, {get_or_create_session, ID}).
+    gen_server:call(?MODULE, {get_session, ID}).
 
 -spec session_terminating(ID :: binary()) -> ok.
 session_terminating(ID) ->
@@ -78,12 +76,12 @@ get_session_list() ->
 init([]) ->
     {ok, #state{}}.
 
-handle_call(new_session, _From, State) ->
-    {ok, Pid, NewState} = create_new_session(State),
+handle_call({new_session, ProviderId}, _From, State) ->
+    {ok, Pid, NewState} = create_new_session(ProviderId, State),
     {reply, {ok, Pid}, NewState};
-handle_call({get_or_create_session, Id}, _From, State) ->
-    {ok, Pid, NewState} = lookup_or_create_session(Id, State),
-    {reply, {ok, Pid}, NewState};
+handle_call({get_session, Id}, _From, State) ->
+    {ok, Pid} = lookup_session(Id, State),
+    {reply, {ok, Pid}, State};
 handle_call({delete_session, ID}, _From, State) ->
     {ok, NewState} = delete_session(ID, State),
     {reply, ok, NewState};
@@ -135,11 +133,6 @@ get_unique_id(List) ->
     ID = random_string(64),
     repeat_id_gen_if_needed(ID, lists:keyfind(ID, 1, List), List).
 
-start_session(Id) ->
-    Nonce = random_string(128),
-    {ok, Pid} = oidcc_session_sup:new_session(Id, Nonce),
-    Pid.
-
 repeat_id_gen_if_needed(ID, false, _) ->
     ID;
 repeat_id_gen_if_needed(_, _, List) ->
@@ -156,21 +149,19 @@ lookup_session(Id, #state{sessions=Sessions}) ->
 session_list(#state{sessions=Sessions}) ->
     Sessions.
 
-create_new_session(State) ->
+create_new_session(ProviderId, State) ->
     ID = get_unique_id(State),
-    create_new_session(ID, State).
+    create_new_session(ID, ProviderId, State).
 
-create_new_session(ID, State) ->
-    Pid = start_session(ID),
+create_new_session(ID, ProviderId, State) ->
+    Pid = start_session(ID, ProviderId),
     {ok, NewState} = set_session_for_id(ID, Pid, State),
     {ok, Pid, NewState}.
 
-lookup_or_create_session(ID, State) ->
-    lookup_or_create_session(lookup_session(ID, State), ID, State).
-lookup_or_create_session({ok, Pid}, _ID, State) ->
-    {ok, Pid, State};
-lookup_or_create_session({error, _}, ID, State) ->
-    create_new_session(ID, State).
+start_session(Id, ProviderId) ->
+    Nonce = random_string(128),
+    {ok, Pid} = oidcc_session_sup:new_session(Id, Nonce, ProviderId),
+    Pid.
 
 random_string(Length) ->
     base64url:encode(crypto:strong_rand_bytes(Length)).

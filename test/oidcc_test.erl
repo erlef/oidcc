@@ -120,25 +120,20 @@ create_redirect_url_test() ->
     {ok, Url3} = oidcc:create_redirect_url(ProviderId, [<<"email">>, "profile", openid], State),
     {ok, Url4} = oidcc:create_redirect_url(ProviderId, [email, profile, openid], State, Nonce),
 
-    io:format("Url1: ~p~n", [Url1]),
-    io:format("Url2: ~p~n", [Url2]),
-    io:format("Url3: ~p~n", [Url3]),
-    io:format("Url4: ~p~n", [Url4]),
-
-    ExpUrl1 = <<"https://my.provider/auth?response_type=code&scope=openid&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
-    Url1 = ExpUrl1,
+    ExpUrl1 = <<"https://my.provider/auth?scope=openid&response_type=code&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
+    ?assertEqual(ExpUrl1, Url1),
 
     ExpUrl2 =
-    <<"https://my.provider/auth?response_type=code&scope=openid+email&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
-    Url2 = ExpUrl2,
+    <<"https://my.provider/auth?scope=openid+email&response_type=code&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
+    ?assertEqual(ExpUrl2, Url2),
 
     ExpUrl3 =
-    <<"https://my.provider/auth?state=someimportantstate&response_type=code&scope=openid+profile+email&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
-    Url3 = ExpUrl3,
+    <<"https://my.provider/auth?scope=openid+profile+email&state=someimportantstate&response_type=code&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
+    ?assertEqual(ExpUrl3, Url3),
 
     ExpUrl4 =
-    <<"https://my.provider/auth?nonce=noncenonce&state=someimportantstate&response_type=code&scope=openid+profile+email&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
-    Url4 = ExpUrl4,
+    <<"https://my.provider/auth?scope=openid+profile+email&nonce=noncenonce&state=someimportantstate&response_type=code&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
+    ?assertEqual(ExpUrl4, Url4),
 
     true = meck:validate(oidcc_openid_provider),
     true = meck:validate(oidcc_openid_provider_mgr),

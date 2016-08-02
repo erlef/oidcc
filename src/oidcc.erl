@@ -1,6 +1,5 @@
 -module(oidcc).
 
--export([login_with/1]).
 -export([add_openid_provider/6]).
 -export([add_openid_provider/7]).
 -export([find_openid_provider/1]).
@@ -18,13 +17,10 @@
 -export([parse_and_validate_token/3]).
 -export([retrieve_user_info/2]).
 -export([retrieve_user_info/3]).
+-export([retrieve_access_token/2]).
+-export([retrieve_access_token/3]).
 -export([introspect_token/2]).
 -export([register_module/1]).
-
-
-login_with(_OpenIdProviderId) ->
-    ok.
-
 
 
 %% @doc
@@ -174,23 +170,12 @@ retrieve_token(AuthCode, OpenIdProviderId) ->
 -spec retrieve_token(binary(), map() | undefined, binary()) -> {ok, binary()}.
 retrieve_token(AuthCode, Pkce, OpenIdProviderId) ->
     {ok, Info} = get_openid_provider_info(OpenIdProviderId),
-    #{ client_id := ClientId,
-       client_secret := Secret,
-       token_endpoint := Endpoint,
-       token_endpoint_auth_methods_supported := AuthMethods,
-       local_endpoint := LocalEndpoint
-     } = Info,
-    AuthMethod = select_preferred_auth(AuthMethods),
-    QsBody0 = [ {<<"grant_type">>, <<"authorization_code">>},
+    #{local_endpoint := LocalEndpoint} = Info,
+    QsBody = [ {<<"grant_type">>, <<"authorization_code">>},
                 {<<"code">>, AuthCode},
                 {<<"redirect_uri">>, LocalEndpoint}
               ],
-    Header0 = [ {<<"content-type">>, <<"application/x-www-form-urlencoded">>}],
-    {QsBody, Header} = add_authentication_code_verifier(QsBody0, Header0,
-                                                        AuthMethod, ClientId,
-                                                        Secret, Pkce),
-    Body = cow_qs:qs(QsBody),
-    return_token(oidcc_http_util:sync_http(post, Endpoint, Header, Body)).
+    retrieve_a_token(QsBody, Pkce, Info).
 
 
 %% @doc
@@ -235,6 +220,19 @@ retrieve_user_info(Token, OpenIdProvider, Subject) ->
     retrieve_user_info(Token, Config, Subject).
 
 
+retrieve_access_token(RefreshToken, OpenIdProvider) ->
+    retrieve_access_token(RefreshToken, [], OpenIdProvider).
+
+retrieve_access_token(RefreshToken, Scopes, OpenIdProvider) ->
+    {ok, Config} = get_openid_provider_info(OpenIdProvider),
+    BodyQs0 = [
+              {<<"refresh_token">>, RefreshToken},
+              {<<"grant_type">>, <<"refresh_token">>}
+             ],
+    BodyQs = append_scope(Scopes, BodyQs0),
+    retrieve_a_token(BodyQs, Config).
+
+
 %% @doc
 %% introspect the given token at the given provider
 %%
@@ -263,6 +261,24 @@ register_module(Module) ->
     oidcc_client:register(Module).
 
 
+retrieve_a_token(QsBodyIn, OpenIdProviderInfo) ->
+    retrieve_a_token(QsBodyIn, undefined, OpenIdProviderInfo).
+
+retrieve_a_token(QsBodyIn, Pkce, OpenIdProviderInfo) ->
+    #{ client_id := ClientId,
+       client_secret := Secret,
+       token_endpoint := Endpoint,
+       token_endpoint_auth_methods_supported := AuthMethods
+     } = OpenIdProviderInfo,
+    AuthMethod = select_preferred_auth(AuthMethods),
+    Header0 = [ {<<"content-type">>, <<"application/x-www-form-urlencoded">>}],
+    {QsBody, Header} = add_authentication_code_verifier(QsBodyIn, Header0,
+                                                        AuthMethod, ClientId,
+                                                        Secret, Pkce),
+    Body = cow_qs:qs(QsBody),
+    return_token(oidcc_http_util:sync_http(post, Endpoint, Header, Body)).
+
+
 extract_access_token(#{access := AccessToken}) ->
     #{token := Token} = AccessToken,
     Token;
@@ -280,35 +296,26 @@ create_redirect_url_if_ready(Info, Scopes, OidcState, OidcNonce, Pkce) ->
        client_id := ClientId,
        authorization_endpoint := AuthEndpoint
      } = Info,
-    Scope = scopes_to_bin(Scopes, <<>>),
     UrlList = [
                {<<"response_type">>, <<"code">>},
-               {<<"scope">>, Scope},
                {<<"client_id">>, ClientId},
                {<<"redirect_uri">>, LocalEndpoint}
               ],
     UrlList1 = append_state(OidcState, UrlList),
     UrlList2 = append_nonce(OidcNonce, UrlList1),
     UrlList3 = append_code_challenge(Pkce, UrlList2),
-    Qs = cow_qs:qs(UrlList3),
+    UrlList4 = append_scope(Scopes, UrlList3),
+    Qs = cow_qs:qs(UrlList4),
     Url = << AuthEndpoint/binary, <<"?">>/binary, Qs/binary>>,
     {ok, Url}.
 
 
-scopes_to_bin([], Bin) ->
-    Bin;
-scopes_to_bin([H | T], <<>>) when is_binary(H) ->
-    scopes_to_bin(T, H);
-scopes_to_bin([H | T], Bin) when is_binary(H) ->
-    NewBin = << H/binary, <<" ">>/binary, Bin/binary>>,
-    scopes_to_bin(T, NewBin);
-scopes_to_bin([H | T], Bin) when is_atom(H) ->
-    List = [ atom_to_binary(H, utf8) | T],
-    scopes_to_bin(List, Bin);
-scopes_to_bin([H | T], Bin) when is_list(H) ->
-    List = [ list_to_binary(H) | T],
-    scopes_to_bin(List, Bin).
-
+append_scope(<<>>, QsList) ->
+    QsList;
+append_scope(Scope, QsList) when is_binary(Scope) ->
+    [{<<"scope">>, Scope} | QsList];
+append_scope(Scopes, QsList) when is_list(Scopes) ->
+    append_scope(scopes_to_bin(Scopes, <<>>), QsList).
 
 
 
@@ -404,4 +411,19 @@ basic_auth(User, Secret) ->
 
 bearer_auth(Token) ->
     {<<"authorization">>, << <<"Bearer ">>/binary, Token/binary >>}.
+
+
+scopes_to_bin([], Bin) ->
+    Bin;
+scopes_to_bin([H | T], <<>>) when is_binary(H) ->
+    scopes_to_bin(T, H);
+scopes_to_bin([H | T], Bin) when is_binary(H) ->
+    NewBin = << H/binary, <<" ">>/binary, Bin/binary>>,
+    scopes_to_bin(T, NewBin);
+scopes_to_bin([H | T], Bin) when is_atom(H) ->
+    List = [ atom_to_binary(H, utf8) | T],
+    scopes_to_bin(List, Bin);
+scopes_to_bin([H | T], Bin) when is_list(H) ->
+    List = [ list_to_binary(H) | T],
+    scopes_to_bin(List, Bin).
 

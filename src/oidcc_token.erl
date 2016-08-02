@@ -170,6 +170,7 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     NonceInToken = maps:get(nonce, Claims, undefined),
     case Nonce of
         NonceInToken -> ok;
+        any -> ok;
         _ -> throw(wrong_nonce)
     end,
 

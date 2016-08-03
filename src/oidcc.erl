@@ -17,8 +17,8 @@
 -export([parse_and_validate_token/3]).
 -export([retrieve_user_info/2]).
 -export([retrieve_user_info/3]).
--export([retrieve_access_token/2]).
--export([retrieve_access_token/3]).
+-export([retrieve_fresh_token/2]).
+-export([retrieve_fresh_token/3]).
 -export([introspect_token/2]).
 -export([register_module/1]).
 
@@ -220,10 +220,11 @@ retrieve_user_info(Token, OpenIdProvider, Subject) ->
     retrieve_user_info(Token, Config, Subject).
 
 
-retrieve_access_token(RefreshToken, OpenIdProvider) ->
-    retrieve_access_token(RefreshToken, [], OpenIdProvider).
 
-retrieve_access_token(RefreshToken, Scopes, OpenIdProvider) ->
+retrieve_fresh_token(RefreshToken, OpenIdProvider) ->
+    retrieve_fresh_token(RefreshToken, [], OpenIdProvider).
+
+retrieve_fresh_token(RefreshToken, Scopes, OpenIdProvider) ->
     {ok, Config} = get_openid_provider_info(OpenIdProvider),
     BodyQs0 = [
               {<<"refresh_token">>, RefreshToken},

@@ -1,7 +1,7 @@
 {application, 
  oidcc, [
          {description, "an easy to use OpenID Connect client library"},
-         {vsn, "0.1.0"},
+         {vsn, "0.2.0"},
          {modules, []},
          {registered, [oidcc_sup]},
          {applications, [
@@ -9,7 +9,6 @@
                          stdlib,
                          crypto,
                          ejwt,
-                         uri,
 			 base64url,
                          gun
                         ]},

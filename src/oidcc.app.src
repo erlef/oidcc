@@ -1,8 +1,7 @@
 {application, 
  oidcc, [
          {description, "an easy to use OpenID Connect client library"},
-         {vsn, "git"},
-         {id, "git"},
+         {vsn, "0.1.0"},
          {modules, []},
          {registered, [oidcc_sup]},
          {applications, [
@@ -14,5 +13,8 @@
 			 base64url,
                          gun
                         ]},
+         {maintainers, ["Bas Wegh"]},
+         {licenses, ["Apache 2.0"]},
+         {links, [{"GitHub","https://github.com/indigo-dc/oidcc"}]},
          {mod, {oidcc_app, []}}
         ]}.

@@ -1,7 +1,7 @@
 REBAR = $(shell pwd)/rebar3
 APP=oidcc
 
-.PHONY: all ct test clean elvis compile 
+.PHONY: all ct test clean elvis compile basic_client
 
 all: compile
 
@@ -21,3 +21,6 @@ elvis:
 compile:
 	$(REBAR) compile
 
+
+basic_client:
+	make -C example/basic_client run

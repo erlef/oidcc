@@ -7,6 +7,7 @@ start_stop_test() ->
                description => <<"some description">>,
                client_id => <<"123">>,
                client_secrect => <<"dont tell">>,
+               request_scopes => undefined,
                config_endpoint => <<"https://my.provider.com/well.known">>,
                local_endpoint => <<"/here">>
               },
@@ -28,6 +29,7 @@ set_test() ->
                description => Description,
                client_id => ClientId,
                client_secrect => ClientSecret,
+               request_scopes => undefined,
                config_endpoint => ConfigEndpoint,
                local_endpoint => LocalEndpoint
               },
@@ -60,6 +62,7 @@ fetch_config_test() ->
                description => <<"some description">>,
                client_id => <<"123">>,
                client_secrect => <<"dont tell">>,
+               request_scopes => undefined,
                config_endpoint => ConfigEndpoint,
                local_endpoint => <<"/here">>
               },
@@ -137,6 +140,7 @@ real_config_fetch_test() ->
                description => <<"some description">>,
                client_id => <<"123">>,
                client_secrect => <<"dont tell">>,
+               request_scopes => undefined,
                config_endpoint => ConfigEndpoint,
                local_endpoint => <<"/here">>
               },

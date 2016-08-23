@@ -15,7 +15,8 @@ basic_session_test() ->
                          oidcc_session:start_link(Id, Nonce, PId)
                  end,
     meck:expect(oidcc_session_sup, new_session, NewSession),
-    meck:expect(oidcc, get_openid_provider_info, fun(_) -> {ok, #{}} end),
+    meck:expect(oidcc, get_openid_provider_info,
+                fun(_) -> {ok, #{request_scopes => undefined}} end),
 
     {ok, Pid} = oidcc_session_mgr:start_link(),
     {ok, []} = oidcc_session_mgr:get_session_list(),
@@ -41,7 +42,8 @@ advanced_session_test() ->
                          oidcc_session:start_link(Id, Nonce, PId)
                  end,
     meck:expect(oidcc_session_sup, new_session, NewSession),
-    meck:expect(oidcc, get_openid_provider_info, fun(_) -> {ok, #{}} end),
+    meck:expect(oidcc, get_openid_provider_info,
+                fun(_) -> {ok, #{request_scopes => undefined}} end),
 
     ProviderId = <<"oidcc_provider">>,
 

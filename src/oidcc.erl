@@ -2,6 +2,7 @@
 
 -export([add_openid_provider/6]).
 -export([add_openid_provider/7]).
+-export([add_openid_provider/8]).
 -export([find_openid_provider/1]).
 -export([get_openid_provider_info/1]).
 -export([get_openid_provider_list/0]).
@@ -35,7 +36,7 @@
 add_openid_provider(Name, Description, ClientId, ClientSecret, ConfigEndpoint,
                     LocalEndpoint) ->
     add_openid_provider(undefined, Name, Description, ClientId, ClientSecret,
-                        ConfigEndpoint, LocalEndpoint).
+                        ConfigEndpoint, LocalEndpoint, undefined).
 
 %% @doc
 %% add an OpenID Connect Provider to the list of possible Providers, giving the
@@ -51,12 +52,23 @@ add_openid_provider(Name, Description, ClientId, ClientSecret, ConfigEndpoint,
                                  {error, id_already_used}.
 add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
                     ConfigEndpoint, LocalEndpoint) ->
+    add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
+                        ConfigEndpoint, LocalEndpoint, undefined).
+
+-spec add_openid_provider(binary(), binary(), binary(), binary(), binary()
+                         , binary(), binary(), list() | undefined ) ->
+                                 {ok, Id::binary(), Pid::pid()}|
+                                 {error, id_already_used}.
+
+add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
+                    ConfigEndpoint, LocalEndpoint, Scopes) ->
     Config = #{name => Name,
                description => Description,
                client_id => ClientId,
                client_secrect => ClientSecret,
                config_endpoint => ConfigEndpoint,
-               local_endpoint => LocalEndpoint
+               local_endpoint => LocalEndpoint,
+               request_scopes => Scopes
               },
     oidcc_openid_provider_mgr:add_openid_provider(IdIn, Config).
 

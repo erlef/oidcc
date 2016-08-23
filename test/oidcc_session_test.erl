@@ -1,11 +1,14 @@
 -module(oidcc_session_test).
 -include_lib("eunit/include/eunit.hrl").
 
+
+
 start_stop_test() ->
     MeckModules = [oidcc, oidcc_session_mgr],
     ok = test_util:meck_new(MeckModules),
     meck:expect(oidcc_session_mgr, session_terminating, fun(_) -> ok end ),
-    meck:expect(oidcc, get_openid_provider_info, fun(_) -> {ok, #{}} end),
+    meck:expect(oidcc, get_openid_provider_info, 
+                fun(_) -> {ok, #{request_scopes => undefined}} end),
     Id = 123,
     Nonce = 123,
     ProviderId = <<"oidcc_provider">>,
@@ -19,7 +22,8 @@ timeout_test() ->
     MeckModules = [oidcc, oidcc_session_mgr],
     ok = test_util:meck_new(MeckModules),
     meck:expect(oidcc_session_mgr, session_terminating, fun(_) -> ok end ),
-    meck:expect(oidcc, get_openid_provider_info, fun(_) -> {ok, #{}} end),
+    meck:expect(oidcc, get_openid_provider_info, 
+                fun(_) -> {ok, #{request_scopes => undefined}} end),
     application:set_env(oidcc, session_timeout, 50),
     Id = 123,
     Nonce = 123,
@@ -33,7 +37,8 @@ garbage_test() ->
     MeckModules = [oidcc, oidcc_session_mgr],
     ok = test_util:meck_new(MeckModules),
     meck:expect(oidcc_session_mgr, session_terminating, fun(_) -> ok end ),
-    meck:expect(oidcc, get_openid_provider_info, fun(_) -> {ok, #{}} end),
+    meck:expect(oidcc, get_openid_provider_info, 
+                fun(_) -> {ok, #{request_scopes => undefined}} end),
     Id = 123,
     Nonce = 123,
     ProviderId = <<"oidcc_provider">>,
@@ -53,7 +58,8 @@ get_set_test() ->
     MeckModules = [oidcc, oidcc_session_mgr],
     ok = test_util:meck_new(MeckModules),
     meck:expect(oidcc_session_mgr, session_terminating, fun(_) -> ok end ),
-    meck:expect(oidcc, get_openid_provider_info, fun(_) -> {ok, #{}} end),
+    meck:expect(oidcc, get_openid_provider_info, 
+                fun(_) -> {ok, #{request_scopes => undefined}} end),
     Id = id,
     Nonce = nonce,
     Scopes = [openid],

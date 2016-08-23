@@ -26,6 +26,7 @@
           desc = undefined,
           client_id = undefined,
           client_secret = undefined,
+          request_scopes = undefined,
           config_ep = undefined,
           config = #{},
           keys = [],
@@ -77,13 +78,14 @@ init({Id, Config}) ->
       description := Description,
       client_id := ClientId,
       client_secrect := ClientSecret,
+      request_scopes := Scopes,
       config_endpoint := ConfigEndpoint,
       local_endpoint := LocalEndpoint
      } = Config,
     trigger_config_retrieval(),
     {ok, #state{id = Id, name = Name, desc = Description, client_id = ClientId,
-               client_secret = ClientSecret, config_ep = ConfigEndpoint,
-               local_endpoint = LocalEndpoint}}.
+                client_secret = ClientSecret, config_ep = ConfigEndpoint,
+                request_scopes = Scopes, local_endpoint = LocalEndpoint}}.
 
 handle_call(get_config, _From, State) ->
     Conf = create_config(State),
@@ -197,11 +199,13 @@ create_config(#state{id = Id, desc = Desc, client_id = ClientId,
                      client_secret = ClientSecret, config_ep = ConfEp,
                      config=Config, keys = Keys,
                      lasttime_updated = LastTimeUpdated, ready = Ready,
-                     local_endpoint = LocalEndpoint, name = Name}) ->
+                     local_endpoint = LocalEndpoint, name = Name,
+                     request_scopes = Scopes}) ->
     StateList = [{id, Id}, {name, Name}, {description, Desc},
                  {client_id, ClientId}, {client_secret, ClientSecret},
                  {config_endpoint, ConfEp}, {lasttime_updated, LastTimeUpdated},
-                 {ready, Ready}, {local_endpoint, LocalEndpoint}, {keys, Keys}],
+                 {ready, Ready}, {local_endpoint, LocalEndpoint}, {keys, Keys},
+                 {request_scopes, Scopes}],
     maps:merge(Config, maps:from_list(StateList)).
 
 

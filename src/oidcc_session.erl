@@ -37,10 +37,15 @@
 %% API.
 
 start_link(Id, Nonce, ProviderId) ->
-    Scopes = application:get_env(oidcc, scopes, [openid]),
+    {ok, Config} = oidcc:get_openid_provider_info(ProviderId),
+    Scopes = maps:get(request_scopes, Config),
     start_link(Id, Nonce, ProviderId, Scopes).
 
-start_link(Id, Nonce, ProviderId, Scopes) ->
+start_link(Id, Nonce, ProviderId, Scopes0) ->
+    Scopes = case Scopes0 of
+                 undefined -> application:get_env(oidcc, scopes, [openid]);
+                 _ -> Scopes0
+             end,
     Pkce = generate_pkce_if_supported(ProviderId),
     gen_server:start_link(?MODULE, {Id, Nonce, Pkce, ProviderId, Scopes}, []).
 

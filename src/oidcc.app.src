@@ -14,7 +14,7 @@
                          kernel,
                          stdlib,
                          crypto,
-                         ejwt,
+                         erljwt,
                          uri,
 			 base64url,
                          gun

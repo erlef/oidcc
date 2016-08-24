@@ -181,8 +181,8 @@ generate_id_token(bad_algo,ClientId,Nonce,Issuer) ->
                     sub => <<"joe">>,
                     iat => 123
                    },
-    Key = <<"some sharted secret">>,
-    ejwt:jwt(hs256,ClaimSetMap,600,Key).
+    Key = <<"some shared secret">>,
+    erljwt:jwt(hs256,ClaimSetMap,600,Key).
 
 
 
@@ -205,4 +205,4 @@ stop_mocking_oidcc() ->
     ok.
 
 generate_id_token(ClaimSetMap,Expiration) ->
-    ejwt:jwt(rs256,ClaimSetMap,Expiration,?RSA_PRIVATE_KEY).
+    erljwt:jwt(rs256,ClaimSetMap,Expiration,?RSA_PRIVATE_KEY).

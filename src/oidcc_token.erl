@@ -69,7 +69,7 @@ validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
 
 int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     {ok, OpInfo} = oidcc:get_openid_provider_info(OpenIdProviderId),
-    {Header, Claims} = case ejwt:pre_parse_jwt(IdToken) of
+    {Header, Claims} = case erljwt:pre_parse_jwt(IdToken) of
                            #{ header := H, claims := C }  -> {H, C};
                            _ -> throw(not_a_jwt)
                        end,
@@ -140,7 +140,7 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     %
     % 9. The current time MUST be before the time represented by the exp Claim.
     PubKey = get_needed_key(PubKeys, Kid),
-    JWT = ejwt:parse_jwt(IdToken, PubKey, <<"JWT">>),
+    JWT = erljwt:parse_jwt(IdToken, PubKey, <<"JWT">>),
     case JWT of
         Claims -> ok;
         invalid -> throw(invalid_signature);

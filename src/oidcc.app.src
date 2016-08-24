@@ -1,18 +1,26 @@
 {application, 
  oidcc, [
          {description, "an easy to use OpenID Connect client library"},
-         {vsn, "git"},
-         {id, "git"},
+         {vsn, "semver"},
          {modules, []},
-         {registered, [oidcc_sup]},
+         {registered, [
+                       oidcc_sup,
+                       oidcc_openid_provider_mgr,
+                       oidcc_openid_provider_sup,
+                       oidcc_session_mgr,
+                       oidcc_session_sup
+                      ]},
          {applications, [
                          kernel,
                          stdlib,
                          crypto,
-                         ejwt,
+                         erljwt,
                          uri,
 			 base64url,
                          gun
                         ]},
+         {maintainers, ["Bas Wegh"]},
+         {licenses, ["Apache 2.0"]},
+         {links, [{"GitHub","https://github.com/indigo-dc/oidcc"}]},
          {mod, {oidcc_app, []}}
         ]}.

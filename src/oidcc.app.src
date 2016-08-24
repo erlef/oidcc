@@ -15,6 +15,7 @@
                          stdlib,
                          crypto,
                          ejwt,
+                         uri,
 			 base64url,
                          gun
                         ]},

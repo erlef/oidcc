@@ -114,7 +114,8 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     % that an azp Claim is present.
     % 5.  If an azp (authorized party) Claim is present, the Client SHOULD
     % verify that its client_id is the Claim Value.
-    case {is_list(Audience), maps:get(azp, Claims, undefined)} of
+    case {has_other_audience(ClientId, Audience),
+          maps:get(azp, Claims, undefined)} of
         {false, _} ->  ok;
         {true, ClientId} -> ok;
         {true, Azp} when is_binary(Azp) -> throw(azp_bad);
@@ -205,6 +206,11 @@ is_part_of_audience(ClientId, Audience) when is_binary(Audience) ->
     Audience == ClientId;
 is_part_of_audience(ClientId, Audience) when is_list(Audience) ->
     lists:member(ClientId, Audience).
+
+has_other_audience(ClientId, Audience) when is_binary(Audience) ->
+    Audience /= ClientId;
+has_other_audience(ClientId, Audience) when is_list(Audience) ->
+    length(lists:delete(ClientId, Audience)) >= 1.
 
 
 

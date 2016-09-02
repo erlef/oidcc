@@ -1,7 +1,7 @@
 {application, 
  oidcc, [
          {description, "an easy to use OpenID Connect client library"},
-         {vsn, "semver"},
+         {vsn, "0.2.0"},
          {modules, []},
          {registered, [
                        oidcc_sup,

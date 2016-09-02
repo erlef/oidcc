@@ -16,7 +16,6 @@
                          crypto,
                          cowboy,
                          erljwt,
-                         uri,
 			 base64url,
                          gun
                         ]},

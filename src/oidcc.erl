@@ -55,11 +55,18 @@ add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
     add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
                         ConfigEndpoint, LocalEndpoint, undefined).
 
--spec add_openid_provider(binary(), binary(), binary(), binary(), binary()
-                         , binary(), binary(), list() | undefined ) ->
+-spec add_openid_provider(Id, Name, Description, ClientId, ClientSecret,
+                          ConfigEndpoint, LocalEndpoint, Scopes) ->
                                  {ok, Id::binary(), Pid::pid()}|
-                                 {error, id_already_used}.
-
+                                 {error, id_already_used} when
+      Id :: binary() | undefined,
+      Name :: binary(),
+      Description :: binary(),
+      ClientId :: binary(),
+      ClientSecret :: binary(),
+      ConfigEndpoint :: binary(),
+      LocalEndpoint :: binary(),
+      Scopes :: list() | undefined.
 add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
                     ConfigEndpoint, LocalEndpoint, Scopes) ->
     Config = #{name => Name,
@@ -128,7 +135,8 @@ create_redirect_for_session(Session) ->
 -spec create_redirect_url(binary()) ->
                                  {ok, binary()} | {error, provider_not_ready}.
 create_redirect_url(OpenIdProviderId) ->
-    create_redirect_url(OpenIdProviderId, [<<"openid">>], undefined, undefined).
+    create_redirect_url(OpenIdProviderId, [<<"openid">>], undefined, undefined,
+                        undefined).
 
 %% @doc
 %% same as create_redirect_url/4 but with State and Nonce being undefined
@@ -136,7 +144,8 @@ create_redirect_url(OpenIdProviderId) ->
 -spec create_redirect_url(binary(), list()) ->
                                  {ok, binary()} | {error, provider_not_ready}.
 create_redirect_url(OpenIdProviderId, Scopes) ->
-    create_redirect_url(OpenIdProviderId, Scopes, undefined, undefined).
+    create_redirect_url(OpenIdProviderId, Scopes, undefined, undefined,
+                        undefined).
 
 %% @doc
 %% same as create_redirect_url/4 but with Nonce being undefined
@@ -144,7 +153,8 @@ create_redirect_url(OpenIdProviderId, Scopes) ->
 -spec create_redirect_url(binary(), list(), binary()) ->
                                  {ok, binary()} | {error, provider_not_ready}.
 create_redirect_url(OpenIdProviderId, Scopes, OidcState) ->
-    create_redirect_url(OpenIdProviderId, Scopes, OidcState, undefined).
+    create_redirect_url(OpenIdProviderId, Scopes, OidcState, undefined,
+                        undefined).
 
 %% @doc
 %% create a redirection for the given OpenId Connect provider
@@ -155,8 +165,8 @@ create_redirect_url(OpenIdProviderId, Scopes, OidcState) ->
 -spec create_redirect_url(binary(), list(), binary(), binary()) ->
                                  {ok, binary()} | {error, provider_not_ready}.
 create_redirect_url(OpenIdProviderId, Scopes, OidcState, OidcNonce ) ->
-    {ok, Info} = get_openid_provider_info(OpenIdProviderId),
-    create_redirect_url_if_ready(Info, Scopes, OidcState, OidcNonce, undefined).
+    create_redirect_url(OpenIdProviderId, Scopes, OidcState, OidcNonce,
+                        undefined).
 
 
 %% @doc
@@ -164,6 +174,14 @@ create_redirect_url(OpenIdProviderId, Scopes, OidcState, OidcNonce ) ->
 %%
 %% also setting the Pkce Map to perform a code challenge
 %% @end
+-spec create_redirect_url(ProviderId, Scopes, OidcState, OidcNonce, Pkce) ->
+                                 {ok, binary()} |
+                                 {error, provider_no_ready} when
+      ProviderId :: binary(),
+      Scopes :: list(),
+      OidcState :: binary() | undefined,
+      OidcNonce :: binary() | undefined,
+      Pkce :: binary() | undefined.
 create_redirect_url(OpenIdProviderId, Scopes, OidcState, OidcNonce, Pkce ) ->
     {ok, Info} = get_openid_provider_info(OpenIdProviderId),
     create_redirect_url_if_ready(Info, Scopes, OidcState, OidcNonce, Pkce).
@@ -202,8 +220,12 @@ parse_and_validate_token(Token, OpenIdProvider) ->
 %% also validates the token according to the OpenID Connect spec, see
 %% source of oidcc_token:validate_id_token/1 for more information
 %% @end
--spec parse_and_validate_token(binary(), binary(), binary()) ->
-                                      {ok, map()} | {error, any()}.
+-spec parse_and_validate_token(Token, Provider, Nonce) ->
+                                      {ok, map()} | {error, any()}
+                                          when
+      Token :: binary(),
+      Provider :: binary(),
+      Nonce :: binary() | any | undefined.
 parse_and_validate_token(Token, OpenIdProvider, Nonce) ->
     TokenMap = oidcc_token:extract_token_map(Token),
     oidcc_token:validate_token_map(TokenMap, OpenIdProvider, Nonce).
@@ -221,8 +243,11 @@ retrieve_user_info(Token, OpenIdProvider) ->
     retrieve_user_info(Token, OpenIdProvider, Subject).
 
 
--spec retrieve_user_info(map() | binary(), binary(), binary()|undefined) ->
-                                {ok, map()} | {error, any()}.
+-spec retrieve_user_info(Token, ProviderOrConfig, Subject)-> {ok, map()} |
+                                                             {error, any()} when
+      Token :: binary() | map(),
+      ProviderOrConfig :: binary() | map(),
+      Subject :: binary() | undefined.
 retrieve_user_info(Token, #{userinfo_endpoint := Endpoint}, Subject) ->
     AccessToken = extract_access_token(Token),
     Header = [bearer_auth(AccessToken)],
@@ -253,8 +278,10 @@ retrieve_fresh_token(RefreshToken, Scopes, OpenIdProvider) ->
 %% this is done by looking up the IntrospectionEndpoint from the configuration
 %% and then requesting info, using the client credentials as authentication
 %% @end
--spec introspect_token(map() | binary(), binary()) -> {ok, map()} |
-                                                      {error, any()}.
+-spec introspect_token(Token, ProviderOrConfig) -> {ok, map()} |
+                                                   {error, any()} when
+      Token :: binary() | map(),
+      ProviderOrConfig :: binary() | map().
 introspect_token(Token, #{introspection_endpoint := Endpoint,
                           client_id := ClientId,
                           client_secret := ClientSecret}) ->
@@ -392,14 +419,10 @@ add_authentication_code_verifier(BodyQs, Header, AuthMethod, CI, CS,
                                      undefined).
 
 
-
-return_token( {error, Reason} ) ->
-    {error, Reason};
 return_token( {ok, #{body := Token, status := 200}} ) ->
     {ok, Token};
 return_token( {ok, #{body := Body, status := Status}} ) ->
     {error, {http_error, Status, Body}}.
-
 
 
 return_validated_user_info(HttpData, undefined) ->
@@ -417,9 +440,7 @@ return_json_info({ok, #{status := 200, body := Data}}) ->
     catch Error -> {error, Error}
     end;
 return_json_info({ok, Map}) ->
-    {error, {bad_status, Map}};
-return_json_info({error, _}=Error) ->
-    Error.
+    {error, {bad_status, Map}}.
 
 
 basic_auth(User, Secret) ->

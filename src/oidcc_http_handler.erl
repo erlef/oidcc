@@ -183,12 +183,13 @@ terminate(_Reason, _Req, _State) ->
 
 extract_args(Req) ->
     {QsList, Req1} = cowboy_req:qs_vals(Req),
-    {Headers, Req2} = cowboy_req:headers(Req1),
-    {Method, Req3} = cowboy_req:method(Req2),
-    {CookieData, Req4} = cowboy_req:cookie(?COOKIE, Req3),
-    {{PeerIP, _Port}, Req99} = cowboy_req:peer(Req4),
+    {ok, BodyQsList, Req2} = cowboy_req:body_qs(Req1),
+    {Headers, Req3} = cowboy_req:headers(Req2),
+    {Method, Req4} = cowboy_req:method(Req3),
+    {CookieData, Req5} = cowboy_req:cookie(?COOKIE, Req4),
+    {{PeerIP, _Port}, Req99} = cowboy_req:peer(Req5),
 
-    QsMap = create_map_from_proplist(QsList),
+    QsMap = create_map_from_proplist(QsList++BodyQsList),
     SessionId = maps:get(state, QsMap, undefined),
 
     UserAgent = get_header(<<"user-agent">>, Headers),

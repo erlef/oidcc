@@ -85,7 +85,9 @@ handle_return(Req, #state{code = AuthCode,
                                                          Nonce),
     try check_token_and_fingerprint(TokenResult, UserAgentValid,
                                     PeerIpValid, CookieValid) of
-        {ok, VerifiedToken} ->
+        {ok, VerifiedToken0} ->
+            {ok, VerifiedToken} = add_userinfo_if_configured(VerifiedToken0,
+                                                             Provider),
             {ok, Req2} = close_session_delete_cookie(Session, Req),
             {ok, UpdateList} = oidcc_client:succeeded(VerifiedToken,
                                                       ClientModId),
@@ -94,6 +96,21 @@ handle_return(Req, #state{code = AuthCode,
     catch Error ->
             handle_fail(internal, Error, Req, State)
     end.
+
+
+add_userinfo_if_configured(Token, Provider) ->
+    GetUserInfo = application:get_env(oidcc, retrieve_userinfo, false),
+    add_userinfo_to_token(GetUserInfo, Token, Provider).
+add_userinfo_to_token(false, Token, _Provider) ->
+    {ok, Token};
+add_userinfo_to_token(true, Token, Provider) ->
+    Result = oidcc:retrieve_user_info(Token, Provider),
+    insert_userinfo_in_token(Result, Token).
+insert_userinfo_in_token({ok, UserInfo}, Token) ->
+    {ok, maps:put(user_info, UserInfo, Token)};
+insert_userinfo_in_token( _, Token) ->
+    {ok, maps:put(user_info, #{}, Token)}.
+
 
 
 check_token_and_fingerprint({ok, VerifiedToken}, true, true, true) ->

@@ -4,12 +4,4 @@
  {<<"erljwt">>,{pkg,<<"erljwt">>,<<"0.1.0">>},0},
  {<<"gun">>,{pkg,<<"gun">>,<<"1.0.0-pre.1">>},0},
  {<<"jsx">>,{pkg,<<"jsx">>,<<"2.8.0">>},1},
- {<<"ranch">>,{pkg,<<"ranch">>,<<"1.2.1">>},1},
- {<<"rebar_vsn_plugin">>,
-  {git,"https://github.com/erlware/rebar_vsn_plugin.git",
-       {ref,"fd40c960c7912193631d948fe962e1162a8d1334"}},
-  1},
- {<<"uri">>,
-  {git,"https://github.com/erlware/uri.git",
-       {ref,"91f6b7162d25cc42538606daf08f5df3b9f5861b"}},
-  0}].
+ {<<"ranch">>,{pkg,<<"ranch">>,<<"1.2.1">>},1}].

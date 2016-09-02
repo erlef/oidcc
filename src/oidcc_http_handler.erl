@@ -184,7 +184,7 @@ terminate(_Reason, _Req, _State) ->
 extract_args(Req) ->
     {QsList, Req1} = cowboy_req:qs_vals(Req),
     {Headers, Req2} = cowboy_req:headers(Req1),
-    {<<"GET">>, Req3} = cowboy_req:method(Req2),
+    {Method, Req3} = cowboy_req:method(Req2),
     {CookieData, Req4} = cowboy_req:cookie(?COOKIE, Req3),
     {{PeerIP, _Port}, Req99} = cowboy_req:peer(Req4),
 
@@ -201,6 +201,7 @@ extract_args(Req) ->
                  },
     case maps:get(provider, QsMap, undefined) of
         undefined ->
+            Method = <<"GET">>,
             {ok, Session} = oidcc_session_mgr:get_session(SessionId),
             Code = maps:get(code, QsMap, undefined),
             Error = maps:get(error, QsMap, undefined),

@@ -217,7 +217,8 @@ parse_and_validate_token(Token, OpenIdProvider, Nonce) ->
 -spec retrieve_user_info(map() | binary(), binary()) ->
                                 {ok, map()} | {error, any()}.
 retrieve_user_info(Token, OpenIdProvider) ->
-    retrieve_user_info(Token, OpenIdProvider, undefined).
+    Subject = extract_subject(Token),
+    retrieve_user_info(Token, OpenIdProvider, Subject).
 
 
 -spec retrieve_user_info(map() | binary(), binary(), binary()|undefined) ->
@@ -291,6 +292,13 @@ retrieve_a_token(QsBodyIn, Pkce, OpenIdProviderInfo) ->
     Body = cow_qs:qs(QsBody),
     return_token(oidcc_http_util:sync_http(post, Endpoint, Header, Body)).
 
+
+extract_subject(#{id := IdToken}) ->
+    extract_subject(IdToken);
+extract_subject(#{sub := Subject}) ->
+    Subject;
+extract_subject(_) ->
+    undefined.
 
 extract_access_token(#{access := AccessToken}) ->
     #{token := Token} = AccessToken,

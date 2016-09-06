@@ -77,10 +77,8 @@ get_nonce(Pid) ->
 get_pkce(Pid) ->
     gen_server:call(Pid, {get, pkce}).
 
-get_client_mod(Pid) when is_pid(Pid) ->
-    gen_server:call(Pid, {get, client_mod});
-get_client_mod(_) ->
-    undefined.
+get_client_mod(Pid) ->
+    gen_server:call(Pid, {get, client_mod}).
 
 set_user_agent(UserAgent, Pid) ->
     gen_server:call(Pid, {set, user_agent, UserAgent}).

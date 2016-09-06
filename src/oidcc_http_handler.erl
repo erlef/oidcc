@@ -245,6 +245,8 @@ extract_args(Req) ->
                                        use_cookie = UseCookie}}
     end.
 
+validate_provider(undefined) ->
+    undefined;
 validate_provider(ProviderId) ->
     case oidcc:get_openid_provider_info(ProviderId) of
         {ok, _ } ->

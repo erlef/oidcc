@@ -77,8 +77,10 @@ get_nonce(Pid) ->
 get_pkce(Pid) ->
     gen_server:call(Pid, {get, pkce}).
 
-get_client_mod(Pid) ->
-    gen_server:call(Pid, {get, client_mod}).
+get_client_mod(Pid) when is_pid(Pid) ->
+    gen_server:call(Pid, {get, client_mod});
+get_client_mod(_) ->
+    undefined.
 
 set_user_agent(UserAgent, Pid) ->
     gen_server:call(Pid, {set, user_agent, UserAgent}).
@@ -165,4 +167,3 @@ apply_s256(_, CodeVerifier) ->
 
 gen_code_verifier() ->
     base64:encode(crypto:strong_rand_bytes(64)).
-

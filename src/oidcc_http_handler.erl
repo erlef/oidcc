@@ -52,20 +52,15 @@ handle_redirect(#state{
                    client_mod = ClientModId,
                    use_cookie = UseCookie
                   } = State, Req) ->
-    try
-        ok = oidcc_session:set_user_agent(UserAgent, Session),
-        ok = oidcc_session:set_peer_ip(PeerIp, Session),
-        ok = oidcc_session:set_client_mod(ClientModId, Session),
-        {ok, Url} = oidcc:create_redirect_for_session(Session),
-        CookieUpdate = cookie_update_if_requested(UseCookie, Session),
-        Redirect = {redirect, Url},
-        Updates = [CookieUpdate, Redirect],
-        {ok, Req2} = apply_updates(Updates, Req),
-        {ok, Req2, State}
-    catch
-        Error:Reason ->
-            handle_fail(redirect, {Error, Reason}, Req, State)
-    end.
+    ok = oidcc_session:set_user_agent(UserAgent, Session),
+    ok = oidcc_session:set_peer_ip(PeerIp, Session),
+    ok = oidcc_session:set_client_mod(ClientModId, Session),
+    {ok, Url} = oidcc:create_redirect_for_session(Session),
+    CookieUpdate = cookie_update_if_requested(UseCookie, Session),
+    Redirect = {redirect, Url},
+    Updates = [CookieUpdate, Redirect],
+    {ok, Req2} = apply_updates(Updates, Req),
+    {ok, Req2, State}.
 
 
 
@@ -163,6 +158,8 @@ cookie_update_if_requested(_, _Session) ->
     {none}.
 
 
+close_session_delete_cookie(undefined, Req) ->
+    {ok, Req};
 close_session_delete_cookie(Session, Req) ->
     HasCookie = not oidcc_session:is_cookie_data(undefined, Session),
     ok = oidcc_session:close(Session),
@@ -224,12 +221,17 @@ extract_args(Req) ->
                                        cookie_data = CookieData
                                       }};
         ProviderId ->
-            {ok, Session} = oidcc_session_mgr:new_session(ProviderId),
-            CookieDefault = application:get_env(oidcc, use_cookie, false),
-            UseCookie = maps:is_key(use_cookie, QsMap) or CookieDefault,
-            {ok, Req99, NewState#state{request_type = redirect,
-                                       session = Session,
-                                       use_cookie = UseCookie}}
+            try
+                {ok, Session} = oidcc_session_mgr:new_session(ProviderId),
+                CookieDefault = application:get_env(oidcc, use_cookie, false),
+                UseCookie = maps:is_key(use_cookie, QsMap) or CookieDefault,
+                {ok, Req99, NewState#state{request_type = redirect,
+                                           session = Session,
+                                           use_cookie = UseCookie}}
+            catch _:_ ->
+                    Desc = <<"error during sesion init for redirection">>,
+                    handle_fail(redirect_init, Desc , Req99, NewState)
+            end
     end.
 
 -define(QSMAPPING, [

@@ -52,15 +52,22 @@ handle_redirect(#state{
                    client_mod = ClientModId,
                    use_cookie = UseCookie
                   } = State, Req) ->
-    ok = oidcc_session:set_user_agent(UserAgent, Session),
-    ok = oidcc_session:set_peer_ip(PeerIp, Session),
-    ok = oidcc_session:set_client_mod(ClientModId, Session),
-    {ok, Url} = oidcc:create_redirect_for_session(Session),
-    CookieUpdate = cookie_update_if_requested(UseCookie, Session),
-    Redirect = {redirect, Url},
-    Updates = [CookieUpdate, Redirect],
-    {ok, Req2} = apply_updates(Updates, Req),
-    {ok, Req2, State}.
+    try
+        ok = oidcc_session:set_user_agent(UserAgent, Session),
+        ok = oidcc_session:set_peer_ip(PeerIp, Session),
+        ok = oidcc_session:set_client_mod(ClientModId, Session),
+        {ok, Url} = oidcc:create_redirect_for_session(Session),
+        CookieUpdate = cookie_update_if_requested(UseCookie, Session),
+        Redirect = {redirect, Url},
+        Updates = [CookieUpdate, Redirect],
+        {ok, Req2} = apply_updates(Updates, Req),
+        {ok, Req2, State}
+    catch
+        Error:Reason ->
+            handle_fail(redirect, {Error, Reason}, Req, State)
+    end.
+
+
 
 handle_return(Req, #state{code = AuthCode,
                           session = Session,
@@ -189,7 +196,7 @@ extract_args(Req) ->
     {CookieData, Req5} = cowboy_req:cookie(?COOKIE, Req4),
     {{PeerIP, _Port}, Req99} = cowboy_req:peer(Req5),
 
-    QsMap = create_map_from_proplist(QsList++BodyQsList),
+    QsMap = create_map_from_proplist(QsList ++ BodyQsList),
     SessionId = maps:get(state, QsMap, undefined),
 
     UserAgent = get_header(<<"user-agent">>, Headers),

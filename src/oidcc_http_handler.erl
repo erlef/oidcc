@@ -128,6 +128,13 @@ check_token_and_fingerprint(_, _, _, false) ->
 
 
 handle_fail(Error, Desc, Req, #state{
+                                 session = undefined
+                                } = State) ->
+    {ok, ClientModId} = oidcc_client:get_module(default),
+    {ok, UpdateList} = oidcc_client:failed(Error, Desc, ClientModId),
+    {ok, Req2} = apply_updates(UpdateList, Req),
+    {ok, Req2, State};
+handle_fail(Error, Desc, Req, #state{
                                  session = Session
                                 } = State) ->
     {ok, ClientModId} = oidcc_session:get_client_mod(Session),
@@ -204,7 +211,9 @@ extract_args(Req) ->
                   user_agent = UserAgent,
                   referer = Referer
                  },
-    case maps:get(provider, QsMap, undefined) of
+    ProviderId0  = maps:get(provider, QsMap, undefined),
+    ProviderId = validate_provider(ProviderId0),
+    case ProviderId of
         undefined ->
             Method = <<"GET">>,
             {ok, Session} = oidcc_session_mgr:get_session(SessionId),
@@ -220,18 +229,25 @@ extract_args(Req) ->
                                        client_mod = ClientModId,
                                        cookie_data = CookieData
                                       }};
+        bad_provider ->
+            Desc = <<"bad provider id">>,
+            handle_fail(redirect_init, Desc , Req99,
+                        NewState#state{session = undefined});
         ProviderId ->
-            try
-                {ok, Session} = oidcc_session_mgr:new_session(ProviderId),
-                CookieDefault = application:get_env(oidcc, use_cookie, false),
-                UseCookie = maps:is_key(use_cookie, QsMap) or CookieDefault,
-                {ok, Req99, NewState#state{request_type = redirect,
-                                           session = Session,
-                                           use_cookie = UseCookie}}
-            catch _:_ ->
-                    Desc = <<"error during sesion init for redirection">>,
-                    handle_fail(redirect_init, Desc , Req99, NewState)
-            end
+            {ok, Session} = oidcc_session_mgr:new_session(ProviderId),
+            CookieDefault = application:get_env(oidcc, use_cookie, false),
+            UseCookie = maps:is_key(use_cookie, QsMap) or CookieDefault,
+            {ok, Req99, NewState#state{request_type = redirect,
+                                       session = Session,
+                                       use_cookie = UseCookie}}
+    end.
+
+validate_provider(ProviderId) ->
+    case oidcc:get_openid_provider_info(ProviderId) of
+        {ok, _ } ->
+            ProviderId;
+        _ ->
+            bad_provider
     end.
 
 -define(QSMAPPING, [

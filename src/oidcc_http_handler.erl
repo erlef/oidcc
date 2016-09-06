@@ -133,8 +133,7 @@ check_token_and_fingerprint(_, _, _, false) ->
 handle_fail(Error, Desc, Req, #state{
                                  session = undefined
                                 } = State) ->
-    {ok, ClientModId} = oidcc_client:get_module(default),
-    {ok, UpdateList} = oidcc_client:failed(Error, Desc, ClientModId),
+    {ok, UpdateList} = oidcc_client:failed(Error, Desc, default),
     {ok, Req2} = apply_updates(UpdateList, Req),
     {ok, Req2, State};
 handle_fail(Error, Desc, Req, #state{

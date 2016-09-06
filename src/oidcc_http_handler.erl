@@ -43,6 +43,9 @@ handle(Req, #state{request_type = return, error=Desc} = State) ->
     %% the user comes back from the OpenId Connect Provider with an error
     %% redirect him to the
     Error = oidc_provider_error,
+    handle_fail(Error, Desc, Req, State);
+handle(Req, #state{request_type = bad_request, error=Desc} = State) ->
+    Error = bad_request,
     handle_fail(Error, Desc, Req, State).
 
 handle_redirect(#state{
@@ -230,9 +233,10 @@ extract_args(Req) ->
                                        cookie_data = CookieData
                                       }};
         bad_provider ->
-            Desc = <<"bad provider id">>,
-            handle_fail(redirect_init, Desc , Req99,
-                        NewState#state{session = undefined});
+            Desc = <<"unknown provider id">>,
+            {ok, Req99, NewState#state{request_type=bad_request,
+                                       error = Desc
+                                      }};
         ProviderId ->
             {ok, Session} = oidcc_session_mgr:new_session(ProviderId),
             CookieDefault = application:get_env(oidcc, use_cookie, false),

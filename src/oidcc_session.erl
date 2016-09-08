@@ -165,4 +165,3 @@ apply_s256(_, CodeVerifier) ->
 
 gen_code_verifier() ->
     base64:encode(crypto:strong_rand_bytes(64)).
-

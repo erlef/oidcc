@@ -43,6 +43,9 @@ handle(Req, #state{request_type = return, error=Desc} = State) ->
     %% the user comes back from the OpenId Connect Provider with an error
     %% redirect him to the
     Error = oidc_provider_error,
+    handle_fail(Error, Desc, Req, State);
+handle(Req, #state{request_type = bad_request, error=Desc} = State) ->
+    Error = bad_request,
     handle_fail(Error, Desc, Req, State).
 
 handle_redirect(#state{
@@ -61,6 +64,8 @@ handle_redirect(#state{
     Updates = [CookieUpdate, Redirect],
     {ok, Req2} = apply_updates(Updates, Req),
     {ok, Req2, State}.
+
+
 
 handle_return(Req, #state{code = AuthCode,
                           session = Session,
@@ -126,6 +131,12 @@ check_token_and_fingerprint(_, _, _, false) ->
 
 
 handle_fail(Error, Desc, Req, #state{
+                                 session = undefined
+                                } = State) ->
+    {ok, UpdateList} = oidcc_client:failed(Error, Desc, default),
+    {ok, Req2} = apply_updates(UpdateList, Req),
+    {ok, Req2, State};
+handle_fail(Error, Desc, Req, #state{
                                  session = Session
                                 } = State) ->
     {ok, ClientModId} = oidcc_session:get_client_mod(Session),
@@ -156,6 +167,8 @@ cookie_update_if_requested(_, _Session) ->
     {none}.
 
 
+close_session_delete_cookie(undefined, Req) ->
+    {ok, Req};
 close_session_delete_cookie(Session, Req) ->
     HasCookie = not oidcc_session:is_cookie_data(undefined, Session),
     ok = oidcc_session:close(Session),
@@ -183,12 +196,13 @@ terminate(_Reason, _Req, _State) ->
 
 extract_args(Req) ->
     {QsList, Req1} = cowboy_req:qs_vals(Req),
-    {Headers, Req2} = cowboy_req:headers(Req1),
-    {<<"GET">>, Req3} = cowboy_req:method(Req2),
-    {CookieData, Req4} = cowboy_req:cookie(?COOKIE, Req3),
-    {{PeerIP, _Port}, Req99} = cowboy_req:peer(Req4),
+    {ok, BodyQsList, Req2} = cowboy_req:body_qs(Req1),
+    {Headers, Req3} = cowboy_req:headers(Req2),
+    {Method, Req4} = cowboy_req:method(Req3),
+    {CookieData, Req5} = cowboy_req:cookie(?COOKIE, Req4),
+    {{PeerIP, _Port}, Req99} = cowboy_req:peer(Req5),
 
-    QsMap = create_map_from_proplist(QsList),
+    QsMap = create_map_from_proplist(QsList ++ BodyQsList),
     SessionId = maps:get(state, QsMap, undefined),
 
     UserAgent = get_header(<<"user-agent">>, Headers),
@@ -199,8 +213,11 @@ extract_args(Req) ->
                   user_agent = UserAgent,
                   referer = Referer
                  },
-    case maps:get(provider, QsMap, undefined) of
+    ProviderId0  = maps:get(provider, QsMap, undefined),
+    ProviderId = validate_provider(ProviderId0),
+    case ProviderId of
         undefined ->
+            Method = <<"GET">>,
             {ok, Session} = oidcc_session_mgr:get_session(SessionId),
             Code = maps:get(code, QsMap, undefined),
             Error = maps:get(error, QsMap, undefined),
@@ -214,6 +231,11 @@ extract_args(Req) ->
                                        client_mod = ClientModId,
                                        cookie_data = CookieData
                                       }};
+        bad_provider ->
+            Desc = <<"unknown provider id">>,
+            {ok, Req99, NewState#state{request_type=bad_request,
+                                       error = Desc
+                                      }};
         ProviderId ->
             {ok, Session} = oidcc_session_mgr:new_session(ProviderId),
             CookieDefault = application:get_env(oidcc, use_cookie, false),
@@ -221,6 +243,16 @@ extract_args(Req) ->
             {ok, Req99, NewState#state{request_type = redirect,
                                        session = Session,
                                        use_cookie = UseCookie}}
+    end.
+
+validate_provider(undefined) ->
+    undefined;
+validate_provider(ProviderId) ->
+    case oidcc:get_openid_provider_info(ProviderId) of
+        {ok, _ } ->
+            ProviderId;
+        _ ->
+            bad_provider
     end.
 
 -define(QSMAPPING, [

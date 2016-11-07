@@ -6,8 +6,7 @@
 -export([validate_id_token/3]).
 
 extract_token_map(Token) ->
-    TokenMap = jsone:decode(Token, [{keys, attempt_atom},
-                                    {object_format, map}]),
+    TokenMap = jsone:decode(Token, [{object_format, map}]),
     IDToken = maps:get(<<"id_token">>, TokenMap, none),
     AccessToken = maps:get(<<"access_token">>, TokenMap, none),
     AccessExpire = maps:get(<<"expires_in">>, TokenMap, undefined),

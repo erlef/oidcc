@@ -6,16 +6,8 @@ The purpose is to enable Erlang applications to rely on OpenId Connect Provider
 for authentication purposes.
 
 
-## Quickstart / Demo
-```
-git clone https://github.com/indigo-dc/oidcc
-cd oidcc/example/basic_client
-make run
-```
-browse to [your example](http://localhost:8080) and log in.
-
-## Usage 
-### Setup an Openid Connect Provider 
+## Usage
+### Setup an Openid Connect Provider
 First an OpenId Connect Provider needs to be added, this is done by either
 `oidcc:add_openid_provider/6` or `oidcc:add_openid_provider/7`.
 The parameter are:
@@ -25,80 +17,26 @@ The parameter are:
 * Name: the name you give this provider, no fuctionality
 * Description: some description of this provider, no fuctionality
 * ClientId: The OpenId Connect client id of your application, at this provider
-* ClientSecret: The OpenId Connect client secret of your application 
+* ClientSecret: The OpenId Connect client secret of your application
 * ConfigEndpoint: The configuration endpoint of the OpenId Connect provider.
   This url is used to receive the configuration and set up the client, no
-  configuration needs to be done. 
+  configuration needs to be done.
 * LocalEndpoint: The local URL where the user will be redirected back to once
-  logged in at the OpenId Connect provider, this MUST be the same as the path the 
-  `oidcc_http_handler` is running at, if you use the oidcc_client behaviour.
+  logged in at the OpenId Connect provider, this MUST be the same as the path that
+  is handled by an oidcc_client behaviour (see [oidcc_cowboy](https://github.com/indigo-dc/oidcc_cowboy) ).
 
 
-Example:
-```Erlang
-{ok, Id, Pid} = oidcc:add_openid_provider( <<"Google">>, 
-                                           <<"The well known search giant">>,
-                                           <<"234890982343">>,
-                                           <<"my client secret">>,
-                                           <<"https://accounts.google.com/.well-known/openid-configuration">>,
-                                           <<"https://my.domain/oidc">>),
-```
-### Login Users: Using the Callbacks and Cowboy handler
-Oidcc implements a cowboy handler for redirecting a user agent (browser) to an OpenId Connect provider and to handle its response automatically. The handler calls a callback, once finished.
 
-The cowboy handler implements the steps described in the chapter "Login Users: by hand".
+### Login Users: by hand
+It is recommended to use one implementation of the oidcc_client behaviour instead
+of handlign this all 'by hand'.
 
-An example using the callbacks is in the examples/basic_client directory.
+List of oidcc_client implementations:
+ * [oidcc_cowboy](https://github.com/indigo-dc/oidcc_cowboy) for cowboy
 
-Basically three things need to be done:
- * Define a path to use for the cowboy handler
- * Implement the [oidcc_client behaviour](https://github.com/indigo-dc/oidcc/blob/master/src/oidcc_client.erl), see [`basic_client.erl`](https://github.com/indigo-dc/oidcc/blob/master/example/basic_client/src/basic_client.erl) for an example.
- * Register the implementation of the behaviour
-
-#### Define a path to user for the cowboy handler
-The path MUST be the same as the local endpoint provided when adding the OpenId Connect provider.
-```
-Dispatch = cowboy_router:compile( [{'_',
-					[
-					 {"/", basic_client_http, []},
-                     %% add the oidcc_http_handler to a path
-					 {"/oidc", oidcc_http_handler, []}
-					]}]),
-%% and start cowboy
-{ok, _} = cowboy:start_http( http_handler
-			       , 100
-			       , [ {port, 8080} ]
-			       , [{env, [{dispatch, Dispatch}]}]
-			       )
-```
-#### Register the implementation of the behaviour 
-```
-{ok, ModuleId} = oidcc_client:register(<module name>).
-```
-
-#### Logging in ...
-Now within your web application all you need to do is redirect the user agent 
-to the `oidcc_http_handler` path passing the OpenId Connect provider id in the
-query string, e.g. `/oidc?provider=123`.
-It is also possible to specify the module to use by passing its id: 
-`/oidc?provider=123&client_mod=456`.
-
-Once the login has either succeeded or failed the registered module gets called.
-
-During the login process the oidcc library ensures the user agent and the 
-remote ip stay the same. 
-
-These checks can be disabled by updating the oidcc settings:
-```
-%% disable user agent check
-application:set_env(oidcc, check_user_agent, false).
-%% disable remote ip check
-application:set_env(oidcc, check_peer_ip, false).
-```
-### Login Users: by hand 
-#### Create Redirection to Login Page 
+#### Create Redirection to Login Page
 Creating a redirection is done with one of the `oidcc:create_redirect_url`
-functions. 
+functions.
 The parameters are:
 * The Id of the OpenId Provider to use (result from the setup above).
 * The scopes to request (if not given is set to openid).
@@ -109,7 +47,7 @@ The returned URL needs to be set as redirection in http reply.
 
 Example:
 ```Erlang
-{ok, Url} = oidcc:create_redirect_url( <<"234">>, 
+{ok, Url} = oidcc:create_redirect_url( <<"234">>,
                                        [openid, email],
                                        <<"my state">>,
                                        <<"random nonce, 4">>),
@@ -154,6 +92,3 @@ gathered by inspecting the `TokenMap`.
 ## LICENSE
 This library was written as part of the INDIGO DataCould project and is realease
 under the Apache License.
-
-
-

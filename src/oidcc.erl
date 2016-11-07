@@ -435,7 +435,7 @@ return_validated_user_info(HttpData, Subject) ->
     end.
 
 return_json_info({ok, #{status := 200, body := Data}}) ->
-    try jsx:decode(Data, [{labels, attempt_atom}, return_maps])
+    try jsone:decode(Data, [{keys, attempt_atom}, {object_format, map}])
     of Map -> {ok, Map}
     catch Error -> {error, Error}
     end;
@@ -468,4 +468,3 @@ scopes_to_bin([H | T], Bin) when is_atom(H) ->
 scopes_to_bin([H | T], Bin) when is_list(H) ->
     List = [ list_to_binary(H) | T],
     scopes_to_bin(List, Bin).
-

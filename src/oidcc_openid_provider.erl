@@ -212,17 +212,21 @@ create_config(#state{id = Id, desc = Desc, client_id = ClientId,
 
 handle_config(Data, _Header, State) ->
     %TODO: implement update at expire data/time
-    Config = jsx:decode(Data, [return_maps, {labels, attempt_atom}]),
+    Config = decode_json(Data),
     ok = trigger_key_retrieval(),
     trigger_config_retrieval(3600000),
     State#state{config = Config}.
 
 handle_keys(Data, _Header, State) ->
     %TODO: implement update at expire data/time
-    #{keys := KeyList}=jsx:decode(Data, [return_maps, {labels, attempt_atom}]),
+    #{keys := KeyList}=decode_json(Data),
     Keys = extract_supported_keys(KeyList, []),
     State#state{keys  = Keys, ready = true, lasttime_updated = timestamp(),
                 gun_pid = undefined}.
+
+decode_json(Data) ->
+    jsone:decode(Data, [{keys, attempt_atom}, {object_format, map}]).
+
 
 extract_supported_keys([], List) ->
     List;
@@ -275,5 +279,3 @@ timestamp() ->
 stop_gun(#state{gun_pid = Pid, mref = MonitorRef} =State) ->
     ok = oidcc_http_util:async_close(Pid, MonitorRef),
     State#state{gun_pid=undefined, retrieving=undefined, http=#{}}.
-
-

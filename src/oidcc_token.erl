@@ -6,7 +6,8 @@
 -export([validate_id_token/3]).
 
 extract_token_map(Token) ->
-    TokenMap = jsx:decode(Token, [return_maps]),
+    TokenMap = jsone:decode(Token, [{keys, attempt_atom},
+                                    {object_format, map}]),
     IDToken = maps:get(<<"id_token">>, TokenMap, none),
     AccessToken = maps:get(<<"access_token">>, TokenMap, none),
     AccessExpire = maps:get(<<"expires_in">>, TokenMap, undefined),
@@ -224,4 +225,3 @@ get_needed_key([#{kid := KeyId, key := Key } |_], KeyId) ->
     Key;
 get_needed_key([_Key | T], KeyId) ->
     get_needed_key(T, KeyId).
-

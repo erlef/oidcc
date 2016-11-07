@@ -20,7 +20,3 @@ elvis:
 
 compile:
 	$(REBAR) compile
-
-
-basic_client:
-	make -C example/basic_client run

@@ -112,7 +112,7 @@ handle_cast(retrieve_config, #state{gun_pid = undefined} = State) ->
     {noreply, NewState};
 handle_cast(retrieve_keys, State) ->
     {ok, ConPid, MRef, Path} = retrieve_keys(State),
-    Header = [{<<"accept">>, "application/json"}],
+    Header = [{<<"accept">>, "application/json;q=0.7,application/jwk+json"}],
     NewState = State#state{gun_pid = ConPid,
                            mref=MRef,
                            sref=undefined,

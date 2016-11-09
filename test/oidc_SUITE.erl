@@ -12,12 +12,20 @@
          %% init_per_testcase/2,
          %% end_per_testcase/2,
 
-         retrieve_configuration/1
+         retrieve_google/1,
+         retrieve_iam/1,
+         retrieve_hbp/1,
+         retrieve_egi/1,
+         retrieve_eudat/1
         ]).
 
 all() ->
     [
-     retrieve_configuration
+     retrieve_google,
+     retrieve_eudat,
+     retrieve_iam,
+     retrieve_hbp,
+     retrieve_egi
     ].
 
 %% groups() ->
@@ -50,14 +58,33 @@ end_per_suite(Conf) ->
 %%     Conf.
 
 
-retrieve_configuration(_Conf) ->
-    Name = <<"Google">>,
-    Description = <<"the well known search giant">>,
+retrieve_google(_Conf) ->
+    ConfigEndpoint = <<"https://accounts.google.com/.well-known/openid-configuration">>,
+    retrieve_configuration(ConfigEndpoint).
+
+retrieve_iam(_Conf) ->
+    ConfigEndpoint = <<"https://iam-test.indigo-datacloud.eu/.well-known/openid-configuration">>,
+    retrieve_configuration(ConfigEndpoint).
+
+retrieve_hbp(_Conf) ->
+    ConfigEndpoint = <<"https://services.humanbrainproject.eu/oidc/.well-known/openid-configuration">>,
+    retrieve_configuration(ConfigEndpoint).
+
+retrieve_egi(_Conf) ->
+    ConfigEndpoint = <<"https://aai-dev.egi.eu/oidc/.well-known/openid-configuration">>,
+    retrieve_configuration(ConfigEndpoint).
+
+retrieve_eudat(_Conf) ->
+    ConfigEndpoint = <<"https://b2access.eudat.eu:8443/oauth2/.well-known/openid-configuration">>,
+    retrieve_configuration(ConfigEndpoint).
+
+retrieve_configuration(ConfigEndpoint) ->
+    Name = <<"name">>,
+    Description = <<"description">>,
     ClientId = <<"some id">>,
     ClientSecret = <<"secret">>,
-    ConfigEndpoint = <<"https://accounts.google.com/.well-known/openid-configuration">>,
     LocalEndpoint = <<"http://localhost:8080/oidc">>,
-    {ok, _, Pid} = oidcc:add_openid_provider(Name, Description, ClientId, ClientSecret, 
+    {ok, _, Pid} = oidcc:add_openid_provider(Name, Description, ClientId, ClientSecret,
 					     ConfigEndpoint, LocalEndpoint),
     ok = wait_for_config(Pid),
     ok.
@@ -73,4 +100,3 @@ wait_for_config(Pid) ->
 	    timer:sleep(100),
 	    wait_for_config(Pid)
     end.
-

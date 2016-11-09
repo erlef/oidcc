@@ -73,9 +73,9 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
                            #{ header := H, claims := C }  -> {H, C};
                            _ -> throw(not_a_jwt)
                        end,
-    case contains_all_required_claims(Claims) of
-        true -> ok;
-        false -> throw(required_field_missing)
+    case list_missing_required_claims(Claims) of
+        [] -> ok;
+        Missing -> throw({required_fields_missing, Missing})
     end,
     Kid = maps:get(kid, Header, none),
     #{ issuer := Issuer,
@@ -95,7 +95,7 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     #{ iss := TokenIssuer} = Claims,
     case (Issuer =:= TokenIssuer) of
         true -> ok;
-        false -> throw(wrong_issuer)
+        false -> throw({wrong_issuer, TokenIssuer, Issuer})
     end,
 
     % 3. The Client MUST validate that the aud (audience) Claim contains its
@@ -194,13 +194,12 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     % checked by now
     maps:remove(nonce, Claims).
 
-contains_all_required_claims(Jwt) ->
+list_missing_required_claims(Jwt) ->
     Required = [iss, sub, aud, exp, iat, nonce],
     CheckKeys = fun(Key, _Val, List) ->
                         lists:delete(Key, List)
                 end,
-    Result =  maps:fold(CheckKeys, Required, Jwt),
-    Result =:= [].
+    maps:fold(CheckKeys, Required, Jwt).
 
 is_part_of_audience(ClientId, Audience) when is_binary(Audience) ->
     Audience == ClientId;

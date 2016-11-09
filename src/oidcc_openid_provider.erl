@@ -234,11 +234,10 @@ create_config(#state{id = Id, desc = Desc, client_id = ClientId,
 handle_config(Data, _Header, #state{issuer=Issuer} = State) ->
     %TODO: implement update at expire data/time
     Config = decode_json(Data),
-    ConfIssuer = maps:get(issuer, Config),
-    IssConf = http_uri:parse(binary_to_list(ConfIssuer)),
-    Iss = http_uri:parse(binary_to_list(Issuer)),
-    case IssConf of
-        Iss ->
+    ConfIssuer = maps:get(issuer, Config, undefined),
+
+    case is_same_issuer(ConfIssuer, Issuer) of
+        true ->
             ok = trigger_key_retrieval(),
             trigger_config_retrieval(3600000),
             State#state{config = Config, issuer=ConfIssuer};
@@ -316,3 +315,19 @@ config_ep_to_issuer(ConfigEp) ->
     [Issuer] = binary:split(ConfigEp, [<<"/.well-known/openid-configuration">>],
                  [trim_all, global]),
     Issuer.
+
+is_same_issuer(undefined, _) ->
+    false;
+is_same_issuer(_Config, []) ->
+    false;
+is_same_issuer(Config, [Config|_]) ->
+    true;
+is_same_issuer(Config, [_|T]) ->
+    is_same_issuer(Config, T);
+is_same_issuer(Config, Issuer) ->
+    Slash = <<"/">>,
+    IssuerSlash = << Issuer/binary, Slash/binary >>,
+    IssuerList = [ http_uri:parse(binary_to_list(Issuer)),
+                   http_uri:parse(binary_to_list(IssuerSlash)) ],
+    ParsedConfig = http_uri:parse(binary_to_list(Config)),
+    is_same_issuer(ParsedConfig, IssuerList).

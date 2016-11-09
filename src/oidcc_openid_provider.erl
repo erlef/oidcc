@@ -8,6 +8,7 @@
 -export([is_ready/1]).
 -export([get_config/1]).
 -export([update_config/1]).
+-export([get_error/1]).
 
 
 %% gen_server.
@@ -20,6 +21,7 @@
 
 -record(state, {
           ready = false,
+          error = undefined,
 
           id = undefined,
           name = undefined,
@@ -27,6 +29,7 @@
           client_id = undefined,
           client_secret = undefined,
           request_scopes = undefined,
+          issuer = undefined,
           config_ep = undefined,
           config = #{},
           keys = [],
@@ -69,6 +72,11 @@ is_ready(Pid) ->
 -spec get_config( Pid :: pid() ) -> {ok, Config :: map()}.
 get_config( Pid) ->
     gen_server:call(Pid, get_config).
+
+-spec get_error( Pid :: pid() ) -> {ok, term()}.
+get_error( Pid) ->
+    gen_server:call(Pid, get_error).
+
 %% gen_server.
 -define(MAX_TRIES, 5).
 
@@ -83,13 +91,18 @@ init({Id, Config}) ->
       local_endpoint := LocalEndpoint
      } = Config,
     trigger_config_retrieval(),
+    Issuer = config_ep_to_issuer(ConfigEndpoint),
     {ok, #state{id = Id, name = Name, desc = Description, client_id = ClientId,
                 client_secret = ClientSecret, config_ep = ConfigEndpoint,
-                request_scopes = Scopes, local_endpoint = LocalEndpoint}}.
+                request_scopes = Scopes, local_endpoint = LocalEndpoint,
+                issuer = Issuer
+               }}.
 
 handle_call(get_config, _From, State) ->
     Conf = create_config(State),
     {reply, {ok, Conf}, State};
+handle_call(get_error, _From, #state{error=Error} = State) ->
+    {reply, {ok, Error}, State};
 handle_call(update_config, _From, State) ->
     ok = trigger_config_retrieval(),
     {reply, ok, State#state{config_tries=0}};
@@ -197,7 +210,7 @@ handle_http_result(#state{ retrieving = Retrieve, http =Http} = State) ->
 
 create_config(#state{id = Id, desc = Desc, client_id = ClientId,
                      client_secret = ClientSecret, config_ep = ConfEp,
-                     config=Config, keys = Keys,
+                     config=Config, keys = Keys, issuer = Issuer,
                      lasttime_updated = LastTimeUpdated, ready = Ready,
                      local_endpoint = LocalEndpoint, name = Name,
                      request_scopes = Scopes}) ->
@@ -205,17 +218,27 @@ create_config(#state{id = Id, desc = Desc, client_id = ClientId,
                  {client_id, ClientId}, {client_secret, ClientSecret},
                  {config_endpoint, ConfEp}, {lasttime_updated, LastTimeUpdated},
                  {ready, Ready}, {local_endpoint, LocalEndpoint}, {keys, Keys},
-                 {request_scopes, Scopes}],
+                 {request_scopes, Scopes}, {issuer, Issuer}],
     maps:merge(Config, maps:from_list(StateList)).
 
 
 
-handle_config(Data, _Header, State) ->
+handle_config(Data, _Header, #state{issuer=Issuer} = State) ->
     %TODO: implement update at expire data/time
     Config = decode_json(Data),
     ok = trigger_key_retrieval(),
-    trigger_config_retrieval(3600000),
-    State#state{config = Config}.
+    ConfIssuer = maps:get(issuer, Config),
+    IssConf = http_uri:parse(binary_to_list(ConfIssuer)),
+    Iss = http_uri:parse(binary_to_list(Issuer)),
+    case IssConf of
+        Iss ->
+            trigger_config_retrieval(3600000),
+            State#state{config = Config, issuer=ConfIssuer};
+        _ ->
+            Error = {bad_issuer_config, Issuer, ConfIssuer},
+            State#state{error = Error}
+    end.
+
 
 handle_keys(Data, _Header, State) ->
     %TODO: implement update at expire data/time
@@ -279,3 +302,9 @@ timestamp() ->
 stop_gun(#state{gun_pid = Pid, mref = MonitorRef} =State) ->
     ok = oidcc_http_util:async_close(Pid, MonitorRef),
     State#state{gun_pid=undefined, retrieving=undefined, http=#{}}.
+
+
+config_ep_to_issuer(ConfigEp) ->
+    [Issuer] = binary:split(ConfigEp, [<<"/.well-known/openid-configuration">>],
+                 [trim_all, global]),
+    Issuer.

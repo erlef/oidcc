@@ -124,13 +124,14 @@ handle_cast(retrieve_config, #state{gun_pid = undefined} = State) ->
                            retrieving=config},
     {noreply, NewState};
 handle_cast(retrieve_keys, State) ->
-    {ok, ConPid, MRef, Path} = retrieve_keys(State),
+    {ok, ConPid, MRef, Path, Error} = retrieve_keys(State),
     Header = [{<<"accept">>, "application/json;q=0.7,application/jwk+json"}],
     NewState = State#state{gun_pid = ConPid,
                            mref=MRef,
                            sref=undefined,
                            path=Path,
                            header = Header,
+                           error = Error,
                            retrieving=keys},
     {noreply, NewState};
 handle_cast(stop, State) ->
@@ -191,7 +192,14 @@ retrieve_config(#state{config_ep = ConfigEndpoint}) ->
 
 retrieve_keys(#state{config = Config}) ->
     KeyEndpoint = maps:get(jwks_uri, Config, undefined),
-    oidcc_http_util:start_http(KeyEndpoint).
+    case KeyEndpoint of
+        undefined ->
+            Error = {no_key_endpoint},
+            {ok, undefined, undefined, undefined, Error};
+        _ ->
+            {ok, ConPid, MRef, Path} = oidcc_http_util:start_http(KeyEndpoint),
+            {ok, ConPid, MRef, Path, undefined}
+    end.
 
 handle_http_result(200, Header, Body, config, State) ->
     handle_config(Body, Header, State);
@@ -226,12 +234,12 @@ create_config(#state{id = Id, desc = Desc, client_id = ClientId,
 handle_config(Data, _Header, #state{issuer=Issuer} = State) ->
     %TODO: implement update at expire data/time
     Config = decode_json(Data),
-    ok = trigger_key_retrieval(),
     ConfIssuer = maps:get(issuer, Config),
     IssConf = http_uri:parse(binary_to_list(ConfIssuer)),
     Iss = http_uri:parse(binary_to_list(Issuer)),
     case IssConf of
         Iss ->
+            ok = trigger_key_retrieval(),
             trigger_config_retrieval(3600000),
             State#state{config = Config, issuer=ConfIssuer};
         _ ->

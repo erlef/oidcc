@@ -60,7 +60,7 @@ validate_fail_field_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(missing_field,ClientId,Nonce,Issuer),
-    {error, required_field_missing} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {error, {required_fields_missing, _}} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 
@@ -74,7 +74,7 @@ validate_fail_issuer_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(valid,ClientId,Nonce,BadIssuer),
-    {error, wrong_issuer} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {error, {wrong_issuer, BadIssuer, Issuer}} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 

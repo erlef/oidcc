@@ -49,7 +49,7 @@ set_test() ->
 fetch_config_test() ->
     Id = <<"some id">>,
 
-    ConfigEndpoint = <<"https://my.provider/info">>,
+    ConfigEndpoint = <<"https://my.provider/.well-known/openid-configuration">>,
     KeyEndpoint = <<"https://my.provider/keys">>,
     ConfigBody1 = <<"{\"issuer\":\"https://my.provider\",">>,
     ConfigBody2 = <<" \"jwks_uri\": \"https://my.provider/keys\" }">>,
@@ -167,5 +167,3 @@ wait_till_ready(Pid) ->
             timer:sleep(100),
             wait_till_ready(Pid)
     end.
-
-

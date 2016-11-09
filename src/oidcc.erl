@@ -308,9 +308,10 @@ retrieve_a_token(QsBodyIn, OpenIdProviderInfo) ->
 retrieve_a_token(QsBodyIn, Pkce, OpenIdProviderInfo) ->
     #{ client_id := ClientId,
        client_secret := Secret,
-       token_endpoint := Endpoint,
-       token_endpoint_auth_methods_supported := AuthMethods
+       token_endpoint := Endpoint
      } = OpenIdProviderInfo,
+    AuthMethods = maps:get(token_endpoint_auth_methods_supported,
+                           OpenIdProviderInfo, [<<"client_secret_basic">>]),
     AuthMethod = select_preferred_auth(AuthMethods),
     Header0 = [ {<<"content-type">>, <<"application/x-www-form-urlencoded">>}],
     {QsBody, Header} = add_authentication_code_verifier(QsBodyIn, Header0,

@@ -16,6 +16,7 @@
                          crypto,
                          erljwt,
 			 base64url,
+                         inets,
                          gun
                         ]},
          {maintainers, ["Bas Wegh"]},

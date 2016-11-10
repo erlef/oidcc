@@ -12,6 +12,9 @@
 -export([get_scopes/1]).
 -export([get_nonce/1]).
 -export([get_pkce/1]).
+-export([get_peer_ip/1]).
+-export([get_user_agent/1]).
+-export([get_cookie_data/1]).
 -export([get_client_mod/1]).
 -export([set_user_agent/2]).
 -export([set_cookie_data/2]).
@@ -76,6 +79,15 @@ get_nonce(Pid) ->
 
 get_pkce(Pid) ->
     gen_server:call(Pid, {get, pkce}).
+
+get_peer_ip(Pid) ->
+    gen_server:call(Pid, {get, peer_ip}).
+
+get_user_agent(Pid) ->
+    gen_server:call(Pid, {get, user_agent}).
+
+get_cookie_data(Pid) ->
+    gen_server:call(Pid, {get, cookie_data}).
 
 get_client_mod(Pid) ->
     gen_server:call(Pid, {get, client_mod}).

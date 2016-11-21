@@ -80,8 +80,8 @@ handle_call({new_session, ProviderId}, _From, State) ->
     {ok, Pid, NewState} = create_new_session(ProviderId, State),
     {reply, {ok, Pid}, NewState};
 handle_call({get_session, Id}, _From, State) ->
-    {ok, Pid} = lookup_session(Id, State),
-    {reply, {ok, Pid}, State};
+    Result = lookup_session(Id, State),
+    {reply, Result, State};
 handle_call({delete_session, ID}, _From, State) ->
     {ok, NewState} = delete_session(ID, State),
     {reply, ok, NewState};

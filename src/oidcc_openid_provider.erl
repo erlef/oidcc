@@ -243,7 +243,7 @@ handle_config(Data, _Header, #state{issuer=Issuer} = State) ->
             State#state{config = Config, issuer=ConfIssuer};
         _ ->
             Error = {bad_issuer_config, Issuer, ConfIssuer},
-            State#state{error = Error}
+            State#state{error = Error, ready=false}
     end.
 
 
@@ -316,18 +316,7 @@ config_ep_to_issuer(ConfigEp) ->
                  [trim_all, global]),
     Issuer.
 
-is_same_issuer(undefined, _) ->
-    false;
-is_same_issuer(_Config, []) ->
-    false;
-is_same_issuer(Config, [Config|_]) ->
-    true;
-is_same_issuer(Config, [_|T]) ->
-    is_same_issuer(Config, T);
 is_same_issuer(Config, Issuer) ->
     Slash = <<"/">>,
     IssuerSlash = << Issuer/binary, Slash/binary >>,
-    IssuerList = [ http_uri:parse(binary_to_list(Issuer)),
-                   http_uri:parse(binary_to_list(IssuerSlash)) ],
-    ParsedConfig = http_uri:parse(binary_to_list(Config)),
-    is_same_issuer(ParsedConfig, IssuerList).
+    (Config =:= Issuer) or (Config =:= IssuerSlash).

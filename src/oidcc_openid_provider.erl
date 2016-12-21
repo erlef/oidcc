@@ -205,8 +205,9 @@ handle_http_result(200, Header, Body, config, State) ->
     handle_config(Body, Header, State);
 handle_http_result(200, Header, Body, keys, State) ->
     handle_keys(Body, Header, State);
-handle_http_result(_Status, _Header, _Body, _Retrieve, State) ->
-    State.
+handle_http_result(Status, _Header, Body, Retrieve, State) ->
+    trigger_config_retrieval(600000),
+    State#state{error = {retrieving, Retrieve, Status, Body}}.
 
 
 handle_http_result(#state{ retrieving = Retrieve, http =Http} = State) ->
@@ -242,20 +243,34 @@ handle_config(Data, _Header, #state{issuer=Issuer} = State) ->
             trigger_config_retrieval(3600000),
             State#state{config = Config, issuer=ConfIssuer};
         _ ->
-            Error = {bad_issuer_config, Issuer, ConfIssuer},
+            trigger_config_retrieval(600000),
+            Error = {bad_issuer_config, Issuer, ConfIssuer, Data},
             State#state{error = Error, ready=false}
     end.
 
 
 handle_keys(Data, _Header, State) ->
-    %TODO: implement update at expire data/time
-    #{keys := KeyList}=decode_json(Data),
+    %TODO: implement update at expire data/time or retrieval when needed
+    KeyConfig=decode_json(Data),
+    KeyList = maps:get(keys, KeyConfig, []),
     Keys = extract_supported_keys(KeyList, []),
-    State#state{keys  = Keys, ready = true, lasttime_updated = timestamp(),
-                gun_pid = undefined}.
+    NewState = State#state{keys  = Keys, ready = false,
+                           lasttime_updated = timestamp(), gun_pid = undefined},
+    case length(Keys) > 0 of
+        true ->
+            NewState#state{ready = true};
+        false ->
+            trigger_config_retrieval(600000),
+            NewState#state{error = {no_keys, Data}}
+    end.
+
 
 decode_json(Data) ->
-    jsone:decode(Data, [{keys, attempt_atom}, {object_format, map}]).
+    try
+        jsone:decode(Data, [{keys, attempt_atom}, {object_format, map}])
+    catch error:badarg ->
+            #{}
+    end.
 
 
 extract_supported_keys([], List) ->

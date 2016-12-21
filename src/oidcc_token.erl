@@ -67,6 +67,8 @@ validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
         Exception -> {error, Exception}
     end.
 
+int_validate_id_token(none, _OpenIdProviderId, _Nonce) ->
+    throw(no_id_token);
 int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     {ok, OpInfo} = oidcc:get_openid_provider_info(OpenIdProviderId),
     {Header, Claims} = case erljwt:pre_parse_jwt(IdToken) of

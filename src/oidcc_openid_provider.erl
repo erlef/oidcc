@@ -240,8 +240,7 @@ start_http_if_possible(Endpoint, Error) ->
         undefined ->
             {ok, undefined, undefined, undefined, Error};
         _ ->
-            {ok, ConPid, MRef, Path} =
-                oidcc_http_util:start_http(Endpoint),
+            {ok, ConPid, MRef, Path} = oidcc_http_util:start_http(Endpoint),
             {ok, ConPid, MRef, Path, undefined}
     end.
 
@@ -270,12 +269,13 @@ create_config(#state{id = Id, desc = Desc, client_id = ClientId,
                      config=Config, keys = Keys, issuer = Issuer,
                      lasttime_updated = LastTimeUpdated, ready = Ready,
                      local_endpoint = LocalEndpoint, name = Name,
-                     request_scopes = Scopes}) ->
+                     request_scopes = Scopes, meta_data = MetaData}) ->
     StateList = [{id, Id}, {name, Name}, {description, Desc},
                  {client_id, ClientId}, {client_secret, ClientSecret},
                  {config_endpoint, ConfEp}, {lasttime_updated, LastTimeUpdated},
                  {ready, Ready}, {local_endpoint, LocalEndpoint}, {keys, Keys},
-                 {request_scopes, Scopes}, {issuer, Issuer}],
+                 {request_scopes, Scopes}, {issuer, Issuer},
+                 {meta_data, MetaData}],
     maps:merge(Config, maps:from_list(StateList)).
 
 

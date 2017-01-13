@@ -6,7 +6,7 @@ start_stop_test() ->
     Config = #{name => <<"some name">>,
                description => <<"some description">>,
                client_id => <<"123">>,
-               client_secrect => <<"dont tell">>,
+               client_secret => <<"dont tell">>,
                request_scopes => undefined,
                issuer_or_endpoint => <<"https://my.provider.com/well.known">>,
                local_endpoint => <<"/here">>
@@ -28,7 +28,7 @@ set_test() ->
     ConfigIn = #{name => Name,
                description => Description,
                client_id => ClientId,
-               client_secrect => ClientSecret,
+               client_secret => ClientSecret,
                request_scopes => undefined,
                issuer_or_endpoint => ConfigEndpoint,
                local_endpoint => LocalEndpoint
@@ -45,8 +45,8 @@ set_test() ->
     ?assertEqual(ConfId, Id),
     ?assertEqual(ConfName, Name),
     ?assertEqual(ConfDesc, Description),
-    ?assertEqual(ConfClientId, ClientId),
     ?assertEqual(ConfClientSecret, ClientSecret),
+    ?assertEqual(ConfClientId, ClientId),
     ?assertEqual(ConfConfigEndpoint, ConfigEndpoint),
     ?assertEqual(ConfLocalEndpoint, LocalEndpoint),
     ok = oidcc_openid_provider:stop(Pid),
@@ -68,7 +68,7 @@ fetch_config_test() ->
     Config = #{name => <<"some name">>,
                description => <<"some description">>,
                client_id => <<"123">>,
-               client_secrect => <<"dont tell">>,
+               client_secret => <<"dont tell">>,
                request_scopes => undefined,
                issuer_or_endpoint => ConfigEndpoint,
                local_endpoint => <<"/here">>
@@ -147,7 +147,7 @@ real_config_fetch_test() ->
     Config = #{name => <<"some name">>,
                description => <<"some description">>,
                client_id => <<"123">>,
-               client_secrect => <<"dont tell">>,
+               client_secret => <<"dont tell">>,
                request_scopes => undefined,
                issuer_or_endpoint => Issuer,
                local_endpoint => <<"/here">>

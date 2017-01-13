@@ -35,11 +35,13 @@
           keys = [],
           lasttime_updated = undefined,
           local_endpoint = undefined,
+          meta_data = #{},
 
           gun_pid = undefined,
           config_tries = 0,
           mref = undefined,
           sref = undefined,
+          method = get,
           header = [],
           body = <<>>,
           path = undefined,
@@ -84,12 +86,17 @@ init({Id, Config}) ->
 
     #{name := Name,
       description := Description,
-      client_id := ClientId,
-      client_secrect := ClientSecret,
       request_scopes := Scopes,
       issuer_or_endpoint := IssuerOrEndpoint,
       local_endpoint := LocalEndpoint
      } = Config,
+    ClientSecret = maps:get(client_secret, Config, undefined),
+    ClientId = case ClientSecret of
+                   undefined ->
+                       undefined;
+                   _ ->
+                       maps:get(client_id, Config, undefined)
+               end,
     trigger_config_retrieval(),
     ConfigEndpoint = to_config_endpoint(IssuerOrEndpoint),
     Issuer = config_ep_to_issuer(ConfigEndpoint),
@@ -122,6 +129,9 @@ handle_cast(retrieve_config, #state{gun_pid = undefined} = State) ->
                            mref=MRef,
                            sref=undefined,
                            path=Path,
+                           method = get,
+                           header = [],
+                           body = <<>>,
                            retrieving=config},
     {noreply, NewState};
 handle_cast(retrieve_keys, State) ->
@@ -131,10 +141,32 @@ handle_cast(retrieve_keys, State) ->
                            mref=MRef,
                            sref=undefined,
                            path=Path,
+                           method = get,
+                           body = <<>>,
                            header = Header,
                            error = Error,
                            retrieving=keys},
     {noreply, NewState};
+handle_cast(register_if_needed, #state{client_id = undefined,
+                                       local_endpoint=LocalEndpoint} = State) ->
+    {ok, ConPid, MRef, Path, Error} = register_client(State),
+    Header = [{<<"content-type">>, "application/json"}],
+    Body = jsone:encode(#{application_type => <<"web">>,
+                          redirect_uris => [LocalEndpoint]
+                          %TODO: add more and make this configurable
+                         }),
+    NewState = State#state{gun_pid = ConPid,
+                           mref=MRef,
+                           sref=undefined,
+                           path=Path,
+                           method = post,
+                           body = Body,
+                           header = Header,
+                           error = Error,
+                           retrieving=registration},
+    {noreply, NewState};
+handle_cast(register_if_needed, State) ->
+    {noreply, State#state{ready=true} };
 handle_cast(stop, State) ->
     {stop, normal, State};
 handle_cast(_Msg, State) ->
@@ -143,9 +175,10 @@ handle_cast(_Msg, State) ->
 
 
 handle_info({gun_up, ConPid, _Protocol},
-            #state{path=Path, header=Header, gun_pid=ConPid} = State) ->
-    {ok, StreamRef} = oidcc_http_util:async_http(get, Path, Header,
-                                                 <<>>, ConPid),
+            #state{path=Path, header=Header, gun_pid=ConPid, method=Method
+                  , body=Body} = State) ->
+    {ok, StreamRef} = oidcc_http_util:async_http(Method, Path, Header,
+                                                 Body, ConPid),
     {noreply, State#state{sref=StreamRef}};
 handle_info({gun_response, ConPid, StreamRef, fin, Status, Header},
             #state{gun_pid=ConPid, sref=StreamRef} = State) ->
@@ -202,10 +235,27 @@ retrieve_keys(#state{config = Config}) ->
             {ok, ConPid, MRef, Path, undefined}
     end.
 
+
+register_client(#state{config = Config}) ->
+    RegistrationEndpoint = maps:get(registration_endpoint, Config, undefined),
+    case RegistrationEndpoint of
+        undefined ->
+            Error = {no_registration_endpoint},
+            {ok, undefined, undefined, undefined, Error};
+        _ ->
+            {ok, ConPid, MRef, Path} =
+                oidcc_http_util:start_http(RegistrationEndpoint),
+            {ok, ConPid, MRef, Path, undefined}
+    end.
+
+
+
 handle_http_result(200, Header, Body, config, State) ->
     handle_config(Body, Header, State);
 handle_http_result(200, Header, Body, keys, State) ->
     handle_keys(Body, Header, State);
+handle_http_result(200, Header, Body, registration, State) ->
+    handle_registration(Body, Header, State);
 handle_http_result(Status, _Header, Body, Retrieve, State) ->
     trigger_config_retrieval(600000),
     State#state{error = {retrieving, Retrieve, Status, Body}}.
@@ -259,10 +309,31 @@ handle_keys(Data, _Header, State) ->
                            lasttime_updated = timestamp(), gun_pid = undefined},
     case length(Keys) > 0 of
         true ->
-            NewState#state{ready = true};
+            ok = trigger_registration(),
+            NewState;
         false ->
             trigger_config_retrieval(600000),
             NewState#state{error = {no_keys, Data}}
+    end.
+
+handle_registration(Data, _Header, State) ->
+    %TODO: implement update at expire data/time or retrieval when needed
+    MetaData=decode_json(Data),
+    io:format("got metadata ~p~n", [MetaData]),
+    ClientId = maps:get(client_id, MetaData, undefined),
+    ClientSecret = maps:get(client_secret, MetaData, undefined),
+    ClientSecretExpire = maps:get(client_secret_expires_at, MetaData,
+                                  undefined),
+    case is_binary(ClientId) and is_binary(ClientSecret)
+        and is_binary(ClientSecretExpire) of
+        true ->
+            State#state{meta_data  = MetaData, client_id = ClientId,
+                        client_secret = ClientSecret, ready = true,
+                        lasttime_updated = timestamp(), gun_pid = undefined};
+        false ->
+            State#state{error=no_clientid, meta_data=#{}, client_id=undefined,
+                        client_secret = undefined, ready = false,
+                        gun_pid = undefined}
     end.
 
 
@@ -318,6 +389,9 @@ trigger_config_retrieval(Time) ->
 
 trigger_key_retrieval() ->
     gen_server:cast(self(), retrieve_keys).
+
+trigger_registration() ->
+    gen_server:cast(self(), register_if_needed).
 
 timestamp() ->
     erlang:system_time(seconds).

@@ -72,7 +72,7 @@ add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
     Config = #{name => Name,
                description => Description,
                client_id => ClientId,
-               client_secrect => ClientSecret,
+               client_secret => ClientSecret,
                issuer_or_endpoint => IssuerOrConfigEP,
                local_endpoint => LocalEndpoint,
                request_scopes => Scopes

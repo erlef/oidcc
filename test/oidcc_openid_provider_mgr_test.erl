@@ -12,7 +12,7 @@ simple_add_test() ->
     Config = #{name => <<"some name">>,
                description => <<"some description">>,
                client_id => <<"123">>,
-               client_secrect => <<"dont tell">>,
+               client_secret => <<"dont tell">>,
                issuer_or_endpoint => <<"well.known">>,
                local_endpoint => <<"/here">>
               },
@@ -38,7 +38,7 @@ id_add_test() ->
     Config = #{name => <<"some name">>,
                description => <<"some description">>,
                client_id => <<"123">>,
-               client_secrect => <<"dont tell">>,
+               client_secret => <<"dont tell">>,
                issuer_or_endpoint => <<"well.known">>,
                local_endpoint => <<"/here">>
               },
@@ -65,7 +65,7 @@ double_add_test() ->
     Config = #{name => <<"some name">>,
                description => <<"some description">>,
                client_id => <<"123">>,
-               client_secrect => <<"dont tell">>,
+               client_secret => <<"dont tell">>,
                issuer_or_endpoint => <<"well.known">>,
                local_endpoint => <<"/here">>
               },
@@ -92,7 +92,7 @@ multiple_add_test() ->
     Config = #{name => <<"some name">>,
                description => <<"some description">>,
                client_id => <<"123">>,
-               client_secrect => <<"dont tell">>,
+               client_secret => <<"dont tell">>,
                issuer_or_endpoint => <<"well.known">>,
                local_endpoint => <<"/here">>
               },
@@ -126,7 +126,7 @@ lookup_test() ->
     Config = #{name => <<"some name">>,
                description => <<"some description">>,
                client_id => <<"123">>,
-               client_secrect => <<"dont tell">>,
+               client_secret => <<"dont tell">>,
                issuer_or_endpoint => <<"well.known">>,
                local_endpoint => <<"/here">>
               },

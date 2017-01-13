@@ -246,22 +246,23 @@ start_http_if_possible(Endpoint, Error) ->
 
 
 
-handle_http_result(200, Header, Body, config, State) ->
+handle_http_result(true, _,  Header, Body, config, State) ->
     handle_config(Body, Header, State);
-handle_http_result(200, Header, Body, keys, State) ->
+handle_http_result(true, _,  Header, Body, keys, State) ->
     handle_keys(Body, Header, State);
-handle_http_result(200, Header, Body, registration, State) ->
+handle_http_result(true, _, Header, Body, registration, State) ->
     handle_registration(Body, Header, State);
-handle_http_result(Status, _Header, Body, Retrieve, State) ->
+handle_http_result(false, Status, _Header, Body, Retrieve, State) ->
     trigger_config_retrieval(600000),
     State#state{error = {retrieving, Retrieve, Status, Body}}.
 
 
 handle_http_result(#state{ retrieving = Retrieve, http =Http} = State) ->
     #{header := Header, status := Status, body := InBody} = Http,
+    GoodStatus = (Status >= 200) and (Status < 300),
     NewState = stop_gun(State),
     {ok, Body} = oidcc_http_util:uncompress_body_if_needed(InBody, Header),
-    handle_http_result(Status, Header, Body, Retrieve, NewState).
+    handle_http_result(GoodStatus, Status, Header, Body, Retrieve, NewState).
 
 
 create_config(#state{id = Id, desc = Desc, client_id = ClientId,

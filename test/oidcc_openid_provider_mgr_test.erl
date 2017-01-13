@@ -13,7 +13,7 @@ simple_add_test() ->
                description => <<"some description">>,
                client_id => <<"123">>,
                client_secrect => <<"dont tell">>,
-               config_endpoint => <<"well.known">>,
+               issuer_or_endpoint => <<"well.known">>,
                local_endpoint => <<"/here">>
               },
     MyPid = self(),
@@ -39,7 +39,7 @@ id_add_test() ->
                description => <<"some description">>,
                client_id => <<"123">>,
                client_secrect => <<"dont tell">>,
-               config_endpoint => <<"well.known">>,
+               issuer_or_endpoint => <<"well.known">>,
                local_endpoint => <<"/here">>
               },
     MyPid = self(),
@@ -66,7 +66,7 @@ double_add_test() ->
                description => <<"some description">>,
                client_id => <<"123">>,
                client_secrect => <<"dont tell">>,
-               config_endpoint => <<"well.known">>,
+               issuer_or_endpoint => <<"well.known">>,
                local_endpoint => <<"/here">>
               },
     MyPid = self(),
@@ -93,7 +93,7 @@ multiple_add_test() ->
                description => <<"some description">>,
                client_id => <<"123">>,
                client_secrect => <<"dont tell">>,
-               config_endpoint => <<"well.known">>,
+               issuer_or_endpoint => <<"well.known">>,
                local_endpoint => <<"/here">>
               },
     NumberToAdd = 1000,
@@ -127,7 +127,7 @@ lookup_test() ->
                description => <<"some description">>,
                client_id => <<"123">>,
                client_secrect => <<"dont tell">>,
-               config_endpoint => <<"well.known">>,
+               issuer_or_endpoint => <<"well.known">>,
                local_endpoint => <<"/here">>
               },
     MyPid = self(),

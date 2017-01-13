@@ -33,10 +33,10 @@
 %% @end
 -spec add_openid_provider(binary(), binary(), binary(), binary(), binary(),
                           binary()) -> {ok, Id::binary(), Pid::pid()}.
-add_openid_provider(Name, Description, ClientId, ClientSecret, ConfigEndpoint,
+add_openid_provider(Name, Description, ClientId, ClientSecret, IssuerOrConfigEP,
                     LocalEndpoint) ->
     add_openid_provider(undefined, Name, Description, ClientId, ClientSecret,
-                        ConfigEndpoint, LocalEndpoint, undefined).
+                        IssuerOrConfigEP, LocalEndpoint, undefined).
 
 %% @doc
 %% add an OpenID Connect Provider to the list of possible Providers, giving the
@@ -51,12 +51,12 @@ add_openid_provider(Name, Description, ClientId, ClientSecret, ConfigEndpoint,
                                  {ok, Id::binary(), Pid::pid()}|
                                  {error, id_already_used}.
 add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
-                    ConfigEndpoint, LocalEndpoint) ->
+                    IssuerOrConfigEP, LocalEndpoint) ->
     add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
-                        ConfigEndpoint, LocalEndpoint, undefined).
+                        IssuerOrConfigEP, LocalEndpoint, undefined).
 
 -spec add_openid_provider(Id, Name, Description, ClientId, ClientSecret,
-                          ConfigEndpoint, LocalEndpoint, Scopes) ->
+                          IssuerOrConfigEP, LocalEndpoint, Scopes) ->
                                  {ok, Id::binary(), Pid::pid()}|
                                  {error, id_already_used} when
       Id :: binary() | undefined,
@@ -64,16 +64,16 @@ add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
       Description :: binary(),
       ClientId :: binary(),
       ClientSecret :: binary(),
-      ConfigEndpoint :: binary(),
+      IssuerOrConfigEP :: binary(),
       LocalEndpoint :: binary(),
       Scopes :: list() | undefined.
 add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
-                    ConfigEndpoint, LocalEndpoint, Scopes) ->
+                    IssuerOrConfigEP, LocalEndpoint, Scopes) ->
     Config = #{name => Name,
                description => Description,
                client_id => ClientId,
                client_secrect => ClientSecret,
-               config_endpoint => ConfigEndpoint,
+               issuer_or_endpoint => IssuerOrConfigEP,
                local_endpoint => LocalEndpoint,
                request_scopes => Scopes
               },

@@ -8,7 +8,7 @@ start_stop_test() ->
                client_id => <<"123">>,
                client_secrect => <<"dont tell">>,
                request_scopes => undefined,
-               config_endpoint => <<"https://my.provider.com/well.known">>,
+               issuer_or_endpoint => <<"https://my.provider.com/well.known">>,
                local_endpoint => <<"/here">>
               },
     Id = <<"some id">>,
@@ -22,7 +22,7 @@ set_test() ->
     Description = <<"some test oidc">>,
     ClientId = <<"234">>,
     ClientSecret = <<"secret">>,
-    ConfigEndpoint = <<"https://my.provider/config">>,
+    ConfigEndpoint = <<"https://my.provider/.well-known/openid-configuration">>,
     LocalEndpoint = <<"https://my.server/return">>,
 
     ConfigIn = #{name => Name,
@@ -30,18 +30,25 @@ set_test() ->
                client_id => ClientId,
                client_secrect => ClientSecret,
                request_scopes => undefined,
-               config_endpoint => ConfigEndpoint,
+               issuer_or_endpoint => ConfigEndpoint,
                local_endpoint => LocalEndpoint
               },
     {ok, Pid} = oidcc_openid_provider:start_link(Id, ConfigIn),
     {ok, Config} = oidcc_openid_provider:get_config(Pid),
-    #{id := Id,
-      name := Name,
-      description := Description,
-      client_id := ClientId,
-      client_secret := ClientSecret,
-      config_endpoint := ConfigEndpoint,
-      local_endpoint := LocalEndpoint } = Config,
+    #{id := ConfId,
+      name := ConfName,
+      description := ConfDesc,
+      client_id := ConfClientId,
+      client_secret := ConfClientSecret,
+      config_endpoint := ConfConfigEndpoint,
+      local_endpoint := ConfLocalEndpoint } = Config,
+    ?assertEqual(ConfId, Id),
+    ?assertEqual(ConfName, Name),
+    ?assertEqual(ConfDesc, Description),
+    ?assertEqual(ConfClientId, ClientId),
+    ?assertEqual(ConfClientSecret, ClientSecret),
+    ?assertEqual(ConfConfigEndpoint, ConfigEndpoint),
+    ?assertEqual(ConfLocalEndpoint, LocalEndpoint),
     ok = oidcc_openid_provider:stop(Pid),
     ok = test_util:wait_for_process_to_die(Pid, 100).
 
@@ -63,7 +70,7 @@ fetch_config_test() ->
                client_id => <<"123">>,
                client_secrect => <<"dont tell">>,
                request_scopes => undefined,
-               config_endpoint => ConfigEndpoint,
+               issuer_or_endpoint => ConfigEndpoint,
                local_endpoint => <<"/here">>
               },
     StartFun = fun(Url)  ->
@@ -135,13 +142,14 @@ real_config_fetch_test() ->
     Id = <<"some id">>,
 
     ConfigEndpoint = <<"https://accounts.google.com/.well-known/openid-configuration">>,
+    Issuer = <<"https://accounts.google.com">>,
 
     Config = #{name => <<"some name">>,
                description => <<"some description">>,
                client_id => <<"123">>,
                client_secrect => <<"dont tell">>,
                request_scopes => undefined,
-               config_endpoint => ConfigEndpoint,
+               issuer_or_endpoint => Issuer,
                local_endpoint => <<"/here">>
               },
 
@@ -152,7 +160,7 @@ real_config_fetch_test() ->
     {ok, Config2} = oidcc_openid_provider:get_config(Pid),
     #{ config_endpoint := ConfigEndpoint,
        keys := Keys,
-       issuer := <<"https://accounts.google.com">>,
+       issuer := Issuer,
        jwks_uri := <<"https://www.googleapis.com/oauth2/v3/certs">>
      } = Config2,
     true = (length(Keys) >= 1),

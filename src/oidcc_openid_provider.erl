@@ -87,10 +87,11 @@ init({Id, Config}) ->
       client_id := ClientId,
       client_secrect := ClientSecret,
       request_scopes := Scopes,
-      config_endpoint := ConfigEndpoint,
+      issuer_or_endpoint := IssuerOrEndpoint,
       local_endpoint := LocalEndpoint
      } = Config,
     trigger_config_retrieval(),
+    ConfigEndpoint = to_config_endpoint(IssuerOrEndpoint),
     Issuer = config_ep_to_issuer(ConfigEndpoint),
     {ok, #state{id = Id, name = Name, desc = Description, client_id = ClientId,
                 client_secret = ClientSecret, config_ep = ConfigEndpoint,
@@ -325,6 +326,23 @@ stop_gun(#state{gun_pid = Pid, mref = MonitorRef} =State) ->
     ok = oidcc_http_util:async_close(Pid, MonitorRef),
     State#state{gun_pid=undefined, retrieving=undefined, http=#{}}.
 
+
+to_config_endpoint(IssuerOrEndpoint) ->
+    Slash = <<"/">>,
+    Config = <<".well-known/openid-configuration">>,
+    ConfigS = << Slash/binary, Config/binary >>,
+    Pos = byte_size(IssuerOrEndpoint) - 33,
+    case binary:match(IssuerOrEndpoint, ConfigS) of
+        {Pos, 33} ->
+            Endpoint = IssuerOrEndpoint,
+            Endpoint;
+       _  ->
+            Issuer = IssuerOrEndpoint,
+            case binary:last(Issuer) of
+                $/ -> << Issuer/binary, Config/binary>>;
+                _ -> << Issuer/binary, ConfigS/binary>>
+            end
+    end.
 
 config_ep_to_issuer(ConfigEp) ->
     [Issuer] = binary:split(ConfigEp, [<<"/.well-known/openid-configuration">>],

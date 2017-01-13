@@ -322,7 +322,7 @@ handle_registration(Data, _Header, State) ->
     ClientSecretExpire = maps:get(client_secret_expires_at, MetaData,
                                   undefined),
     case is_binary(ClientId) and is_binary(ClientSecret)
-        and is_binary(ClientSecretExpire) of
+        and is_number(ClientSecretExpire) of
         true ->
             State#state{meta_data  = MetaData, client_id = ClientId,
                         client_secret = ClientSecret, ready = true,

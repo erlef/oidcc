@@ -226,25 +226,22 @@ retrieve_config(#state{config_ep = ConfigEndpoint}) ->
 
 retrieve_keys(#state{config = Config}) ->
     KeyEndpoint = maps:get(jwks_uri, Config, undefined),
-    case KeyEndpoint of
-        undefined ->
-            Error = {no_key_endpoint},
-            {ok, undefined, undefined, undefined, Error};
-        _ ->
-            {ok, ConPid, MRef, Path} = oidcc_http_util:start_http(KeyEndpoint),
-            {ok, ConPid, MRef, Path, undefined}
-    end.
+    Error = {no_key_endpoint},
+    start_http_if_possible(KeyEndpoint, Error).
 
 
 register_client(#state{config = Config}) ->
     RegistrationEndpoint = maps:get(registration_endpoint, Config, undefined),
-    case RegistrationEndpoint of
+    Error = {no_registration_endpoint},
+    start_http_if_possible(RegistrationEndpoint, Error).
+
+start_http_if_possible(Endpoint, Error) ->
+    case Endpoint of
         undefined ->
-            Error = {no_registration_endpoint},
             {ok, undefined, undefined, undefined, Error};
         _ ->
             {ok, ConPid, MRef, Path} =
-                oidcc_http_util:start_http(RegistrationEndpoint),
+                oidcc_http_util:start_http(Endpoint),
             {ok, ConPid, MRef, Path, undefined}
     end.
 
@@ -319,7 +316,6 @@ handle_keys(Data, _Header, State) ->
 handle_registration(Data, _Header, State) ->
     %TODO: implement update at expire data/time or retrieval when needed
     MetaData=decode_json(Data),
-    io:format("got metadata ~p~n", [MetaData]),
     ClientId = maps:get(client_id, MetaData, undefined),
     ClientSecret = maps:get(client_secret, MetaData, undefined),
     ClientSecretExpire = maps:get(client_secret_expires_at, MetaData,

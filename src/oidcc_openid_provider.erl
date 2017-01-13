@@ -328,8 +328,8 @@ handle_registration(Data, _Header, State) ->
                         client_secret = ClientSecret, ready = true,
                         lasttime_updated = timestamp(), gun_pid = undefined};
         false ->
-            State#state{error=no_clientid, meta_data=#{}, client_id=undefined,
-                        client_secret = undefined, ready = false,
+            State#state{error=no_clientid, meta_data=MetaData, ready = false,
+                        client_id=undefined, client_secret = undefined,
                         gun_pid = undefined}
     end.
 

@@ -131,7 +131,7 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     #{ alg := Algo} = Header,
     DefaultAlgos = [<<"RS256">>],
     AcceptedAlgos =
-        case application:get_env(oidcc, allow_none_algorithm) of
+        case application:get_env(oidcc, allow_none_algorithm, false) of
             true ->
                 [<<"none">> | DefaultAlgos];
             _ ->

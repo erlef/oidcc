@@ -9,8 +9,7 @@ init() ->
     oidcc_client:register(?MODULE).
 
 login_succeeded(Token) ->
-    lager:info("~n~n*************************************~nthe user logged in with~n ~p~n", [Token]),
-    % create e.g. a session and store it't id in a session to look it up on further usage
+    conformance:check_result(true, Token),
     Path = <<"/">>,
     Updates = [
                {redirect, Path}
@@ -19,7 +18,7 @@ login_succeeded(Token) ->
 
 
 login_failed(Error, Desc) ->
-    lager:info("~n~n*************************************~nlogin failed with~n ~p:~p~n", [Error, Desc]),
+    conformance:check_result(false, {Error, Desc}),
     Path = <<"/">>,
     Updates = [{redirect, Path}],
     {ok, Updates}.

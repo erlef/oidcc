@@ -2,68 +2,316 @@
 
 -export([
          run_test/2,
+         check_result/2,
+         set_conf/2,
+         get_conf/1,
+         get_conf/2,
          start_debug/0,
+         start_debug/1,
          stop_debug/0
         ]).
--define(RPID,<<"oidcc.test.code">>).
 
-run_test(<<"rp-response_type-code">> = Id, Req) ->
-   test_rp_response_type_code(Id, Req);
-run_test(<<"rp-scope-userinfo-claims">> = Id, Req) ->
-    test_rp_scope_userinfo_claims(Id, Req);
-run_test(<<"rp-nonce-invalid">>=Id, Req) ->
-    test_rp_nonce_invalid(Id, Req);
-run_test(<<"rp-token_endpoint-client_secret_basic">> = Id, Req) ->
-    test_rp_token_endpoint_basic(Id, Req);
-run_test(<<"rp-id_token-aud">> = Id, Req) ->
-    test_rp_id_token(Id, Req);
-run_test(<<"rp-id_token-kid-absent-single-jwks">> = Id, Req) ->
-    test_rp_id_token(Id, Req);
-run_test(<<"rp-userinfo-bad-sub-claim">> = Id, Req) ->
-    test_rp_user_info(Id, Req);
-run_test(TestId, Req) ->
-    lager:error("unknown or unimplemented test ~p",[TestId]),
-    redirect_to(<<"/">>, Req).
+%%  *************
+%%  *** TESTS ***
+%%  *************
 
 
+%% *** CODE - MANDATORY ***
 
-test_rp_response_type_code(TestId, Req) ->
-    {ok, Id, _Pid} = dyn_reg_test(TestId),
+%% rp-response_type-code
+%% Make an authentication request using the Authorization Code Flow.
+test_rp_response_type_code(Req) ->
+    {ok, Id, _Pid} = dyn_reg_test(),
     redirect_to_provider(Id, Req).
 
+%% An authentication response containing an authorization code.
+check_rp_response_type_code(true, _) ->
+    true;
+check_rp_response_type_code(_, _) ->
+    false.
 
 
-test_rp_scope_userinfo_claims(TestId, Req) ->
-    %TODO: enable autofetch of userinfo
+%% rp-scope-userinfo-claims
+%% Request claims using scope values.
+test_rp_scope_userinfo_claims(Req) ->
     Scopes = [openid, email, phone],
-    lager:info("requesting scopes ~p", [Scopes]),
-    {ok, Id, _Pid} = dyn_reg_test(TestId, Scopes),
+    set_conf(scopes, Scopes),
+    log("requesting scopes ~p", [Scopes]),
+    {ok, Id, _Pid} = dyn_reg_test(Scopes),
     redirect_to_provider(Id, Req).
 
-test_rp_nonce_invalid(TestId, Req) ->
-    {ok, Id, _Pid} = dyn_reg_test(TestId),
+%% A UserInfo Response containing the requested claims.
+%% (following not applicable)
+%% If no access token is issued (when using Implicit Flow with
+%% response_type='id_token') the ID Token contains the requested claims.
+check_rp_scope_userinfo_claims(true, _TokenMap) ->
+    %% TODO: ensure the requested scopes are in the userinfo
+    %% Scopes = get_conf(scopes, []),
+    false;
+check_rp_scope_userinfo_claims(_, _) ->
+    false.
+
+
+%% rp-nonce-invalid
+%% Pass a 'nonce' value in the Authentication Request.
+%% Verify the 'nonce' value returned in the ID Token.
+test_rp_nonce_invalid(Req) ->
+    {ok, Id, _Pid} = dyn_reg_test(),
     redirect_to_provider(Id, Req).
 
-test_rp_token_endpoint_basic(TestId, Req) ->
-    {ok, Id, _Pid} = dyn_reg_test(TestId),
+%% Identify that the 'nonce' value in the ID Token is invalid and
+%% reject the ID Token.
+check_rp_nonce_invalid(false, {internal, {token_invalid, {error, wrong_nonce}}}) ->
+    true;
+check_rp_nonce_invalid(_, _) ->
+    false.
+
+%% rp-token_endpoint-client_secret_basic
+%%
+%% Use the 'client_secret_basic' method to authenticate at the
+%% Authorization Server when using the token endpoint.
+test_rp_token_endpoint_basic(Req) ->
+    {ok, Id, _Pid} = dyn_reg_test(),
     redirect_to_provider(Id, Req).
 
-test_rp_id_token(TestId, Req) ->
-    {ok, Id, _Pid} = dyn_reg_test(TestId),
+%% A Token Response, containing an ID token.
+check_rp_token_endpoint_basic(true, #{id := #{token := IdToken}})
+    when is_binary(IdToken), byte_size(IdToken) > 5 ->
+    true;
+check_rp_token_endpoint_basic(_, _) ->
+    false.
+
+%% rp-id_token-aud
+%%
+%% Request an ID token and compare its aud value
+%% to the Relying Party's 'client_id'.
+test_rp_id_token(Req) ->
+    {ok, Id, _Pid} = dyn_reg_test(),
+    {ok, Config} = oidcc:get_openid_provider_info(Id),
+    log("Provider Info: ~p",[Config]),
     redirect_to_provider(Id, Req).
 
-test_rp_user_info(TestId, Req) ->
-    {ok, Id, _Pid} = dyn_reg_test(TestId),
+%% Identify that the 'aud' value is missing or doesn't match the 'client_id'
+%% and reject the ID Token after doing ID Token validation.
+check_rp_id_token_aud(false,
+                      {internal, {token_invalid,{error,not_in_audience}}}) ->
+    true;
+check_rp_id_token_aud(_, _) ->
+    false.
+
+
+%% rp-id_token-kid-absent-single-jwks
+%%
+%% Request an ID token and verify its signature using the keys
+%% provided by the Issuer.
+%%
+%% Use the single key published by the Issuer to verify the ID Tokens signature
+%% and accept the ID Token after doing ID Token validation.
+check_rp_id_token_absent_single_jwks(true, _TokenMap) ->
+    true;
+check_rp_id_token_absent_single_jwks(_, _) ->
+    false.
+
+%% rp-id_token-sig-none
+%%
+%% Use Code Flow and retrieve an unsigned ID Token.
+%%
+%% Accept the ID Token after doing ID Token validation.
+check_rp_id_token_sig_none(true, _TokenMap) ->
+    true;
+check_rp_id_token_sig_none(_, _) ->
+    false.
+
+%% rp-id_token-issuer-mismatch
+%%
+%% Request an ID token and verify its 'iss' value.
+%%
+%% Identify the incorrect 'iss' value and reject the ID Token after doing ID Token validation.
+check_rp_id_token_issuer_mismatch(false, {internal, {token_invalid, {error, {wrong_issuer, _, _}}}}) ->
+    true;
+check_rp_id_token_issuer_mismatch(_, _) ->
+    false.
+
+%% rp-id_token-kid-absent-multiple-jwks
+%%
+%% Request an ID token and verify its signature using the keys provided by
+%% the Issuer.
+%%
+%% dentify that the 'kid' value is missing from the JOSE header and that the
+%% Issuer publishes multiple keys in its JWK Set document (referenced by
+%% 'jwks_uri').
+%% The RP can do one of two things;
+%% reject the ID Token since it can not by using the kid determined which
+%% key to use to verify the signature. <- solution used here
+%%
+%% Or it can just test all possible keys and hit upon one that works,
+%% which it will in this case.
+check_rp_id_token_kid_absent_multiple(false, {internal, {token_invalid, {error, too_many_keys}}}) ->
+    true;
+check_rp_id_token_kid_absent_multiple(_, _) ->
+    false.
+
+%% rp-id_token-bad-sig-rs256
+%%
+%% Request an ID token and verify its signature using the keys provided by
+%% the Issuer.
+%%
+%% Identify the invalid signature and reject the ID Token after doing
+%% ID Token validation.
+check_rp_id_token_bad_sig(false, {internal, {token_invalid, {error, invalid_signature}}}) ->
+    true;
+check_rp_id_token_bad_sig(_, _) ->
+    false.
+
+%% rp-id_token-iat
+%%
+%% Request an ID token and verify its 'iat' value.
+%%
+%% dentify the missing 'iat' value and reject the ID Token after doing
+%% ID Token validation.
+check_rp_id_token_iat(false, {internal, {token_invalid, {error, {required_fields_missing, [iat]}}}}) ->
+    true;
+check_rp_id_token_iat(_, _) ->
+    false.
+
+
+%% rp-id_token-sig-rs256
+%%
+%% Request an encrypted ID Token. Decrypt the returned the ID Token and
+%% verify its signature using the keys published by the Issuer.
+%%
+%% Accept the ID Token after doing ID Token validation.
+check_rp_id_token_sig_rs256(true, _) ->
+    true;
+check_rp_id_token_sig_rs256(_, _) ->
+    false.
+
+%% rp-id_token-sub
+%%
+%%Request an ID token and verify it contains a sub value.
+%%
+%% Identify the missing 'sub' value and reject the ID Token.
+check_rp_id_token_sub(false, {internal, {token_invalid, {error, {required_fields_missing, [sub]}}}}) ->
+    true;
+check_rp_id_token_sub(_, _) ->
+    false.
+
+%% rp-userinfo-bad-sub-claim
+%%
+%% Make a UserInfo Request and verify the 'sub' value of the UserInfo Response
+%% by comparing it with the ID Token's 'sub' value.
+test_rp_user_info(Req) ->
+    {ok, Id, _Pid} = dyn_reg_test(),
     redirect_to_provider(Id, Req).
 
+%% Identify the invalid 'sub' value and reject the UserInfo Response.
+check_rp_user_info_bad_sub_claim(false, {_Error, _Desc}) ->
+    %% ensure the error is due to invalid sub value
+    false;
+check_rp_user_info_bad_sub_claim(_, _) ->
+    false.
 
-dyn_reg_test(TestId) ->
-    dyn_reg_test(TestId, undefined).
+%% *** CODE - OPTIONAL ***
+%% *** CONFIGURATION - MANDATORY ***
+%% *** CONFIGURATION - OPTIONAL ***
+%% *** DYNAMIC - OPTIONAL ***
 
-dyn_reg_test(TestId, Scopes) ->
+
+
+
+%% *****************************************************************************
+%% functions to handle tests
+%%
+
+-define(TESTS, [
+                {<<"rp-response_type-code">>,
+                 fun test_rp_response_type_code/1,
+                 fun check_rp_response_type_code/2},
+                {<<"rp-scope-userinfo-claims">>,
+                 fun test_rp_scope_userinfo_claims/1,
+                  fun check_rp_scope_userinfo_claims/2},
+                {<<"rp-nonce-invalid">>,
+                 fun test_rp_nonce_invalid/1,
+                 fun check_rp_nonce_invalid/2 },
+                {<<"rp-token_endpoint-client_secret_basic">>,
+                 fun test_rp_token_endpoint_basic/1,
+                 fun check_rp_token_endpoint_basic/2 },
+                {<<"rp-id_token-aud">> ,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_aud/2 },
+                {<<"rp-id_token-kid-absent-single-jwks">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_absent_single_jwks/2 },
+                {<<"rp-id_token-sig-none">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_sig_none/2},
+                {<<"rp-id_token-issuer-mismatch">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_issuer_mismatch/2},
+                {<<"rp-id_token-kid-absent-multiple-jwks">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_kid_absent_multiple/2},
+                {<<"rp-id_token-bad-sig-rs256">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_bad_sig/2},
+                {<<"rp-id_token-iat">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_iat/2},
+                {<<"rp-id_token-sig-rs256">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_sig_rs256/2},
+                {<<"rp-id_token-sub">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_sub/2},
+
+                {<<"rp-userinfo-bad-sub-claim">>,
+                 fun test_rp_user_info/1,
+                 fun check_rp_user_info_bad_sub_claim/2 }
+               ]).
+
+run_test(Id, Req) ->
+    case lists:keyfind(Id, 1, ?TESTS) of
+        {Id, TestFun, _} ->
+            register_test(Id),
+            TestFun(Req);
+        _ ->
+            lager:error("unknown or unimplemented test ~p",[Id]),
+            redirect_to(<<"/">>, Req)
+    end.
+
+
+
+
+check_result(LoggedIn, TokenOrError) ->
+    {ok, Id} = get_test_id(),
+    case LoggedIn of
+        true ->
+            log("User logged in ~p~n", [TokenOrError]);
+        false ->
+            log("User not logged in ~p~n", [TokenOrError])
+    end,
+    case lists:keyfind(Id, 1, ?TESTS) of
+        {Id, _, CheckFun} ->
+            case CheckFun(LoggedIn, TokenOrError) of
+                true ->
+                    log("*** ~p passed ***", [Id]);
+                _ ->
+                    log("*** ~p FAILED ***", [Id])
+            end ;
+        _ ->
+            lager:error("unknown or unimplemented check ~p",[Id]),
+            log("*** ~p FAILED ***")
+    end.
+
+
+
+dyn_reg_test() ->
+    dyn_reg_test(undefined).
+
+dyn_reg_test(Scopes) ->
+    {ok, TestId} = get_test_id(),
     Issuer = gen_issuer(TestId),
     dyn_reg(Issuer, TestId, Scopes).
-
 
 dyn_reg(Issuer, Name, Scopes) ->
     {ok, Id, Pid} = oidcc:add_openid_provider(
@@ -72,7 +320,7 @@ dyn_reg(Issuer, Name, Scopes) ->
                      <<"https://localhost:8080/oidc">>,
                       Scopes
                                          ),
-    lager:info("registration at ~p started with id ~p~n",[Issuer, Id]),
+    log("registration at ~p started with id ~p~n",[Issuer, Id]),
     case wait_for_provider_to_be_ready(Pid) of
         ok ->
             {ok, #{meta_data :=
@@ -82,11 +330,11 @@ dyn_reg(Issuer, Name, Scopes) ->
                          registration_access_token := RegAT
                         }
                   }} = oidcc:get_openid_provider_info(Pid),
-            lager:info("successfully registered ~p at: ~p~n",[Id, Issuer]),
-            lager:info(" client id: ~p~n",[ClientId]),
-            lager:info(" client secret: ~p~n",[ClientSecret]),
-            lager:info(" secret expires: ~p~n",[SecretExpire]),
-            lager:info(" reg access token: ~p~n~n~n",[RegAT]),
+            log("successfully registered ~p at: ~p~n",[Id, Issuer]),
+            log(" client id: ~p~n",[ClientId]),
+            log(" client secret: ~p~n",[ClientSecret]),
+            log(" secret expires: ~p~n",[SecretExpire]),
+            log(" reg access token: ~p~n~n~n",[RegAT]),
 
             {ok, Id, Pid};
         Error -> Error
@@ -95,7 +343,8 @@ dyn_reg(Issuer, Name, Scopes) ->
 gen_issuer(TestId) ->
     Base = <<"https://rp.certification.openid.net:8080/">>,
     Slash = <<"/">>,
-    << Base/binary, ?RPID/binary, Slash/binary, TestId/binary >>.
+    RpId = get_rp_id(),
+    << Base/binary, RpId/binary, Slash/binary, TestId/binary >>.
 
 
 
@@ -120,6 +369,10 @@ start_debug() ->
     Options = [{time, 60000}, {msgs, 10000}],
     redbug:start(ModuleList, Options).
 
+start_debug(ModuleList) ->
+    Options = [{time, 60000}, {msgs, 10000}],
+    redbug:start(ModuleList, Options).
+
 stop_debug() ->
     redbug:stop().
 
@@ -130,7 +383,41 @@ redirect_to_provider(Id, Req) ->
 
 
 redirect_to(Url, Req) ->
-    lager:info("redirecting to ~p", [Url]),
+    log("redirecting to ~p~n", [Url]),
     Header = [{<<"location">>, Url}],
     {ok, Req2} = cowboy_req:reply(302, Header, Req),
     Req2.
+
+
+register_test(Id) ->
+    set_conf(test_id, Id),
+    CurrentTime = cowboy_clock:rfc1123(),
+    log("starting test ~p at ~p~n",[Id, CurrentTime]).
+
+get_test_id() ->
+    get_conf(test_id).
+
+get_rp_id() ->
+    get_conf(rp_id, <<"oidcc.temp.code">>).
+
+set_conf(Key, Value) ->
+    application:set_env(?MODULE, Key, Value).
+
+get_conf(Key) ->
+    application:get_env(?MODULE, Key).
+
+get_conf(Key, Default) ->
+    application:get_env(?MODULE, Key, Default).
+
+
+log(Format, Args) ->
+    Msg = io_lib:format(Format, Args),
+    log(Msg).
+
+log(Msg) ->
+    {ok, TestId} = get_test_id(),
+    {ok, LogDir} = get_conf(log_dir),
+    Ext = <<".txt">>,
+    FileName = << LogDir/binary, TestId/binary, Ext/binary >>,
+    ok = file:write_file(FileName, Msg, [append]),
+    lager:info(Msg).

@@ -10,7 +10,6 @@
                          oidcc_cowboy,
                          cowboy,
                          lager,
-                         erlydtl,
 			 eper
                         ]},
          {mod, {conformance_app, []}}

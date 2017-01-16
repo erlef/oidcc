@@ -384,9 +384,10 @@ extract_supported_keys([#{ kty := Kty0} = Map|T], ListTypeIn, List) ->
 
     case (Use /= unknown) of
         true ->
-            Key = #{kty => Kty, use => Use, alg => Alg,
+            Update = #{kty => Kty, use => Use, alg => Alg,
                     key => Key, kid => Kid },
-            extract_supported_keys(T, ListType, [Key | List]);
+            Entry = maps:merge(Map, Update),
+            extract_supported_keys(T, ListType, [Entry | List]);
         _ ->
             %% bad key, do exclude this provider
             []

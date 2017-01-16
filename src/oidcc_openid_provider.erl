@@ -368,7 +368,8 @@ extract_supported_keys([#{ kty := Kty0} = Map|T], ListTypeIn, List) ->
               {<<"enc">>, combined} -> {enc, combined};
               {undefined, any} -> {sign, pure_sign};
               {undefined, pure_sign} -> {sign, pure_sign};
-              _ -> unknown
+              {_, cobined} -> {Use0, combined};
+              {_, any} -> {Use0, combined}
           end,
     Key =
         case Kty of

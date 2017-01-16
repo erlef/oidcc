@@ -150,7 +150,10 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     % Header Parameter. The Client MUST use the keys provided by the Issuer.
     %
     % 9. The current time MUST be before the time represented by the exp Claim.
-    PubKey = get_needed_key(PubKeys, Kid),
+    PubKey = case Algo == <<"none">> of
+                 true -> undefined;
+                 false -> get_needed_key(PubKeys, Kid)
+             end,
     JWT = erljwt:parse_jwt(IdToken, PubKey, <<"JWT">>),
     case JWT of
         Claims -> ok;

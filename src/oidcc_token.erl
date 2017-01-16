@@ -129,9 +129,17 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     % the Client in the id_token_signed_response_alg parameter during
     % Registration.
     #{ alg := Algo} = Header,
-    case Algo == <<"RS256">> of
+    DefaultAlgos = [<<"RS256">>],
+    AcceptedAlgos =
+        case application:get_env(oidcc, allow_none_algorithm) of
+            true ->
+                [<<"none">> | DefaultAlgos];
+            _ ->
+                DefaultAlgos
+        end,
+    case lists:member(Algo, AcceptedAlgos) of
         true -> ok;
-        false -> throw(not_rs256)
+        false -> throw(bad_algorithm)
     end,
 
     % 6. If the ID Token is received via direct communication between the Client

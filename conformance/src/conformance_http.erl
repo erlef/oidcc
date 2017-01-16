@@ -25,7 +25,7 @@ terminate(_Reason, _Req, _State) ->
     ok.
 
 extract_args(Req) ->
-    {TestId, Req2} = cowboy_req:qs_val(<<"test">>, Req),
+    {TestId, Req2} = cowboy_req:qs_val(<<"id">>, Req),
     NewState = #state{
 		  test_id = TestId
 		 },
@@ -33,8 +33,9 @@ extract_args(Req) ->
 
 
 main_page(Req, State) ->
-    Status = 200,
-    {ok, Body} = conformance_dtl:render([]),
-    Req3 = cowboy_req:set_resp_body(Body, Req),
-    {ok, Req4} = cowboy_req:reply(Status, Req3),
-    {ok, Req4, State}.
+    lager:error("no test id given, redirecting to main page"),
+    %% redirect to /
+    Path = <<"/">>,
+    Header = [{<<"location">>, Path}],
+    {ok, Req2} = cowboy_req:reply(302, Header, Req),
+    {ok, Req2, State}.

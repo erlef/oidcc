@@ -112,7 +112,7 @@ validate_fail_algo_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(bad_algo,ClientId,Nonce,Issuer),
-    {error, not_rs256} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {error, bad_algorithm} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 
@@ -191,7 +191,8 @@ mock_oidcc(OpenIdProviderId, Issuer, ClientId) ->
                        Id = OpenIdProviderId,
                        {ok, #{issuer => Issuer,
                          client_id => ClientId,
-                         keys => [#{ key => ?RSA_PUBLIC_KEY}]
+                         keys => [#{ kty => rsa, key => ?RSA_PUBLIC_KEY,
+                                     use => sign}]
                         }}
                end,
     ok = meck:new(oidcc),

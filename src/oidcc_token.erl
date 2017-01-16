@@ -129,9 +129,17 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     % the Client in the id_token_signed_response_alg parameter during
     % Registration.
     #{ alg := Algo} = Header,
-    case Algo == <<"RS256">> of
+    DefaultAlgos = [<<"RS256">>],
+    AcceptedAlgos =
+        case application:get_env(oidcc, allow_none_algorithm, false) of
+            true ->
+                [<<"none">> | DefaultAlgos];
+            _ ->
+                DefaultAlgos
+        end,
+    case lists:member(Algo, AcceptedAlgos) of
         true -> ok;
-        false -> throw(not_rs256)
+        false -> throw(bad_algorithm)
     end,
 
     % 6. If the ID Token is received via direct communication between the Client
@@ -142,7 +150,10 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     % Header Parameter. The Client MUST use the keys provided by the Issuer.
     %
     % 9. The current time MUST be before the time represented by the exp Claim.
-    PubKey = get_needed_key(PubKeys, Kid),
+    PubKey = case Algo == <<"none">> of
+                 true -> undefined;
+                 false -> get_needed_key(PubKeys, Kid)
+             end,
     JWT = erljwt:parse_jwt(IdToken, PubKey, <<"JWT">>),
     case JWT of
         Claims -> ok;
@@ -214,14 +225,19 @@ has_other_audience(ClientId, Audience) when is_list(Audience) ->
     length(lists:delete(ClientId, Audience)) >= 1.
 
 
+get_needed_key(List, Id) ->
+    Filter = fun(#{use := Use, kty := Kty}) ->
+                     (Use == sign) and (Kty == rsa)
+             end,
+    find_needed_key(lists:filter(Filter, List), Id).
 
-get_needed_key([], _) ->
+find_needed_key([], _) ->
     throw(no_key);
-get_needed_key([#{key := Key}], none) ->
+find_needed_key([#{key := Key}], none) ->
     Key;
-get_needed_key(_, none) ->
+find_needed_key(_, none) ->
     throw(too_many_keys);
-get_needed_key([#{kid := KeyId, key := Key } |_], KeyId) ->
+find_needed_key([#{kid := KeyId, key := Key } |_], KeyId) ->
     Key;
-get_needed_key([_Key | T], KeyId) ->
+find_needed_key([_Key | T], KeyId) ->
     get_needed_key(T, KeyId).

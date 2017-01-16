@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+    <body>
+        <h1> RP Conformance testing of oidcc </h1>
+        <ul>
+                <li><a href="https://openid.net/certification/rp_testing/">Conformance Testing for RPs</a></li>
+                <li><a href="https://openid.net/certification/rp_submission/">Submission of Results for RPs</a></li>
+                <li><a href="https://rp.certification.openid.net:8080/">Tests</a></li>
+        </ul>
+
+        <h2> Mandatory Code Tests </h2>
+        <h3> Response Type and Response Mode </h3>
+        <ul>
+                <li><a href="/test/?id=rp-response_type-code">rp-response_type-code</a></li>
+        </ul>
+
+        <h3> scope Request Parameter </h3>
+        <ul>
+                <li><a href="/test/?id=rp-scope-userinfo-claims">rp-scope-userinfo-claims</a> TODO</li>
+        </ul>
+
+        <h3> nonce Request Parameter </h3>
+        <ul>
+                <li><a href="/test/?id=rp-nonce-invalid">rp-nonce-invalid</a></li>
+        </ul>
+
+        <h3> Client Authentication </h3>
+        <ul>
+                <li><a href="/test/?id=rp-token_endpoint-client_secret_basic">rp-token_endpoint-client_secret_basic</a></li>
+        </ul>
+
+        <h3> ID Token </h3>
+        <ul>
+                <li><a href="/test/?id=rp-id_token-aud">rp-id_token-aud</a></li>
+                <li><a href="/test/?id=rp-id_token-kid-absent-single-jwks">rp-id_token-kid-absent-single-jwks</a></li>
+                <li><a href="/test/?id=rp-id_token-sig-none">rp-id_token-sig-none</a></li>
+                <li><a href="/test/?id=rp-id_token-issuer-mismatch">rp-id_token-issuer-mismatch</a></li>
+                <li><a href="/test/?id=rp-id_token-kid-absent-multiple-jwks">rp-id_token-kid-absent-multiple-jwks</a></li>
+                <li><a href="/test/?id=rp-id_token-bad-sig-rs256">rp-id_token-bad-sig-rs256</a></li>
+                <li><a href="/test/?id=rp-id_token-iat">rp-id_token-iat</a></li>
+                <li><a href="/test/?id=rp-id_token-sig-rs256">rp-id_token-sig-rs256</a> TODO</li>
+                <li><a href="/test/?id=rp-id_token-sub">rp-id_token-sub</a></li>
+        </ul>
+        <h3> UserInfo Endpoint </h3>
+        <ul>
+                <li><a href="/test/?id=rp-userinfo-bad-sub-claim">rp-userinfo-bad-sub-claim</a> TODO</li>
+                <li><a href="/test/?id=rp-userinfo-bearer-body">rp-userinfo-bearer-body</a> TODO</li>
+                <li><a href="/test/?id=rp-userinfo-bearer-header">rp-userinfo-bearer-header</a> TODO</li>
+        </ul>
+
+    </body>
+</html>

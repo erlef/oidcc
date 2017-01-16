@@ -350,7 +350,7 @@ extract_supported_keys([], _, List) ->
 extract_supported_keys([#{ kty := Kty0} = Map|T], ListTypeIn, List) ->
     Kty = case Kty0 of
               <<"RSA">> -> rsa;
-              _ -> unknown
+              _ ->  Kty0
           end,
     Alg0 = maps:get(alg, Map, undefined),
     Alg = case Alg0 of
@@ -370,22 +370,22 @@ extract_supported_keys([#{ kty := Kty0} = Map|T], ListTypeIn, List) ->
               {undefined, pure_sign} -> {sign, pure_sign};
               _ -> unknown
           end,
-    {N, E} =
+    Key =
         case Kty of
             rsa ->
                 N0 = maps:get(n, Map),
                 E0 = maps:get(e, Map),
                 N1 = binary:decode_unsigned(base64url:decode(N0)),
                 E1 = binary:decode_unsigned(base64url:decode(E0)),
-                {N1, E1};
+                [E1, N1];
             _ ->
-                {unknown, unknown}
+                unknown
         end,
 
     case (Use /= unknown) of
         true ->
-            Key = #{kty => rsa, use => Use, alg => Alg,
-                    key => [E, N], kid => Kid },
+            Key = #{kty => Kty, use => Use, alg => Alg,
+                    key => Key, kid => Kid },
             extract_supported_keys(T, ListType, [Key | List]);
         _ ->
             %% bad key, do exclude this provider

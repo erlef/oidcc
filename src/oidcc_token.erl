@@ -215,8 +215,8 @@ has_other_audience(ClientId, Audience) when is_list(Audience) ->
 
 
 get_needed_key(List, Id) ->
-    Filter = fun(#{use := Use}) ->
-                     Use == sign
+    Filter = fun(#{use := Use, kty := Kty}) ->
+                     (Use == sign) and (Kty == rsa)
              end,
     find_needed_key(lists:filter(Filter, List), Id).
 

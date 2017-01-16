@@ -342,30 +342,57 @@ decode_json(Data) ->
     end.
 
 
-extract_supported_keys([], List) ->
+extract_supported_keys(Keys, List) ->
+    extract_supported_keys(Keys, any, List).
+
+extract_supported_keys([], _, List) ->
     List;
-extract_supported_keys([#{ kty := <<"RSA">>,
-                           alg := <<"RS256">>,
-                           use := <<"sig">>,
-                           n := N0,
-                           e := E0
-                         } = Map|T], List) ->
+extract_supported_keys([#{ kty := Kty0} = Map|T], ListTypeIn, List) ->
+    Kty = case Kty0 of
+              <<"RSA">> -> rsa;
+              _ -> unknown
+          end,
+    Alg0 = maps:get(alg, Map, undefined),
+    Alg = case Alg0 of
+              <<"RS256">> -> rs256;
+              undefined -> undefined;
+              _ -> unknown
+          end,
     Kid = maps:get(kid, Map, undefined),
-    N = binary:decode_unsigned(base64url:decode(N0)),
-    E = binary:decode_unsigned(base64url:decode(E0)),
-    Key = #{kty => rsa, alg => rs256, use => sign, key => [E, N], kid => Kid },
-    extract_supported_keys(T, [Key | List]);
-extract_supported_keys([#{ kty := <<"RSA">>,
-                           n := N0,
-                           e := E0
-                         } = Map|T], List) ->
-    Kid = maps:get(kid, Map, undefined),
-    N = binary:decode_unsigned(base64url:decode(N0)),
-    E = binary:decode_unsigned(base64url:decode(E0)),
-    Key = #{kty => rsa, key => [E, N], kid => Kid },
-    extract_supported_keys(T, [Key | List]);
-extract_supported_keys([_H|T], List) ->
-    extract_supported_keys(T, List).
+    Use0 = maps:get(use, Map, undefined),
+    {Use, ListType} =
+        case {Use0, ListTypeIn} of
+              {<<"sig">>, any} -> {sign, combined};
+              {<<"sig">>, combined} -> {sign, combined};
+              {<<"enc">>, any} -> {enc, combined};
+              {<<"enc">>, combined} -> {enc, combined};
+              {undefined, any} -> {sign, pure_sign};
+              {undefined, pure_sign} -> {sign, pure_sign};
+              _ -> unknown
+          end,
+    {N, E} =
+        case Kty of
+            rsa ->
+                N0 = maps:get(n, Map),
+                E0 = maps:get(e, Map),
+                N1 = binary:decode_unsigned(base64url:decode(N0)),
+                E1 = binary:decode_unsigned(base64url:decode(E0)),
+                {N1, E1};
+            _ ->
+                {unknown, unknown}
+        end,
+
+    case (Use /= unknown) of
+        true ->
+            Key = #{kty => rsa, use => Use, alg => Alg,
+                    key => [E, N], kid => Kid },
+            extract_supported_keys(T, ListType, [Key | List]);
+        _ ->
+            %% bad key, do exclude this provider
+            []
+    end;
+extract_supported_keys(_, _, _) ->
+    [].
 
 
 

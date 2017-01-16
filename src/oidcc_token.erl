@@ -214,14 +214,19 @@ has_other_audience(ClientId, Audience) when is_list(Audience) ->
     length(lists:delete(ClientId, Audience)) >= 1.
 
 
+get_needed_key(List, Id) ->
+    Filter = fun(#{use := Use}) ->
+                     Use == sign
+             end,
+    find_needed_key(lists:filter(Filter, List), Id).
 
-get_needed_key([], _) ->
+find_needed_key([], _) ->
     throw(no_key);
-get_needed_key([#{key := Key}], none) ->
+find_needed_key([#{key := Key}], none) ->
     Key;
-get_needed_key(_, none) ->
+find_needed_key(_, none) ->
     throw(too_many_keys);
-get_needed_key([#{kid := KeyId, key := Key } |_], KeyId) ->
+find_needed_key([#{kid := KeyId, key := Key } |_], KeyId) ->
     Key;
-get_needed_key([_Key | T], KeyId) ->
+find_needed_key([_Key | T], KeyId) ->
     get_needed_key(T, KeyId).

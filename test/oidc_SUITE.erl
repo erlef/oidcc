@@ -87,7 +87,25 @@ retrieve_configuration(ConfigEndpoint) ->
     {ok, _, Pid} = oidcc:add_openid_provider(Name, Description, ClientId, ClientSecret,
 					     ConfigEndpoint, LocalEndpoint),
     ok = wait_for_config(Pid),
+    ok = ensure_has_signing_keys(Pid),
     ok.
+
+
+ensure_has_signing_keys(Pid) ->
+    {ok, Config} = oidcc:get_openid_provider_info(Pid),
+    #{keys := Keys} = Config,
+    Filter = fun(#{use := Use}) ->
+                     Use == sign
+             end,
+    ct:log("all keys: ~p", [Keys]),
+    case lists:filter(Filter, Keys) of
+        [] -> {error, no_signing_keys};
+        SigKeys ->
+            ct:log("signign keys: ~p", [SigKeys]),
+            ok
+    end.
+
+
 
 
 

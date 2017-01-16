@@ -191,7 +191,7 @@ mock_oidcc(OpenIdProviderId, Issuer, ClientId) ->
                        Id = OpenIdProviderId,
                        {ok, #{issuer => Issuer,
                          client_id => ClientId,
-                         keys => [#{ key => ?RSA_PUBLIC_KEY}]
+                         keys => [#{ key => ?RSA_PUBLIC_KEY, use => sign}]
                         }}
                end,
     ok = meck:new(oidcc),

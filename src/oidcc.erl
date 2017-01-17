@@ -14,6 +14,8 @@
 -export([create_redirect_for_session/1]).
 -export([retrieve_token/2]).
 -export([retrieve_token/3]).
+-export([retrieve_and_validate_token/3]).
+-export([retrieve_and_validate_token/4]).
 -export([parse_and_validate_token/2]).
 -export([parse_and_validate_token/3]).
 -export([retrieve_user_info/2]).
@@ -207,6 +209,26 @@ retrieve_token(AuthCode, Pkce, OpenIdProviderId) ->
               ],
     retrieve_a_token(QsBody, Pkce, Info).
 
+
+%% @doc
+%% retrieve the token using the authcode received before and directly validate
+%% the result.
+%%
+%% the authcode was sent to the local endpoint by the OpenId Connect provider,
+%% using redirects. the result is textual representation of the token and should
+%% be verified using parse_and_validate_token/3
+%% @end
+retrieve_and_validate_token(AuthCode, Nonce, ProviderId) ->
+    retrieve_and_validate_token(AuthCode, undefined, Nonce, ProviderId).
+
+retrieve_and_validate_token(AuthCode, Pkce, Nonce, ProviderId) ->
+    case retrieve_token(AuthCode, Pkce, ProviderId) of
+        {ok, Token} ->
+            TokenMap = oidcc_token:extract_token_map(Token),
+            oidcc_token:validate_token_map(TokenMap, ProviderId,
+                                           Nonce, true);
+        Error -> Error
+    end.
 
 %% @doc
 %% like parse_and_validate_token/3 yet without checking the nonce

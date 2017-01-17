@@ -238,9 +238,12 @@ parse_and_validate_token(Token, OpenIdProvider, Nonce) ->
 %% @end
 -spec retrieve_user_info(map() | binary(), binary()) ->
                                 {ok, map()} | {error, any()}.
-retrieve_user_info(Token, OpenIdProvider) ->
+retrieve_user_info(#{access := _, id := _, refresh := _} = Token,
+                   OpenIdProvider) ->
     Subject = extract_subject(Token),
-    retrieve_user_info(Token, OpenIdProvider, Subject).
+    retrieve_user_info(Token, OpenIdProvider, Subject);
+retrieve_user_info(_, _) ->
+    {error, bad_token_map}.
 
 
 -spec retrieve_user_info(Token, ProviderOrConfig, Subject)-> {ok, map()} |
@@ -321,10 +324,12 @@ retrieve_a_token(QsBodyIn, Pkce, OpenIdProviderInfo) ->
     return_token(oidcc_http_util:sync_http(post, Endpoint, Header, Body)).
 
 
-extract_subject(#{id := IdToken}) ->
-    extract_subject(IdToken);
 extract_subject(#{sub := Subject}) ->
     Subject;
+extract_subject(#{id := IdToken}) ->
+    extract_subject(IdToken);
+extract_subject(#{claims := Claims}) ->
+    extract_subject(Claims);
 extract_subject(_) ->
     undefined.
 

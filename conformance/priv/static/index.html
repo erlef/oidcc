@@ -16,7 +16,11 @@
 
         <h3> scope Request Parameter </h3>
         <ul>
-                <li><a href="/test/?id=rp-scope-userinfo-claims">rp-scope-userinfo-claims</a> TODO</li>
+                <li><a href="/test/?id=rp-scope-userinfo-claims&scp=all">rp-scope-userinfo-claims all</a></li>
+                <li><a href="/test/?id=rp-scope-userinfo-claims&scp=profile">rp-scope-userinfo-claims profile</a></li>
+                <li><a href="/test/?id=rp-scope-userinfo-claims&scp=email">rp-scope-userinfo-claims email</a></li>
+                <li><a href="/test/?id=rp-scope-userinfo-claims&scp=address">rp-scope-userinfo-claims address</a></li>
+                <li><a href="/test/?id=rp-scope-userinfo-claims&scp=phone">rp-scope-userinfo-claims phone</a></li>
         </ul>
 
         <h3> nonce Request Parameter </h3>
@@ -38,14 +42,46 @@
                 <li><a href="/test/?id=rp-id_token-kid-absent-multiple-jwks">rp-id_token-kid-absent-multiple-jwks</a></li>
                 <li><a href="/test/?id=rp-id_token-bad-sig-rs256">rp-id_token-bad-sig-rs256</a></li>
                 <li><a href="/test/?id=rp-id_token-iat">rp-id_token-iat</a></li>
-                <li><a href="/test/?id=rp-id_token-sig-rs256">rp-id_token-sig-rs256</a> TODO</li>
+                <li><a href="/test/?id=rp-id_token-sig-rs256">rp-id_token-sig-rs256</a></li>
                 <li><a href="/test/?id=rp-id_token-sub">rp-id_token-sub</a></li>
         </ul>
         <h3> UserInfo Endpoint </h3>
         <ul>
-                <li><a href="/test/?id=rp-userinfo-bad-sub-claim">rp-userinfo-bad-sub-claim</a> TODO</li>
+                <li><a href="/test/?id=rp-userinfo-bad-sub-claim">rp-userinfo-bad-sub-claim</a></li>
                 <li><a href="/test/?id=rp-userinfo-bearer-body">rp-userinfo-bearer-body</a> TODO</li>
-                <li><a href="/test/?id=rp-userinfo-bearer-header">rp-userinfo-bearer-header</a> TODO</li>
+                <li><a href="/test/?id=rp-userinfo-bearer-header">rp-userinfo-bearer-header</a></li>
+        </ul>
+        <h2> Mandatory Configuration Tests (only those missing above) </h2>
+        <h3> Discovery </h3>
+        <ul>
+                <li><a href="/test/?id=rp-discovery-jwks_uri-keys">rp-discovery-jwks_uri-keys</a> TODO</li>
+                <li><a href="/test/?id=rp-discovery-issuer-not-matching-config">rp-discovery-issuer-not-matching-config</a> TODO</li>
+                <li><a href="/test/?id=rp-discovery-openid-configuration">rp-discovery-openid-configuration</a> TODO</li>
+        </ul>
+
+        <h3> Key Rotation </h3>
+        <ul>
+                <li><a href="/test/?id=rp-key-rotation-op-sign-key">rp-key-rotation-op-sign-key</a> TODO</li>
+        </ul>
+        <h3> UserInfo Endpoint </h3>
+        <ul>
+                <li><a href="/test/?id=rp-userinfo-sig">rp-userinfo-sig</a> TODO</li>
+        </ul>
+
+        <h2> Mandatory Dynamic Tests (only those missing above) </h2>
+        <h3> Discovery </h3>
+        <ul>
+                <li><a href="/test/?id=rp-discovery-webfinger-acct">rp-discovery-webfinger-acct</a> TODO</li>
+                <li><a href="/test/?id=rp-discovery-webfinger-url">rp-discovery-webfinger-url</a> TODO</li>
+        </ul>
+        <h3> Dynamic Client Registration </h3>
+        <ul>
+                <li><a href="/test/?id=rp-registration-dynamic">rp-registration-dynamic</a> TODO</li>
+        </ul>
+        <h3> request_uri Request Parameter </h3>
+        <ul>
+                <li><a href="/test/?id=rp-request_uri-sig">rp-request_uri-sig</a> TODO</li>
+                <li><a href="/test/?id=rp-request_uri-unsigned">rp-request_uri-unsigned</a> TODO</li>
         </ul>
 
     </body>

@@ -1,7 +1,7 @@
 -module(conformance).
 
 -export([
-         run_test/2,
+         run_test/3,
          check_result/2,
          set_conf/2,
          get_conf/1,
@@ -34,22 +34,55 @@ check_rp_response_type_code(_, _) ->
 %% rp-scope-userinfo-claims
 %% Request claims using scope values.
 test_rp_scope_userinfo_claims(Req) ->
-    Scopes = [openid, email, phone],
+    Params = maps:from_list(get_conf(params, [])),
+    Scopes = case maps:get(<<"scp">>, Params, undefined) of
+                 <<"profile">> -> [openid, profile];
+                 <<"email">> -> [openid, email];
+                 <<"address">> -> [openid, address];
+                 <<"phone">> -> [openid, phone];
+                 _ -> [openid, profile, email, address, phone]
+             end,
     set_conf(scopes, Scopes),
     log("requesting scopes ~p", [Scopes]),
-    {ok, Id, _Pid} = dyn_reg_test(Scopes),
+    {ok, Id, _Pid} = dyn_reg_test(#{scopes => Scopes}),
     redirect_to_provider(Id, Req).
 
 %% A UserInfo Response containing the requested claims.
 %% (following not applicable)
 %% If no access token is issued (when using Implicit Flow with
 %% response_type='id_token') the ID Token contains the requested claims.
-check_rp_scope_userinfo_claims(true, _TokenMap) ->
-    %% TODO: ensure the requested scopes are in the userinfo
-    %% Scopes = get_conf(scopes, []),
-    false;
+check_rp_scope_userinfo_claims(true, #{user_info := UserInfo}) ->
+    ProfileList = [name, family_name, given_name, middle_name,
+                                 nickname, preferred_username, profile, picture,
+                                 website, gender, birthdate, zoneinfo, locale,
+                                 updated_at],
+    EmailList = [email, email_verified],
+    AddressList = [address],
+    PhoneList = [phone_number, phone_number_verified],
+    ProfileOk = check_scope(profile, ProfileList, UserInfo),
+    EmailOk = check_scope(email, EmailList, UserInfo),
+    AddressOk = check_scope(address, AddressList, UserInfo),
+    PhoneOk = check_scope(phone, PhoneList, UserInfo),
+    ProfileOk and EmailOk and AddressOk and PhoneOk;
 check_rp_scope_userinfo_claims(_, _) ->
     false.
+
+
+check_scope(Scope, ScopeList, UserInfo) ->
+    Scopes = get_conf(scopes, []),
+    Contains = fun( Key, _, Bool) ->
+                       case lists:member(Key, ScopeList) of
+                           true -> true;
+                           _ -> Bool
+                       end
+               end,
+    case lists:member(Scope, Scopes) of
+        true ->
+            maps:fold(Contains, false, UserInfo);
+        _ ->
+            true
+    end.
+
 
 
 %% rp-nonce-invalid
@@ -87,8 +120,6 @@ check_rp_token_endpoint_basic(_, _) ->
 %% to the Relying Party's 'client_id'.
 test_rp_id_token(Req) ->
     {ok, Id, _Pid} = dyn_reg_test(),
-    {ok, Config} = oidcc:get_openid_provider_info(Id),
-    log("Provider Info: ~p",[Config]),
     redirect_to_provider(Id, Req).
 
 %% Identify that the 'aud' value is missing or doesn't match the 'client_id'
@@ -177,12 +208,19 @@ check_rp_id_token_iat(_, _) ->
 
 %% rp-id_token-sig-rs256
 %%
-%% Request an encrypted ID Token. Decrypt the returned the ID Token and
-%% verify its signature using the keys published by the Issuer.
+%% Request an signed ID Token. Verify the signature on the ID Token using the
+%% keys published by the Issuer.
 %%
 %% Accept the ID Token after doing ID Token validation.
-check_rp_id_token_sig_rs256(true, _) ->
-    true;
+check_rp_id_token_sig_rs256(true, #{ id := #{token := IdToken}} )
+ when is_binary(IdToken), byte_size(IdToken) > 3 ->
+    case erljwt:pre_parse_jwt(IdToken) of
+        #{header := #{alg := Algo}} ->
+            log("signature algorithm used is: ~p~n",[Algo]),
+            Algo /= <<"none">>;
+        _ ->
+            false
+    end;
 check_rp_id_token_sig_rs256(_, _) ->
     false.
 
@@ -205,10 +243,40 @@ test_rp_user_info(Req) ->
     redirect_to_provider(Id, Req).
 
 %% Identify the invalid 'sub' value and reject the UserInfo Response.
-check_rp_user_info_bad_sub_claim(false, {_Error, _Desc}) ->
+check_rp_user_info_bad_sub_claim(true, TokenMap) ->
     %% ensure the error is due to invalid sub value
-    false;
+    #{ user_info := UserInfo } = TokenMap,
+    length( maps:to_list(UserInfo) ) == 0;
 check_rp_user_info_bad_sub_claim(_, _) ->
+    false.
+
+
+
+%% rp-userinfo-bearer-body
+%%
+%% Pass the access token as a form-encoded body parameter while doing the
+%% UserInfo Request.
+test_rp_user_info_bearer_body(Req) ->
+    {ok, Id, _Pid} = dyn_reg_test(),
+    redirect_to_provider(Id, Req).
+
+%% A UserInfo Response.
+check_rp_user_info_bearer_body(true, TokenMap) ->
+    #{ user_info := UserInfo } = TokenMap,
+    length( maps:to_list(UserInfo) ) /= 0;
+check_rp_user_info_bearer_body(_, _) ->
+    false.
+
+%% rp-userinfo-bearer-header
+%%
+%% Pass the access token using the "Bearer" authentication scheme while doing
+%% the UserInfo Request.
+%%
+%% A UserInfo Response.
+check_rp_user_info_bearer_header(true, TokenMap) ->
+    #{ user_info := UserInfo } = TokenMap,
+    length( maps:to_list(UserInfo) ) /= 0;
+check_rp_user_info_bearer_header(_, _) ->
     false.
 
 %% *** CODE - OPTIONAL ***
@@ -266,13 +334,19 @@ check_rp_user_info_bad_sub_claim(_, _) ->
 
                 {<<"rp-userinfo-bad-sub-claim">>,
                  fun test_rp_user_info/1,
-                 fun check_rp_user_info_bad_sub_claim/2 }
+                 fun check_rp_user_info_bad_sub_claim/2 },
+                {<<"rp-userinfo-bearer-body">>,
+                 fun test_rp_user_info_bearer_body/1,
+                 fun check_rp_user_info_bearer_body/2 },
+                {<<"rp-userinfo-bearer-header">>,
+                 fun test_rp_user_info/1,
+                 fun check_rp_user_info_bearer_header/2 }
                ]).
 
-run_test(Id, Req) ->
+run_test(Id, Params, Req) ->
     case lists:keyfind(Id, 1, ?TESTS) of
         {Id, TestFun, _} ->
-            register_test(Id),
+            register_test(Id, Params),
             TestFun(Req);
         _ ->
             lager:error("unknown or unimplemented test ~p",[Id]),
@@ -306,9 +380,10 @@ check_result(LoggedIn, TokenOrError) ->
 
 
 dyn_reg_test() ->
-    dyn_reg_test(undefined).
+    dyn_reg_test(#{}).
 
-dyn_reg_test(Scopes) ->
+dyn_reg_test(Options) ->
+    Scopes = maps:get(scopes, Options, undefined),
     {ok, TestId} = get_test_id(),
     Issuer = gen_issuer(TestId),
     dyn_reg(Issuer, TestId, Scopes).
@@ -323,18 +398,20 @@ dyn_reg(Issuer, Name, Scopes) ->
     log("registration at ~p started with id ~p~n",[Issuer, Id]),
     case wait_for_provider_to_be_ready(Pid) of
         ok ->
-            {ok, #{meta_data :=
-                       #{client_id := ClientId,
-                         client_secret := ClientSecret,
-                         client_secret_expires_at := SecretExpire,
-                         registration_access_token := RegAT
-                        }
-                  }} = oidcc:get_openid_provider_info(Pid),
+            {ok, Config} = oidcc:get_openid_provider_info(Pid),
+            #{meta_data :=
+                  #{client_id := ClientId,
+                    client_secret := ClientSecret,
+                    client_secret_expires_at := SecretExpire,
+                    registration_access_token := RegAT
+                   }
+             } =  Config,
             log("successfully registered ~p at: ~p~n",[Id, Issuer]),
             log(" client id: ~p~n",[ClientId]),
             log(" client secret: ~p~n",[ClientSecret]),
             log(" secret expires: ~p~n",[SecretExpire]),
             log(" reg access token: ~p~n~n~n",[RegAT]),
+            log(" complete config: ~p",[Config]),
 
             {ok, Id, Pid};
         Error -> Error
@@ -389,8 +466,9 @@ redirect_to(Url, Req) ->
     Req2.
 
 
-register_test(Id) ->
+register_test(Id, Params) ->
     set_conf(test_id, Id),
+    set_conf(params, Params),
     CurrentTime = cowboy_clock:rfc1123(),
     log("starting test ~p at ~p~n",[Id, CurrentTime]).
 

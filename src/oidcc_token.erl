@@ -2,8 +2,10 @@
 
 -export([extract_token_map/1]).
 -export([validate_token_map/3]).
+-export([validate_token_map/4]).
 -export([verify_access_token_map_hash/2]).
 -export([validate_id_token/3]).
+-export([validate_id_token/4]).
 
 extract_token_map(Token) ->
     TokenMap = jsone:decode(Token, [{object_format, map}]),
@@ -19,10 +21,13 @@ extract_token_map(Token) ->
 
 
 validate_token_map(TokenMap, OpenIdProvider, Nonce) ->
+    validate_token_map(TokenMap, OpenIdProvider, Nonce, false).
+
+validate_token_map(TokenMap, OpenIdProvider, Nonce, AllowNone) ->
     #{id := IdTokenMap,
       access := AccessTokenMap} = TokenMap,
 
-    case validate_id_token_map(IdTokenMap, OpenIdProvider, Nonce) of
+    case validate_id_token_map(IdTokenMap, OpenIdProvider, Nonce, AllowNone) of
         {ok, NewIdTokenMap} ->
             NewAccessTokenMap = verify_access_token_map_hash(AccessTokenMap,
                                                              NewIdTokenMap),
@@ -53,23 +58,25 @@ int_verify_access_token_hash(#{token := AccessToken} = Map,
     maps:put(hash, Result, Map).
 
 validate_id_token_map(#{token := IdToken} = IdTokenMap,
-                      OpenIdProviderId, Nonce) ->
-    case validate_id_token(IdToken, OpenIdProviderId, Nonce) of
+                      OpenIdProviderId, Nonce, AllowNone) ->
+    case validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone) of
         {ok, Claims} ->
             {ok, maps:put(claims, Claims, IdTokenMap)};
         Other -> Other
     end.
 
 validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
-    try int_validate_id_token(IdToken, OpenIdProviderId, Nonce) of
+    validate_id_token(IdToken, OpenIdProviderId, Nonce, false).
+
+validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone) ->
+    try int_validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone) of
         Claims -> {ok, Claims}
     catch
         Exception -> {error, Exception}
     end.
 
-int_validate_id_token(none, _OpenIdProviderId, _Nonce) ->
-    throw(no_id_token);
-int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
+int_validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone)
+    when is_binary(IdToken), byte_size(IdToken) > 5->
     {ok, OpInfo} = oidcc:get_openid_provider_info(OpenIdProviderId),
     {Header, Claims} = case erljwt:pre_parse_jwt(IdToken) of
                            #{ header := H, claims := C }  -> {H, C};
@@ -129,15 +136,16 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
     % the Client in the id_token_signed_response_alg parameter during
     % Registration.
     #{ alg := Algo} = Header,
-    DefaultAlgos = [<<"RS256">>],
-    AcceptedAlgos =
-        case application:get_env(oidcc, allow_none_algorithm, false) of
+    DefaultAlgorithms = [<<"RS256">>],
+    AcceptedAlgorithms =
+        case AllowNone
+            and application:get_env(oidcc, support_none_algorithm, true) of
             true ->
-                [<<"none">> | DefaultAlgos];
+                [<<"none">> | DefaultAlgorithms];
             _ ->
-                DefaultAlgos
+                DefaultAlgorithms
         end,
-    case lists:member(Algo, AcceptedAlgos) of
+    case lists:member(Algo, AcceptedAlgorithms) of
         true -> ok;
         false -> throw(bad_algorithm)
     end,
@@ -205,7 +213,9 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
 
     % delete the nonce before handing it out, only needs space as it has been
     % checked by now
-    maps:remove(nonce, Claims).
+    maps:remove(nonce, Claims);
+int_validate_id_token(_IdToken, _OpenIdProviderId, _Nonce, _AllowNone) ->
+    throw(no_id_token).
 
 list_missing_required_claims(Jwt) ->
     Required = [iss, sub, aud, exp, iat, nonce],

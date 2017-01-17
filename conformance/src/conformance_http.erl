@@ -6,7 +6,8 @@
 -export([terminate/3]).
 
 -record(state, {
-	  test_id = undefined
+	  test_id = undefined,
+          params = []
 	 }).
 
 
@@ -16,8 +17,8 @@ init(_, Req, _Opts) ->
 
 handle(Req, #state{test_id = undefined } = State) ->
     main_page(Req, State);
-handle(Req, #state{test_id = TestId } = State) ->
-    Req2 = conformance:run_test(TestId, Req),
+handle(Req, #state{test_id = TestId, params = Params } = State) ->
+    Req2 = conformance:run_test(TestId, Params, Req),
     {ok, Req2, State}.
 
 
@@ -25,9 +26,14 @@ terminate(_Reason, _Req, _State) ->
     ok.
 
 extract_args(Req) ->
-    {TestId, Req2} = cowboy_req:qs_val(<<"id">>, Req),
+    {QsVals, Req2} = cowboy_req:qs_vals(Req),
+    TestId = case lists:keyfind(<<"id">>, 1, QsVals) of
+                 {_, V} -> V;
+                 _ -> undefined
+             end,
     NewState = #state{
-		  test_id = TestId
+		  test_id = TestId,
+                  params = QsVals
 		 },
     {ok, Req2, NewState}.
 

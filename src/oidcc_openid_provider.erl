@@ -37,16 +37,10 @@
           local_endpoint = undefined,
           meta_data = #{},
 
-          gun_pid = undefined,
           config_tries = 0,
-          mref = undefined,
-          sref = undefined,
-          method = get,
-          header = [],
-          body = <<>>,
-          path = undefined,
-          http = #{},
-          retrieving = undefined
+          http_result = undefined,
+          retrieving = undefined,
+          request_id = undefined
          }).
 
 %% API.
@@ -123,47 +117,28 @@ handle_call(_Request, _From, State) ->
     {reply, ignored, State}.
 
 
-handle_cast(retrieve_config, #state{gun_pid = undefined} = State) ->
-    {ok, ConPid, MRef, Path} = retrieve_config(State),
-    NewState = State#state{gun_pid = ConPid,
-                           mref=MRef,
-                           sref=undefined,
-                           path=Path,
-                           method = get,
-                           header = [],
-                           body = <<>>,
-                           retrieving=config},
+handle_cast(retrieve_config, #state{ request_id = undefined,
+                                     config_ep=ConfigEndpoint} = State) ->
+    NewState = http_async_get(config, ConfigEndpoint, [], State),
     {noreply, NewState};
-handle_cast(retrieve_keys, State) ->
-    {ok, ConPid, MRef, Path, Error} = retrieve_keys(State),
-    Header = [{<<"accept">>, "application/json;q=0.7,application/jwk+json"}],
-    NewState = State#state{gun_pid = ConPid,
-                           mref=MRef,
-                           sref=undefined,
-                           path=Path,
-                           method = get,
-                           body = <<>>,
-                           header = Header,
-                           error = Error,
-                           retrieving=keys},
+handle_cast(retrieve_keys, #state{ request_id = undefined,
+                                   config = Config} = State) ->
+    {ok, KeyEndpoint} = maps:get(jwks_uri, Config),
+    Header = [{"accept", "application/json;q=0.7,application/jwk+json"}],
+    NewState = http_async_get(keys, KeyEndpoint, Header, State),
     {noreply, NewState};
-handle_cast(register_if_needed, #state{client_id = undefined,
-                                       local_endpoint=LocalEndpoint} = State) ->
-    {ok, ConPid, MRef, Path, Error} = register_client(State),
-    Header = [{<<"content-type">>, "application/json"}],
+handle_cast(register_if_needed, #state{ request_id = undefined,
+                                        client_id = undefined,
+                                        local_endpoint=LocalEndpoint,
+                                        config = Config
+                                      } = State) ->
     Body = jsone:encode(#{application_type => <<"web">>,
                           redirect_uris => [LocalEndpoint]
                           %TODO: add more and make this configurable
                          }),
-    NewState = State#state{gun_pid = ConPid,
-                           mref=MRef,
-                           sref=undefined,
-                           path=Path,
-                           method = post,
-                           body = Body,
-                           header = Header,
-                           error = Error,
-                           retrieving=registration},
+    {ok, RegistrationEndpoint} = maps:get(registration_endpoint, Config),
+    NewState = http_async_post(registration, RegistrationEndpoint, [],
+                                   "application/json", Body, State),
     {noreply, NewState};
 handle_cast(register_if_needed, State) ->
     {noreply, State#state{ready=true} };
@@ -173,77 +148,37 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 
-
-handle_info({gun_up, ConPid, _Protocol},
-            #state{path=Path, header=Header, gun_pid=ConPid, method=Method
-                  , body=Body} = State) ->
-    {ok, StreamRef} = oidcc_http_util:async_http(Method, Path, Header,
-                                                 Body, ConPid),
-    {noreply, State#state{sref=StreamRef}};
-handle_info({gun_response, ConPid, StreamRef, fin, Status, Header},
-            #state{gun_pid=ConPid, sref=StreamRef} = State) ->
-    Http = #{status => Status, header => Header, body => <<>>},
-    NewState = handle_http_result(State#state{http=Http}),
+handle_info({http, {RequestId, Result}}, #state{request_id = RequestId} =
+                State) ->
+    NewState = handle_http_result(State#state{http_result = Result}),
     {noreply, NewState};
-handle_info({gun_response, ConPid, StreamRef, nofin, Status, Header},
-            #state{gun_pid=ConPid, sref=StreamRef} = State) ->
-    NewState = State#state{http = #{status => Status,
-                                    header => Header}},
-    {noreply, NewState};
-handle_info({gun_data, ConPid, StreamRef, nofin, Data},
-            #state{gun_pid=ConPid, sref=StreamRef, http=Http} = State) ->
-    OldBody = maps:get(body, Http, <<>>),
-    NewBody = << OldBody/binary, Data/binary >>,
-    NewState = State#state{http=maps:put(body, NewBody, Http)},
-    {noreply, NewState};
-handle_info({gun_data, ConPid, StreamRef, fin, Data},
-            #state{gun_pid=ConPid, sref=StreamRef, http=Http} = State) ->
-    OldBody = maps:get(body, Http, <<>>),
-    Body = << OldBody/binary, Data/binary >>,
-    NewState = handle_http_result(State#state{http=maps:put(body, Body, Http)}),
-    {noreply, NewState};
-handle_info({gun_error, ConPid, Reason}, #state{gun_pid=ConPid}= State ) ->
-    handle_http_client_crash(Reason, State);
-handle_info({gun_error, ConPid, _SRef, Reason}, #state{gun_pid=ConPid}=State)->
-    handle_http_client_crash(Reason, State);
-handle_info({'DOWN', MRef, process, ConPid, Reason},
-            #state{gun_pid=ConPid, mref = MRef} = State) ->
+handle_info({http, {error, Reason}}, State) ->
     handle_http_client_crash(Reason, State);
 handle_info(_Info, State) ->
     {noreply, State}.
 
+http_async_get(Type, Url, Header, State) ->
+    case oidcc_http_util:async_http(get, Url, Header) of
+        {ok, RequestId} ->
+            State#state{request_id = RequestId, retrieving=Type};
+        Error ->
+            State#state{error = Error}
+    end.
+
+http_async_post(Type, Url, Header, ContentType, Body, State) ->
+    case oidcc_http_util:async_http(post, Url, Header, ContentType, Body) of
+        {ok, RequestId} ->
+            State#state{request_id = RequestId, retrieving=Type};
+        Error ->
+            State#state{error = Error}
+    end.
 
 
-terminate(_Reason, #state{gun_pid=GunPid}) ->
-    gun:close(GunPid),
+terminate(_Reason, _State) ->
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
-retrieve_config(#state{config_ep = ConfigEndpoint}) ->
-    oidcc_http_util:start_http(ConfigEndpoint).
-
-retrieve_keys(#state{config = Config}) ->
-    KeyEndpoint = maps:get(jwks_uri, Config, undefined),
-    Error = {no_key_endpoint},
-    start_http_if_possible(KeyEndpoint, Error).
-
-
-register_client(#state{config = Config}) ->
-    RegistrationEndpoint = maps:get(registration_endpoint, Config, undefined),
-    Error = {no_registration_endpoint},
-    start_http_if_possible(RegistrationEndpoint, Error).
-
-start_http_if_possible(Endpoint, Error) ->
-    case Endpoint of
-        undefined ->
-            {ok, undefined, undefined, undefined, Error};
-        _ ->
-            {ok, ConPid, MRef, Path} = oidcc_http_util:start_http(Endpoint),
-            {ok, ConPid, MRef, Path, undefined}
-    end.
-
 
 
 handle_http_result(true, _,  Header, Body, config, State) ->
@@ -257,12 +192,11 @@ handle_http_result(false, Status, _Header, Body, Retrieve, State) ->
     State#state{error = {retrieving, Retrieve, Status, Body}}.
 
 
-handle_http_result(#state{ retrieving = Retrieve, http =Http} = State) ->
-    #{header := Header, status := Status, body := InBody} = Http,
+handle_http_result(#state{retrieving=Retrieve, http_result=Result} = State) ->
+    {{_Proto, Status, _StatusName}, Header, InBody} = Result,
     GoodStatus = (Status >= 200) and (Status < 300),
-    NewState = stop_gun(State),
     {ok, Body} = oidcc_http_util:uncompress_body_if_needed(InBody, Header),
-    handle_http_result(GoodStatus, Status, Header, Body, Retrieve, NewState).
+    handle_http_result(GoodStatus, Status, Header, Body, Retrieve, State).
 
 
 create_config(#state{id = Id, desc = Desc, client_id = ClientId,
@@ -304,7 +238,8 @@ handle_keys(Data, _Header, State) ->
     KeyList = maps:get(keys, KeyConfig, []),
     Keys = extract_supported_keys(KeyList, []),
     NewState = State#state{keys  = Keys, ready = false,
-                           lasttime_updated = timestamp(), gun_pid = undefined},
+                           lasttime_updated = timestamp(),
+                           request_id = undefined},
     case length(Keys) > 0 of
         true ->
             ok = trigger_registration(),
@@ -326,11 +261,11 @@ handle_registration(Data, _Header, State) ->
         true ->
             State#state{meta_data  = MetaData, client_id = ClientId,
                         client_secret = ClientSecret, ready = true,
-                        lasttime_updated = timestamp(), gun_pid = undefined};
+                        lasttime_updated = timestamp(), request_id = undefined};
         false ->
             State#state{error=no_clientid, meta_data=MetaData, ready = false,
                         client_id=undefined, client_secret = undefined,
-                        gun_pid = undefined}
+                        request_id = undefined}
     end.
 
 
@@ -402,7 +337,8 @@ handle_http_client_crash(_Reason, #state{config_tries=?MAX_TRIES} = State) ->
     {noreply, State};
 handle_http_client_crash(_Reason, #state{config_tries=Tries} = State) ->
     trigger_config_retrieval(30000),
-    NewState = State#state{gun_pid=undefined, retrieving=undefined, http=#{},
+    NewState = State#state{request_id=undefined, retrieving=undefined,
+                           http_result={},
                config_tries=Tries+1},
     {noreply, NewState}.
 
@@ -421,11 +357,6 @@ trigger_registration() ->
 
 timestamp() ->
     erlang:system_time(seconds).
-
-stop_gun(#state{gun_pid = Pid, mref = MonitorRef} =State) ->
-    ok = oidcc_http_util:async_close(Pid, MonitorRef),
-    State#state{gun_pid=undefined, retrieving=undefined, http=#{}}.
-
 
 to_config_endpoint(IssuerOrEndpoint) ->
     Slash = <<"/">>,

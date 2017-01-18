@@ -15,6 +15,76 @@
 %%  *** TESTS ***
 %%  *************
 
+-define(TESTS, [
+                %% mandatory code
+                {<<"rp-response_type-code">>,
+                 fun test_rp_response_type_code/1,
+                 fun check_rp_response_type_code/2},
+                {<<"rp-scope-userinfo-claims">>,
+                 fun test_rp_scope_userinfo_claims/1,
+                  fun check_rp_scope_userinfo_claims/2},
+                {<<"rp-nonce-invalid">>,
+                 fun test_rp_nonce_invalid/1,
+                 fun check_rp_nonce_invalid/2 },
+                {<<"rp-token_endpoint-client_secret_basic">>,
+                 fun test_rp_token_endpoint_basic/1,
+                 fun check_rp_token_endpoint_basic/2 },
+                {<<"rp-id_token-aud">> ,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_aud/2 },
+                {<<"rp-id_token-kid-absent-single-jwks">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_absent_single_jwks/2 },
+                {<<"rp-id_token-sig-none">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_sig_none/2},
+                {<<"rp-id_token-issuer-mismatch">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_issuer_mismatch/2},
+                {<<"rp-id_token-kid-absent-multiple-jwks">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_kid_absent_multiple/2},
+                {<<"rp-id_token-bad-sig-rs256">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_bad_sig/2},
+                {<<"rp-id_token-iat">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_iat/2},
+                {<<"rp-id_token-sig-rs256">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_sig_rs256/2},
+                {<<"rp-id_token-sub">>,
+                 fun test_rp_id_token/1,
+                 fun check_rp_id_token_sub/2},
+                {<<"rp-userinfo-bad-sub-claim">>,
+                 fun test_rp_user_info/1,
+                 fun check_rp_user_info_bad_sub_claim/2 },
+                %% been removed
+                %% {<<"rp-userinfo-bearer-body">>,
+                %%  fun test_rp_user_info_bearer_body/1,
+                %%  fun check_rp_user_info_bearer_body/2 },
+                {<<"rp-userinfo-bearer-header">>,
+                 fun test_rp_user_info/1,
+                 fun check_rp_user_info_bearer_header/2 },
+
+
+                %% mandatory configuration
+                {<<"rp-discovery-jwks_uri-keys">>,
+                 fun test_rp_discovery/0,
+                 undefined},
+                {<<"rp-discovery-issuer-not-matching-config">>,
+                 fun test_rp_discovery_not_matching/0,
+                 undefined},
+                {<<"rp-discovery-openid-configuration">>,
+                 fun test_rp_discovery/0,
+                 undefined},
+                {<<"rp-key-rotation-op-sign-key">>,
+                 fun test_rp_key_rotation/1,
+                 fun check_rp_key_rotation/2},
+                {<<"rp-userinfo-sig">>,
+                 fun test_rp_userinfo_sig/1,
+                 fun check_rp_userinfo_sig/2}
+               ]).
 
 %% *** CODE - MANDATORY ***
 
@@ -251,22 +321,6 @@ check_rp_user_info_bad_sub_claim(_, _) ->
     false.
 
 
-
-%% rp-userinfo-bearer-body
-%%
-%% Pass the access token as a form-encoded body parameter while doing the
-%% UserInfo Request.
-test_rp_user_info_bearer_body(Req) ->
-    {ok, Id, _Pid} = dyn_reg_test(),
-    redirect_to_provider(Id, Req).
-
-%% A UserInfo Response.
-check_rp_user_info_bearer_body(true, TokenMap) ->
-    #{ user_info := UserInfo } = TokenMap,
-    length( maps:to_list(UserInfo) ) /= 0;
-check_rp_user_info_bearer_body(_, _) ->
-    false.
-
 %% rp-userinfo-bearer-header
 %%
 %% Pass the access token using the "Bearer" authentication scheme while doing
@@ -279,11 +333,89 @@ check_rp_user_info_bearer_header(true, TokenMap) ->
 check_rp_user_info_bearer_header(_, _) ->
     false.
 
-%% *** CODE - OPTIONAL ***
+
+
+%% ******
 %% *** CONFIGURATION - MANDATORY ***
+%% ******
+
+%% rp-discovery-jwks_uri-keys
+%%
+%% The Relying Party uses keys from the jwks_uri which has been obtained from
+%% the OpenID Provider Metadata.
+%%
+%% Should be able to verify signed responses and/or encrypt requests using
+%% obtained keys.
+test_rp_discovery() ->
+    {ok, _Id, Pid} = dyn_reg_test(),
+    {ok, Config} = oidcc_openid_provider:get_config(Pid),
+    Keys = maps:get(keys, Config, []),
+    KeysOk = length(Keys) > 0,
+    Ready = oidcc_openid_provider:is_ready(Pid),
+    KeysOk and Ready.
+
+%% rp-discovery-issuer-not-matching-config
+%%
+%% Retrieve OpenID Provider Configuration Information for OpenID Provider from
+%% the .well-known/openid-configuration path. Verify that the issuer in the
+%% provider configuration matches the one returned by WebFinger.
+%%
+%% Identify that the issuers are not matching and reject the provider
+%% configuration.
+test_rp_discovery_not_matching() ->
+    {error, Reason, Pid} = dyn_reg_test(),
+    {bad_issuer_config, _, _,_} = Reason,
+    not oidcc_openid_provider:is_ready(Pid).
+
+%% rp-discovery-openid-configuration
+%%
+%%  Retrieve and use the OpenID Provider Configuration Information.
+%%
+%% Read and use the JSON object returned from the OpenID Connect Provider.
+%% @see rp-discovery-jwks_uri-keys
+
+
+
+%% rp-key-rotation-op-sign-key
+%%
+%% Request an ID Token and verify its signature. Make a new authentication and
+%% retrieve another ID Token and verify its signature.
+%%
+%% Successfully verify both ID Token signatures, fetching the rotated signing
+%% keys if the 'kid' claim in the JOSE header is unknown.
+test_rp_key_rotation(Req) ->
+    {ok, Id, _Pid} = dyn_reg_test(),
+    redirect_to_provider(Id, Req).
+
+check_rp_key_rotation(true, _TokenMap) ->
+    {ok, Id} = appplication:get_env(conformance, provider_id),
+    {in_progress, provider_url(Id)};
+check_rp_key_rotation(_, _) ->
+    false.
+
+
+%% rp-userinfo-sig
+%%
+%% Request signed UserInfo.
+%%
+%% Successful signature verification of the UserInfo Response.
+test_rp_userinfo_sig(Req) ->
+    start_debug(["oidcc_http_util"]),
+    {ok, Id, _Pid} = dyn_reg_test(),
+    redirect_to_provider(Id, Req).
+
+check_rp_userinfo_sig(true, _TokenMap) ->
+    stop_debug(),
+    false;
+check_rp_userinfo_sig(_, _) ->
+    false.
+
+
+%% *** DYNAMIC - MANDATORY ***
+
+%% *** CODE - OPTIONAL ***
 %% *** CONFIGURATION - OPTIONAL ***
 %% *** DYNAMIC - OPTIONAL ***
-
 
 
 
@@ -291,63 +423,18 @@ check_rp_user_info_bearer_header(_, _) ->
 %% functions to handle tests
 %%
 
--define(TESTS, [
-                {<<"rp-response_type-code">>,
-                 fun test_rp_response_type_code/1,
-                 fun check_rp_response_type_code/2},
-                {<<"rp-scope-userinfo-claims">>,
-                 fun test_rp_scope_userinfo_claims/1,
-                  fun check_rp_scope_userinfo_claims/2},
-                {<<"rp-nonce-invalid">>,
-                 fun test_rp_nonce_invalid/1,
-                 fun check_rp_nonce_invalid/2 },
-                {<<"rp-token_endpoint-client_secret_basic">>,
-                 fun test_rp_token_endpoint_basic/1,
-                 fun check_rp_token_endpoint_basic/2 },
-                {<<"rp-id_token-aud">> ,
-                 fun test_rp_id_token/1,
-                 fun check_rp_id_token_aud/2 },
-                {<<"rp-id_token-kid-absent-single-jwks">>,
-                 fun test_rp_id_token/1,
-                 fun check_rp_id_token_absent_single_jwks/2 },
-                {<<"rp-id_token-sig-none">>,
-                 fun test_rp_id_token/1,
-                 fun check_rp_id_token_sig_none/2},
-                {<<"rp-id_token-issuer-mismatch">>,
-                 fun test_rp_id_token/1,
-                 fun check_rp_id_token_issuer_mismatch/2},
-                {<<"rp-id_token-kid-absent-multiple-jwks">>,
-                 fun test_rp_id_token/1,
-                 fun check_rp_id_token_kid_absent_multiple/2},
-                {<<"rp-id_token-bad-sig-rs256">>,
-                 fun test_rp_id_token/1,
-                 fun check_rp_id_token_bad_sig/2},
-                {<<"rp-id_token-iat">>,
-                 fun test_rp_id_token/1,
-                 fun check_rp_id_token_iat/2},
-                {<<"rp-id_token-sig-rs256">>,
-                 fun test_rp_id_token/1,
-                 fun check_rp_id_token_sig_rs256/2},
-                {<<"rp-id_token-sub">>,
-                 fun test_rp_id_token/1,
-                 fun check_rp_id_token_sub/2},
-
-                {<<"rp-userinfo-bad-sub-claim">>,
-                 fun test_rp_user_info/1,
-                 fun check_rp_user_info_bad_sub_claim/2 },
-                {<<"rp-userinfo-bearer-body">>,
-                 fun test_rp_user_info_bearer_body/1,
-                 fun check_rp_user_info_bearer_body/2 },
-                {<<"rp-userinfo-bearer-header">>,
-                 fun test_rp_user_info/1,
-                 fun check_rp_user_info_bearer_header/2 }
-               ]).
 
 run_test(Id, Params, Req) ->
     case lists:keyfind(Id, 1, ?TESTS) of
-        {Id, TestFun, _} ->
+        {Id, TestFun, CheckFun} ->
             register_test(Id, Params),
-            TestFun(Req);
+            case CheckFun of
+                undefined ->
+                    {ok, Path} = handle_result(TestFun(), Id),
+                    redirect_to(Path, Req);
+                _ ->
+                    TestFun(Req)
+            end;
         _ ->
             lager:error("unknown or unimplemented test ~p",[Id]),
             redirect_to(<<"/">>, Req)
@@ -366,16 +453,24 @@ check_result(LoggedIn, TokenOrError) ->
     end,
     case lists:keyfind(Id, 1, ?TESTS) of
         {Id, _, CheckFun} ->
-            case CheckFun(LoggedIn, TokenOrError) of
-                true ->
-                    log("*** ~p passed ***", [Id]);
-                _ ->
-                    log("*** ~p FAILED ***", [Id])
-            end ;
-        _ ->
-            lager:error("unknown or unimplemented check ~p",[Id]),
-            log("*** ~p FAILED ***")
+            handle_result(CheckFun(LoggedIn, TokenOrError), Id);
+        Other ->
+            handle_result(Other, Id)
     end.
+
+handle_result({in_progress, Path}, _Id) ->
+    {ok, Path};
+handle_result(true, Id) ->
+    log("*** ~p passed ***", [Id]),
+    {ok, <<"/">>};
+handle_result(false, Id) ->
+    log("*** ~p FAILED ***", [Id]),
+    {ok, <<"/">>};
+handle_result(_Unknown, Id) ->
+    lager:error("unknown or unimplemented check ~p",[Id]),
+    log("*** ~p FAILED ***"),
+    {ok, <<"/">>}.
+
 
 
 
@@ -396,6 +491,7 @@ dyn_reg(Issuer, Name, Scopes) ->
                       Scopes
                                          ),
     log("registration at ~p started with id ~p~n",[Issuer, Id]),
+    application:set_env(?MODULE, provider_id, Id),
     case wait_for_provider_to_be_ready(Pid) of
         ok ->
             {ok, Config} = oidcc:get_openid_provider_info(Pid),
@@ -414,7 +510,12 @@ dyn_reg(Issuer, Name, Scopes) ->
             log(" complete config: ~p",[Config]),
 
             {ok, Id, Pid};
-        Error -> Error
+        {error, timeout} ->
+            log("the request timed out~n",[]),
+            {error, timeout, Pid};
+        {error, Reason} ->
+            log("an error occured: ~p ~n",[Reason]),
+            {error, Reason, Pid}
     end.
 
 gen_issuer(TestId) ->
@@ -432,12 +533,16 @@ wait_for_provider_to_be_ready(Pid) ->
 wait_for_provider_to_be_ready(_Pid, 0) ->
     {error, timeout};
 wait_for_provider_to_be_ready(Pid, Num) ->
-    case oidcc_openid_provider:is_ready(Pid) of
-        false ->
+    Ready = oidcc_openid_provider:is_ready(Pid),
+    {ok, Error} = oidcc_openid_provider:get_error(Pid),
+    case {Ready, Error} of
+        {true, undefined} ->
+            ok;
+        {false, undefined} ->
             timer:sleep(100),
             wait_for_provider_to_be_ready(Pid, Num-1);
-        true ->
-            ok
+        {false, Error} ->
+            {error, Error}
     end.
 
 
@@ -454,9 +559,11 @@ stop_debug() ->
     redbug:stop().
 
 redirect_to_provider(Id, Req) ->
+    redirect_to(provider_url(Id), Req).
+
+provider_url(Id) ->
     Base = <<"/oidc?provider=">>,
-    Url = << Base/binary, Id/binary >>,
-    redirect_to(Url, Req).
+    << Base/binary, Id/binary >>.
 
 
 redirect_to(Url, Req) ->

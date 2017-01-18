@@ -1,4 +1,12 @@
+{"1.1.0",
 [{<<"base64url">>,{pkg,<<"base64url">>,<<"0.0.1">>},1},
  {<<"cowlib">>,{pkg,<<"cowlib">>,<<"1.0.2">>},0},
  {<<"erljwt">>,{pkg,<<"erljwt">>,<<"0.3.1">>},0},
- {<<"jsone">>,{pkg,<<"jsone">>,<<"1.4.0">>},1}].
+ {<<"jsone">>,{pkg,<<"jsone">>,<<"1.4.0">>},1}]}.
+[
+{pkg_hash,[
+ {<<"base64url">>, <<"36A90125F5948E3AFD7BE97662A1504B934DD5DAC78451CA6E9ABF85A10286BE">>},
+ {<<"cowlib">>, <<"9D769A1D062C9C3AC753096F868CA121E2730B9A377DE23DEC0F7E08B1DF84EE">>},
+ {<<"erljwt">>, <<"8E69AA39CDC99FA0D6909046FCD79BFA5A27292A1A2CA3CA832296157BFB538D">>},
+ {<<"jsone">>, <<"6ECFD2C91E16F48E1535743B57D01A42C65D7DD51A8B43E5723B1F79927169A8">>}]}
+].

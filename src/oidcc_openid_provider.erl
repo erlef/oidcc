@@ -37,7 +37,7 @@
           local_endpoint = undefined,
           meta_data = #{},
 
-          config_tries = 0,
+          config_tries = 1,
           http_result = undefined,
           retrieving = undefined,
           request_id = undefined

@@ -276,7 +276,7 @@ retrieve_user_info(_, _) ->
 retrieve_user_info(Token, #{userinfo_endpoint := Endpoint}, Subject) ->
     AccessToken = extract_access_token(Token),
     Header = [bearer_auth(AccessToken)],
-    HttpResult = oidcc_http_util:sync_http(get, Endpoint, Header, undefined),
+    HttpResult = oidcc_http_util:sync_http(get, Endpoint, Header),
     return_validated_user_info(HttpResult, Subject);
 retrieve_user_info(Token, OpenIdProvider, Subject) ->
     {ok, Config} = get_openid_provider_info(OpenIdProvider),
@@ -312,12 +312,13 @@ introspect_token(Token, #{introspection_endpoint := Endpoint,
                           client_secret := ClientSecret}) ->
     AccessToken = extract_access_token(Token),
     Header = [
-              {<<"accept">>, <<"application/json">>},
-              {<<"content-type">>, <<"application/x-www-form-urlencoded">>},
+              {"accept", "application/json"},
               basic_auth(ClientId, ClientSecret)
              ],
     BodyQs = cow_qs:qs([{<<"token">>, AccessToken}]),
-    HttpResult = oidcc_http_util:sync_http(post, Endpoint, Header, BodyQs),
+    HttpResult = oidcc_http_util:sync_http(post, Endpoint, Header,
+                                           "application/x-www-form-urlencoded",
+                                           BodyQs),
     return_json_info(HttpResult);
 introspect_token(Token, ProviderId) ->
     {ok, Config} = get_openid_provider_info(ProviderId),
@@ -338,12 +339,14 @@ retrieve_a_token(QsBodyIn, Pkce, OpenIdProviderInfo) ->
     AuthMethods = maps:get(token_endpoint_auth_methods_supported,
                            OpenIdProviderInfo, [<<"client_secret_basic">>]),
     AuthMethod = select_preferred_auth(AuthMethods),
-    Header0 = [ {<<"content-type">>, <<"application/x-www-form-urlencoded">>}],
+    Header0 = [],
     {QsBody, Header} = add_authentication_code_verifier(QsBodyIn, Header0,
                                                         AuthMethod, ClientId,
                                                         Secret, Pkce),
     Body = cow_qs:qs(QsBody),
-    return_token(oidcc_http_util:sync_http(post, Endpoint, Header, Body)).
+    return_token(oidcc_http_util:sync_http(post, Endpoint, Header,
+                                           "application/x-www-form-urlencoded",
+                                           Body)).
 
 
 extract_subject(#{sub := Subject}) ->

@@ -13,11 +13,11 @@
          {applications, [
                          kernel,
                          stdlib,
-                         crypto,
+                         ssl,
                          erljwt,
 			 base64url,
-                         inets,
-                         gun
+                         cowlib,
+                         inets
                         ]},
          {maintainers, ["Bas Wegh"]},
          {licenses, ["Apache 2.0"]},

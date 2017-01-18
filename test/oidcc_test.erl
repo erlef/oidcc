@@ -172,7 +172,7 @@ retrieve_token(AuthMethods) ->
                      end
              end,
 
-    HttpFun = fun(Method, Url, _Header, _Body)  ->
+    HttpFun = fun(Method, Url, _Header, _ContentType, _Body)  ->
                       Method = post,
                       Url = TokenEndpoint,
                       {ok, #{status => 200, header => [], body => HttpBody}}
@@ -184,7 +184,7 @@ retrieve_token(AuthMethods) ->
 
     ok = meck:expect(oidcc_openid_provider, get_config, ConfigFun),
     ok = meck:expect(oidcc_openid_provider_mgr, get_openid_provider, MapFun),
-    ok = meck:expect(oidcc_http_util, sync_http,HttpFun),
+    ok = meck:expect(oidcc_http_util, sync_http, HttpFun),
 
     AuthCode = <<"1234567890">>,
 
@@ -241,7 +241,7 @@ retrieve_user_info_test() ->
                          _ -> {error, not_found}
                      end
              end,
-    HttpFun = fun(Method, Url, _Header, _Body)  ->
+    HttpFun = fun(Method, Url, _Header)  ->
                       Method = get,
                       Url = UserInfoEndpoint,
                       {ok, #{status => 200, header => [], body => HttpBody}}

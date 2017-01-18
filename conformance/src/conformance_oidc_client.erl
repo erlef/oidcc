@@ -9,8 +9,7 @@ init() ->
     oidcc_client:register(?MODULE).
 
 login_succeeded(Token) ->
-    conformance:check_result(true, Token),
-    Path = <<"/">>,
+    {ok, Path} = conformance:check_result(true, Token),
     Updates = [
                {redirect, Path}
               ],

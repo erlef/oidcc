@@ -24,7 +24,7 @@ all() ->
      retrieve_google,
      retrieve_eudat,
      retrieve_iam,
-     retrieve_hbp,
+     %% retrieve_hbp,
      retrieve_egi
     ].
 
@@ -39,6 +39,8 @@ all() ->
 
 init_per_suite(Conf) ->
     {ok, _} = application:ensure_all_started(oidcc),
+    application:set_env(oidcc, cert_depth, 5),
+    application:set_env(oidcc, cacertfile, "/etc/ssl/certs/ca-certificates.crt"),
     Conf.
 
 end_per_suite(Conf) ->

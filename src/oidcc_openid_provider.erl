@@ -74,8 +74,6 @@ get_error( Pid) ->
     gen_server:call(Pid, get_error).
 
 %% gen_server.
--define(MAX_TRIES, 5).
-
 init({Id, Config}) ->
 
     #{name := Name,
@@ -343,13 +341,18 @@ extract_supported_keys(_, _, _) ->
 
 
 
-handle_http_client_crash(Reason, #state{config_tries=?MAX_TRIES} = State) ->
-    State#state{error = Reason};
-handle_http_client_crash(_Reason, #state{config_tries=Tries} = State) ->
-    trigger_config_retrieval(30000),
-    State#state{request_id=undefined, retrieving=undefined,
-                http_result={},
-                config_tries=Tries+1}.
+handle_http_client_crash(Reason, #state{config_tries=Tries} = State) ->
+    MaxRetries = application:get_env(oidcc, provider_max_tries, 5),
+    case Tries >= MaxRetries of
+        true ->
+            State#state{error = Reason};
+        false ->
+
+            trigger_config_retrieval(30000),
+            State#state{request_id=undefined, retrieving=undefined,
+                        http_result={},
+                        config_tries=Tries+1}
+    end.
 
 
 trigger_config_retrieval() ->

@@ -123,9 +123,15 @@ handle_cast(retrieve_config, #state{ request_id = undefined,
     {noreply, NewState};
 handle_cast(retrieve_keys, #state{ request_id = undefined,
                                    config = Config} = State) ->
-    {ok, KeyEndpoint} = maps:get(jwks_uri, Config),
-    Header = [{"accept", "application/json;q=0.7,application/jwk+json"}],
-    NewState = http_async_get(keys, KeyEndpoint, Header, State),
+    NewState =
+        case maps:get(jwks_uri, Config, undefined) of
+            undefined ->
+                State#state{error=no_jwk_uri};
+            KeyEndpoint ->
+                Header = [{"accept",
+                           "application/json;q=0.7,application/jwk+json"}],
+                http_async_get(keys, KeyEndpoint, Header, State)
+        end,
     {noreply, NewState};
 handle_cast(register_if_needed, #state{ request_id = undefined,
                                         client_id = undefined,
@@ -136,7 +142,7 @@ handle_cast(register_if_needed, #state{ request_id = undefined,
                           redirect_uris => [LocalEndpoint]
                           %TODO: add more and make this configurable
                          }),
-    {ok, RegistrationEndpoint} = maps:get(registration_endpoint, Config),
+    RegistrationEndpoint = maps:get(registration_endpoint, Config),
     NewState = http_async_post(registration, RegistrationEndpoint, [],
                                    "application/json", Body, State),
     {noreply, NewState};
@@ -152,8 +158,6 @@ handle_info({http, {RequestId, Result}}, #state{request_id = RequestId} =
                 State) ->
     NewState = handle_http_result(State#state{http_result = Result}),
     {noreply, NewState};
-handle_info({http, {error, Reason}}, State) ->
-    handle_http_client_crash(Reason, State);
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -192,11 +196,16 @@ handle_http_result(false, Status, _Header, Body, Retrieve, State) ->
     State#state{error = {retrieving, Retrieve, Status, Body}}.
 
 
-handle_http_result(#state{retrieving=Retrieve, http_result=Result} = State) ->
-    {{_Proto, Status, _StatusName}, Header, InBody} = Result,
+handle_http_result(#state{http_result={error, Reason}} = State) ->
+    handle_http_client_crash(Reason, State);
+handle_http_result(#state{retrieving=Retrieve,
+                          http_result={{_Proto, Status, _StatusName}, Header,
+                                       InBody}
+                         } = State) ->
     GoodStatus = (Status >= 200) and (Status < 300),
     {ok, Body} = oidcc_http_util:uncompress_body_if_needed(InBody, Header),
     handle_http_result(GoodStatus, Status, Header, Body, Retrieve, State).
+
 
 
 create_config(#state{id = Id, desc = Desc, client_id = ClientId,
@@ -224,11 +233,12 @@ handle_config(Data, _Header, #state{issuer=Issuer} = State) ->
         true ->
             ok = trigger_key_retrieval(),
             trigger_config_retrieval(3600000),
-            State#state{config = Config, issuer=ConfIssuer};
+            State#state{config = Config, issuer=ConfIssuer,
+                        request_id=undefined};
         _ ->
             trigger_config_retrieval(600000),
             Error = {bad_issuer_config, Issuer, ConfIssuer, Data},
-            State#state{error = Error, ready=false}
+            State#state{error = Error, ready=false, request_id=undefined}
     end.
 
 
@@ -246,7 +256,7 @@ handle_keys(Data, _Header, State) ->
             NewState;
         false ->
             trigger_config_retrieval(600000),
-            NewState#state{error = {no_keys, Data}}
+            NewState#state{error = {no_keys, Data}, request_id = undefined}
     end.
 
 handle_registration(Data, _Header, State) ->
@@ -333,14 +343,13 @@ extract_supported_keys(_, _, _) ->
 
 
 
-handle_http_client_crash(_Reason, #state{config_tries=?MAX_TRIES} = State) ->
-    {noreply, State};
+handle_http_client_crash(Reason, #state{config_tries=?MAX_TRIES} = State) ->
+    State#state{error = Reason};
 handle_http_client_crash(_Reason, #state{config_tries=Tries} = State) ->
     trigger_config_retrieval(30000),
-    NewState = State#state{request_id=undefined, retrieving=undefined,
-                           http_result={},
-               config_tries=Tries+1},
-    {noreply, NewState}.
+    State#state{request_id=undefined, retrieving=undefined,
+                http_result={},
+                config_tries=Tries+1}.
 
 
 trigger_config_retrieval() ->

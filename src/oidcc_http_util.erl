@@ -6,37 +6,39 @@
 
 
 sync_http(Method, Url, Header) ->
-    Result = httpc:request(Method,
-                           {normalize(Url), normalize_headers(Header)},
-                           options(Url),
-                           [{body_format, binary}]),
-    normalize_result(Result).
+    perform_request(Method, Url, Header, undefined, undefined,
+                    [{body_format, binary}]).
 
-sync_http(Method, Url, Header, ContentType, InBody) ->
-    Result = httpc:request(Method,
-                           {normalize(Url), normalize_headers(Header),
-                            normalize(ContentType), InBody
-                           },
-                           options(Url),
-                           [{body_format, binary}]),
-    normalize_result(Result).
+sync_http(Method, Url, Header, ContentType, Body) ->
+    perform_request(Method, Url, Header, ContentType, Body,
+                    [{body_format, binary}]).
 
 async_http(Method, Url, Header) ->
-    Result = httpc:request(Method,
-                           {normalize(Url), normalize_headers(Header)},
-                           options(Url),
-                           [{sync, false}]),
-    normalize_result(Result).
+    perform_request(Method, Url, Header, undefined, undefined,
+                    [{sync, false}]).
 
 
 async_http(Method, Url, Header, ContentType, Body) ->
-    Result = httpc:request(Method,
-                           {normalize(Url), normalize_headers(Header),
-                            normalize(ContentType), Body
-                           },
-                           options(Url),
-                           [{sync, false}]),
-    normalize_result(Result).
+    perform_request(Method, Url, Header, ContentType, Body,
+                    [{sync, false}]).
+
+
+
+
+perform_request(Method, Url, Header, ContentType, Body, Options) ->
+    case options(Url) of
+        {ok, HttpOptions} ->
+            Request = gen_request(Url, Header, ContentType, Body),
+            Result = httpc:request(Method, Request, HttpOptions, Options),
+            normalize_result(Result);
+        Error ->
+            Error
+    end.
+
+gen_request(Url, Header, undefined, undefined) ->
+    {normalize(Url), normalize_headers(Header)};
+gen_request(Url, Header, ContentType, Body) ->
+    {normalize(Url), normalize_headers(Header), normalize(ContentType), Body}.
 
 
 normalize_result({ok, {{_Proto, Status, _StatusName}, RespHeaders, Body}}) ->
@@ -62,23 +64,32 @@ uncompress_body_if_needed(Body, {_, <<"deflate">>})  ->
 uncompress_body_if_needed(_Body, {_, Compression})  ->
     erlang:error({unsupported_encoding, Compression}).
 
-options(Url) ->
+options(Url) when is_list(Url) ->
     {ok, {Schema, _, HostName, _, _,  _}} = http_uri:parse(normalize(Url)),
      case Schema of
-        http -> [];
+        http -> {ok, []};
         https -> ssl_options(HostName)
-    end.
+    end;
+options(Url) when is_binary(Url) ->
+    options(binary_to_list(Url)).
 
 ssl_options(HostName) ->
     VerifyFun = ssl_verify_fun(HostName),
-    {ok, CaCertFile} = application:get_env(oidcc, cacertfile),
-    [
-      {ssl, [
-             {verify, verify_peer},
-             {verify_fun, VerifyFun},
-             {cacertfile, CaCertFile}
-            ] }
-    ].
+    CaCert = application:get_env(oidcc, cacertfile),
+    Depth = application:get_env(oidcc, cert_depth, 1),
+    case CaCert of
+        {ok, CaCertFile} ->
+            {ok, [
+                  {ssl, [
+                         {verify, verify_peer},
+                         {verify_fun, VerifyFun},
+                         {cacertfile, CaCertFile},
+                         {depth, Depth}
+                        ] }
+                 ]};
+        _ ->
+            {error, missing_cacertfile}
+    end.
 
 
 ssl_verify_fun(_Hostname) ->
@@ -105,7 +116,6 @@ ssl_verify_fun(_Hostname) ->
         []
     }.
 
-%% Private
 normalize(L) when is_list(L) ->
     L;
 normalize(B) when is_binary(B) ->

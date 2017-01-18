@@ -227,17 +227,34 @@ handle_config(Data, _Header, #state{issuer=Issuer} = State) ->
     Config = decode_json(Data),
     ConfIssuer = maps:get(issuer, Config, undefined),
 
-    case is_same_issuer(ConfIssuer, Issuer) of
-        true ->
+    SameIssuer = is_same_issuer(ConfIssuer, Issuer),
+    AuthCodeFlow = supports_auth_code(Config),
+    case {SameIssuer, AuthCodeFlow} of
+        {true, true} ->
             ok = trigger_key_retrieval(),
             trigger_config_retrieval(3600000),
             State#state{config = Config, issuer=ConfIssuer,
                         request_id=undefined};
+        {true, false} ->
+            Error = no_authcode_support,
+            State#state{error = Error, ready=false, request_id=undefined};
         _ ->
             trigger_config_retrieval(600000),
             Error = {bad_issuer_config, Issuer, ConfIssuer, Data},
             State#state{error = Error, ready=false, request_id=undefined}
     end.
+
+
+supports_auth_code(#{response_types_supported := ResponseTypes} = Config) ->
+    Code = <<"code">>,
+    AuthCode = <<"authorization_code">>,
+    GrantTypes = maps:get(grant_types_supported, Config,
+                          [AuthCode, <<"implicit">>]),
+    CodeResponse = lists:member(Code, ResponseTypes),
+    AuthGrant = lists:member(AuthCode, GrantTypes),
+    CodeResponse and AuthGrant;
+supports_auth_code(_) ->
+    false.
 
 
 handle_keys(Data, _Header, State) ->

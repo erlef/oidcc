@@ -13,7 +13,7 @@
          {applications, [
                          kernel,
                          stdlib,
-                         public_key,
+                         ssl,
                          erljwt,
 			 base64url,
                          cowlib,

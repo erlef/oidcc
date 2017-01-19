@@ -162,7 +162,15 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone)
                  true -> undefined;
                  false -> get_needed_key(PubKeys, Kid)
              end,
-    JWT = erljwt:parse_jwt(IdToken, PubKey, <<"JWT">>),
+    JWT = case erljwt:parse_jwt(IdToken, PubKey, <<"JWT">>) of
+              invalid ->
+                  %% it might be the case that our keys expired ...
+                  %% so refetch them
+                  NewKeys = refetch_keys(OpenIdProviderId),
+                  NewPubKey = get_needed_key(NewKeys, Kid),
+                  erljwt:parse_jwt(IdToken, NewPubKey, <<"JWT">>);
+              Other -> Other
+          end,
     case JWT of
         Claims -> ok;
         invalid -> throw(invalid_signature);
@@ -234,6 +242,11 @@ has_other_audience(ClientId, Audience) when is_binary(Audience) ->
 has_other_audience(ClientId, Audience) when is_list(Audience) ->
     length(lists:delete(ClientId, Audience)) >= 1.
 
+refetch_keys(ProviderId) ->
+    case oidcc_openid_provider:update_and_get_keys(ProviderId) of
+        {ok, Keys} -> Keys;
+        _ -> []
+    end.
 
 get_needed_key(List, Id) ->
     Filter = fun(#{use := Use, kty := Kty}) ->

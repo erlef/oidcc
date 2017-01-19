@@ -8,6 +8,7 @@
 -export([is_ready/1]).
 -export([get_config/1]).
 -export([update_config/1]).
+-export([update_and_get_keys/1]).
 -export([get_error/1]).
 
 
@@ -22,6 +23,7 @@
 -record(state, {
           ready = false,
           error = undefined,
+          key_requests = [],
 
           id = undefined,
           name = undefined,
@@ -69,6 +71,10 @@ is_ready(Pid) ->
 get_config( Pid) ->
     gen_server:call(Pid, get_config).
 
+-spec update_and_get_keys( Pid :: pid() ) -> {ok, Keys :: map()}.
+update_and_get_keys(Pid) ->
+    gen_server:call(Pid, update_and_get_keys, 20000).
+
 -spec get_error( Pid :: pid() ) -> {ok, term()}.
 get_error( Pid) ->
     gen_server:call(Pid, get_error).
@@ -101,6 +107,11 @@ init({Id, Config}) ->
 handle_call(get_config, _From, State) ->
     Conf = create_config(State),
     {reply, {ok, Conf}, State};
+handle_call(update_and_get_keys, From, #state{key_requests = Requests}=State) ->
+    trigger_key_retrieval(),
+    NewRequests = [ From | Requests ],
+    NewState = State#state{key_requests = NewRequests},
+    {noreply, NewState};
 handle_call(get_error, _From, #state{error=Error} = State) ->
     {reply, {ok, Error}, State};
 handle_call(update_config, _From, State) ->
@@ -119,6 +130,9 @@ handle_cast(retrieve_config, #state{ request_id = undefined,
                                      config_ep=ConfigEndpoint} = State) ->
     NewState = http_async_get(config, ConfigEndpoint, [], State),
     {noreply, NewState};
+handle_cast(retrieve_config, State) ->
+    trigger_config_retrieval(120000),
+    {noreply, State};
 handle_cast(retrieve_keys, #state{ request_id = undefined,
                                    config = Config} = State) ->
     NewState =
@@ -131,6 +145,9 @@ handle_cast(retrieve_keys, #state{ request_id = undefined,
                 http_async_get(keys, KeyEndpoint, Header, State)
         end,
     {noreply, NewState};
+handle_cast(retrieve_keys, State) ->
+    trigger_key_retrieval(),
+    {noreply, State};
 handle_cast(register_if_needed, #state{ request_id = undefined,
                                         client_id = undefined,
                                         local_endpoint=LocalEndpoint,
@@ -258,13 +275,13 @@ supports_auth_code(_) ->
 
 
 handle_keys(Data, _Header, State) ->
-    %TODO: implement update at expire data/time or retrieval when needed
     KeyConfig=decode_json(Data),
     KeyList = maps:get(keys, KeyConfig, []),
     Keys = extract_supported_keys(KeyList, []),
     NewState = State#state{keys  = Keys, ready = false,
                            lasttime_updated = timestamp(),
                            request_id = undefined},
+    send_key_replies(Keys, State),
     case length(Keys) > 0 of
         true ->
             ok = trigger_registration(),
@@ -273,6 +290,13 @@ handle_keys(Data, _Header, State) ->
             trigger_config_retrieval(600000),
             NewState#state{error = {no_keys, Data}, request_id = undefined}
     end.
+
+send_key_replies(Keys, #state{key_requests = Requests}) ->
+    Send = fun(From, _) ->
+                   gen_server:reply(From, {ok, Keys})
+           end,
+    lists:foldl(Send, ok, Requests).
+
 
 handle_registration(Data, _Header, State) ->
     %TODO: implement update at expire data/time or retrieval when needed
@@ -364,7 +388,6 @@ handle_http_client_crash(Reason, #state{config_tries=Tries} = State) ->
         true ->
             State#state{error = Reason};
         false ->
-
             trigger_config_retrieval(30000),
             State#state{request_id=undefined, retrieving=undefined,
                         http_result={},

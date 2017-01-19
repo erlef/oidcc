@@ -7,7 +7,7 @@
 start(_, _) ->
     conformance_oidc_client:init(),
     PrivDir = code:priv_dir(conformance),
-    create_log_dir(),
+    init(),
     Dispatch = cowboy_router:compile( [{'_',
 					[
                                          {"/", cowboy_static,
@@ -32,12 +32,25 @@ start(_, _) ->
 stop(_) ->
     ok.
 
-create_log_dir() ->
+init() ->
     LDir = "/tmp/oidcc_rp_conformance/",
+    CDir = LDir ++ "code/",
+    CnfDir = LDir ++ "configuration/",
+    DDir = LDir ++ "dynamic/",
     os:cmd("rm -rf " ++ LDir),
     LogDir = list_to_binary(LDir),
+    CodeDir = list_to_binary(CDir),
+    ConfDir = list_to_binary(CnfDir),
+    DynDir = list_to_binary(DDir),
 
     ok = file:make_dir(LogDir),
+    ok = file:make_dir(CodeDir),
+    ok = file:make_dir(ConfDir),
+    ok = file:make_dir(DynDir),
     conformance:set_conf(log_dir, LogDir),
+    conformance:set_conf(code_dir, CodeDir),
+    conformance:set_conf(conf_dir, ConfDir),
+    conformance:set_conf(dyn_dir, DynDir),
+    conformance:set_conf(rp_id, <<"oidcc.code">>),
     lager:info("using log dir ~p",[LogDir]),
     ok.

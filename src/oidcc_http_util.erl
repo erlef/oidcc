@@ -5,6 +5,7 @@
 -export([uncompress_body_if_needed/2]).
 -export([qs/1, urlencode/1]).
 
+-include_lib("public_key/include/public_key.hrl").
 -type qs_vals() :: [{binary(), binary() | true}].
 
 sync_http(Method, Url, Header) ->
@@ -94,26 +95,76 @@ ssl_options(HostName) ->
     end.
 
 
-ssl_verify_fun(_Hostname) ->
+ssl_verify_fun(Hostname) ->
+    HostPartList =
+        fun(Host) ->
+                lists:reverse(binary:split(list_to_binary(Host),
+                                           <<".">>, [global]))
+        end,
+    ExtractHosts =
+        fun(Entry, List) ->
+                case Entry of
+                    {dNSName, Host} -> [Host | List];
+                    _ -> List
+                end
+        end,
+    Compare =
+        fun(_HostPart, [ <<"*">> ]) ->
+                true;
+           (HostPart, [HostPart | CertList]) ->
+                CertList;
+           (_, _) ->
+                false
+        end,
+
+
+    BinHostList = HostPartList(Hostname),
+    IsValid =
+        fun(HostOfCert, CurValid) ->
+                CrtList = HostPartList(HostOfCert),
+                LongEnough = length(CrtList) >= 2,
+                Valid = case lists:foldl(Compare, CrtList, BinHostList) of
+                            [] -> true;
+                            Other -> Other
+                        end,
+                case Valid and LongEnough of
+                    true -> true;
+                    _ -> CurValid
+                end
+        end,
+
+    ContainsValidHost =
+        fun(HostsOfCert, UserState) ->
+               case lists:foldl(IsValid, false, HostsOfCert) of
+                   true ->
+                        {valid, UserState};
+                    _ ->
+                        {fail, {bad_cert, name_not_permitted}}
+                end
+        end,
+
+
     {
+
         fun (_, {bad_cert, _} = Reason, _) ->
                 {fail, Reason};
             (_, {extension, _}, UserState) ->
                 {unknown, UserState};
             (_, valid, UserState) ->
+                %% nothing to do with intermediate CA-certificates
                 {valid, UserState};
-            (_Cert, valid_peer, UserState) ->
-                %% TBSCert = Cert#'OTPCertificate'.tbsCertificate,
-                %% Extensions = TBSCert#'OTPTBSCertificate'.extensions,
-                %% case lists:keysearch(?'id-ce-subjectAltName',
-                %%                      #'Extension'.extnID, Extensions) of
-                %%     {value, #'Extension'{extnValue =
-                %%                                [{dNSName, Hostname}]}} ->
-                        %% {valid, UserState};
-                %%     false ->
-                %%         {fail, invalid_certificate_hostname}
-                %% end
-                {valid, UserState}
+            (Cert, valid_peer, UserState) ->
+                %% validate the certificate of the peer host
+                TBSCert = Cert#'OTPCertificate'.tbsCertificate,
+                Extensions = TBSCert#'OTPTBSCertificate'.extensions,
+                case lists:keysearch(?'id-ce-subjectAltName',
+                                     #'Extension'.extnID, Extensions) of
+                    {value, #'Extension'{extnValue = ExtValue}} ->
+                        HostsOfCert = lists:foldl(ExtractHosts, [], ExtValue),
+                        ContainsValidHost(HostsOfCert, UserState);
+                    false ->
+                        {fail, invalid_certificate_hostname}
+                end
         end,
         []
     }.

@@ -14,9 +14,10 @@
                          kernel,
                          stdlib,
                          ssl,
+                         public_key,
+                         crypto,
                          erljwt,
 			 base64url,
-                         cowlib,
                          inets
                         ]},
          {maintainers, ["Bas Wegh"]},

@@ -178,6 +178,9 @@ retrieve_token(AuthMethods) ->
                       {ok, #{status => 200, header => [], body => HttpBody}}
               end,
 
+    PassThrough = fun(Data) ->
+                          meck:passthrough([Data])
+                  end,
     ok = meck:new(oidcc_openid_provider),
     ok = meck:new(oidcc_openid_provider_mgr),
     ok = meck:new(oidcc_http_util),
@@ -185,6 +188,8 @@ retrieve_token(AuthMethods) ->
     ok = meck:expect(oidcc_openid_provider, get_config, ConfigFun),
     ok = meck:expect(oidcc_openid_provider_mgr, get_openid_provider, MapFun),
     ok = meck:expect(oidcc_http_util, sync_http, HttpFun),
+    ok = meck:expect(oidcc_http_util, urlencode, PassThrough ),
+    ok = meck:expect(oidcc_http_util, qs, PassThrough),
 
     AuthCode = <<"1234567890">>,
 

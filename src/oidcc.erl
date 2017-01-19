@@ -315,7 +315,7 @@ introspect_token(Token, #{introspection_endpoint := Endpoint,
               {"accept", "application/json"},
               basic_auth(ClientId, ClientSecret)
              ],
-    BodyQs = cow_qs:qs([{<<"token">>, AccessToken}]),
+    BodyQs = oidcc_http_util:qs([{<<"token">>, AccessToken}]),
     HttpResult = oidcc_http_util:sync_http(post, Endpoint, Header,
                                            "application/x-www-form-urlencoded",
                                            BodyQs),
@@ -343,7 +343,7 @@ retrieve_a_token(QsBodyIn, Pkce, OpenIdProviderInfo) ->
     {QsBody, Header} = add_authentication_code_verifier(QsBodyIn, Header0,
                                                         AuthMethod, ClientId,
                                                         Secret, Pkce),
-    Body = cow_qs:qs(QsBody),
+    Body = oidcc_http_util:qs(QsBody),
     return_token(oidcc_http_util:sync_http(post, Endpoint, Header,
                                            "application/x-www-form-urlencoded",
                                            Body)).
@@ -384,7 +384,7 @@ create_redirect_url_if_ready(Info, Scopes, OidcState, OidcNonce, Pkce) ->
     UrlList2 = append_nonce(OidcNonce, UrlList1),
     UrlList3 = append_code_challenge(Pkce, UrlList2),
     UrlList4 = append_scope(Scopes, UrlList3),
-    Qs = cow_qs:qs(UrlList4),
+    Qs = oidcc_http_util:qs(UrlList4),
     Url = << AuthEndpoint/binary, <<"?">>/binary, Qs/binary>>,
     {ok, Url}.
 
@@ -475,8 +475,8 @@ return_json_info({ok, Map}) ->
 
 
 basic_auth(User, Secret) ->
-    UserEnc = cow_qs:urlencode(User),
-    SecretEnc = cow_qs:urlencode(Secret),
+    UserEnc = oidcc_http_util:urlencode(User),
+    SecretEnc = oidcc_http_util:urlencode(Secret),
     RawAuth = <<UserEnc/binary, <<":">>/binary, SecretEnc/binary>>,
     AuthData = base64:encode(RawAuth),
     BasicAuth = << <<"Basic ">>/binary, AuthData/binary >>,

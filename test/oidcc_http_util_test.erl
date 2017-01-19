@@ -5,7 +5,7 @@
 https_sync_get_test() ->
     application:set_env(oidcc, cert_depth, 5),
     application:set_env(oidcc, cacertfile, "/etc/ssl/certs/ca-certificates.crt"),
-    Url = <<"https://www.google.com">>,
+    Url = <<"https://www.openid.net">>,
     {ok,#{status := 200} } = oidcc_http_util:sync_http(get,Url,[]),
     application:unset_env(oidcc, cert_depth),
     application:unset_env(oidcc, cacertfile),
@@ -14,7 +14,7 @@ https_sync_get_test() ->
 https_async_get_test() ->
     application:set_env(oidcc, cert_depth, 5),
     application:set_env(oidcc, cacertfile, "/etc/ssl/certs/ca-certificates.crt"),
-    Url = <<"https://www.google.com">>,
+    Url = <<"https://www.openid.net">>,
     {ok, Id} = oidcc_http_util:async_http(get,Url,[]),
     receive
         {http, {Id, _Result}} ->

@@ -40,6 +40,7 @@ all() ->
 init_per_suite(Conf) ->
     {ok, _} = application:ensure_all_started(oidcc),
     application:set_env(oidcc, cert_depth, 5),
+    application:set_env(oidcc, provider_max_tries, 1),
     application:set_env(oidcc, cacertfile, "/etc/ssl/certs/ca-certificates.crt"),
     Conf.
 
@@ -113,10 +114,14 @@ ensure_has_signing_keys(Pid) ->
 
 
 wait_for_config(Pid) ->
-    case oidcc_openid_provider:is_ready(Pid) of
-	true ->
+    Ready = oidcc_openid_provider:is_ready(Pid),
+    {ok, Error} = oidcc_openid_provider:get_error(Pid),
+    case {Ready, Error}  of
+	{true, undefined} ->
 	    ok;
-	false ->
+	{false, undefined} ->
 	    timer:sleep(100),
-	    wait_for_config(Pid)
+	    wait_for_config(Pid);
+        _ ->
+            {error, Error}
     end.

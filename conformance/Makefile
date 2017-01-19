@@ -1,7 +1,7 @@
 REBAR = $(shell pwd)/rebar3
 APP=oidcc
 
-.PHONY: all ct test clean elvis compile
+.PHONY: all ct test clean elvis compile conformance_test
 
 all: compile
 
@@ -15,3 +15,8 @@ compile:
 
 run:
 	$(REBAR) run
+
+
+conformance_test:
+	$(REBAR) release
+	./utils/run_tests.sh

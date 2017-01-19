@@ -19,71 +19,91 @@
                 %% mandatory code
                 {<<"rp-response_type-code">>,
                  fun test_rp_response_type_code/1,
-                 fun check_rp_response_type_code/2},
+                 fun check_rp_response_type_code/2,
+                 code},
                 {<<"rp-scope-userinfo-claims">>,
                  fun test_rp_scope_userinfo_claims/1,
-                  fun check_rp_scope_userinfo_claims/2},
+                  fun check_rp_scope_userinfo_claims/2,
+                 code},
                 {<<"rp-nonce-invalid">>,
                  fun test_rp_nonce_invalid/1,
-                 fun check_rp_nonce_invalid/2 },
+                 fun check_rp_nonce_invalid/2,
+                 code},
                 {<<"rp-token_endpoint-client_secret_basic">>,
                  fun test_rp_token_endpoint_basic/1,
-                 fun check_rp_token_endpoint_basic/2 },
+                 fun check_rp_token_endpoint_basic/2,
+                 code},
                 {<<"rp-id_token-aud">> ,
                  fun test_rp_id_token/1,
-                 fun check_rp_id_token_aud/2 },
+                 fun check_rp_id_token_aud/2,
+                 code},
                 {<<"rp-id_token-kid-absent-single-jwks">>,
                  fun test_rp_id_token/1,
-                 fun check_rp_id_token_absent_single_jwks/2 },
+                 fun check_rp_id_token_absent_single_jwks/2,
+                 code},
                 {<<"rp-id_token-sig-none">>,
                  fun test_rp_id_token/1,
-                 fun check_rp_id_token_sig_none/2},
+                 fun check_rp_id_token_sig_none/2,
+                 code},
                 {<<"rp-id_token-issuer-mismatch">>,
                  fun test_rp_id_token/1,
-                 fun check_rp_id_token_issuer_mismatch/2},
+                 fun check_rp_id_token_issuer_mismatch/2,
+                 code},
                 {<<"rp-id_token-kid-absent-multiple-jwks">>,
                  fun test_rp_id_token/1,
-                 fun check_rp_id_token_kid_absent_multiple/2},
+                 fun check_rp_id_token_kid_absent_multiple/2,
+                 code},
                 {<<"rp-id_token-bad-sig-rs256">>,
                  fun test_rp_id_token/1,
-                 fun check_rp_id_token_bad_sig/2},
+                 fun check_rp_id_token_bad_sig/2,
+                 code},
                 {<<"rp-id_token-iat">>,
                  fun test_rp_id_token/1,
-                 fun check_rp_id_token_iat/2},
+                 fun check_rp_id_token_iat/2,
+                 code},
                 {<<"rp-id_token-sig-rs256">>,
                  fun test_rp_id_token/1,
-                 fun check_rp_id_token_sig_rs256/2},
+                 fun check_rp_id_token_sig_rs256/2,
+                 code},
                 {<<"rp-id_token-sub">>,
                  fun test_rp_id_token/1,
-                 fun check_rp_id_token_sub/2},
+                 fun check_rp_id_token_sub/2,
+                 code},
                 {<<"rp-userinfo-bad-sub-claim">>,
                  fun test_rp_user_info/1,
-                 fun check_rp_user_info_bad_sub_claim/2 },
+                 fun check_rp_user_info_bad_sub_claim/2,
+                 code},
                 %% been removed
                 %% {<<"rp-userinfo-bearer-body">>,
                 %%  fun test_rp_user_info_bearer_body/1,
                 %%  fun check_rp_user_info_bearer_body/2 },
                 {<<"rp-userinfo-bearer-header">>,
                  fun test_rp_user_info/1,
-                 fun check_rp_user_info_bearer_header/2 },
+                 fun check_rp_user_info_bearer_header/2,
+                 code},
 
 
                 %% mandatory configuration
                 {<<"rp-discovery-jwks_uri-keys">>,
                  fun test_rp_discovery/0,
-                 undefined},
+                 undefined,
+                 configuration},
                 {<<"rp-discovery-issuer-not-matching-config">>,
                  fun test_rp_discovery_not_matching/0,
-                 undefined},
+                 undefined,
+                 configuration},
                 {<<"rp-discovery-openid-configuration">>,
                  fun test_rp_discovery/0,
-                 undefined},
+                 undefined,
+                 configuration},
                 {<<"rp-key-rotation-op-sign-key">>,
                  fun test_rp_key_rotation/1,
-                 fun check_rp_key_rotation/2},
+                 fun check_rp_key_rotation/2,
+                 configuration},
                 {<<"rp-userinfo-sig">>,
                  fun test_rp_userinfo_sig/1,
-                 fun check_rp_userinfo_sig/2}
+                 fun check_rp_userinfo_sig/2,
+                 configuration}
                ]).
 
 %% *** CODE - MANDATORY ***
@@ -385,11 +405,18 @@ test_rp_discovery_not_matching() ->
 %% keys if the 'kid' claim in the JOSE header is unknown.
 test_rp_key_rotation(Req) ->
     {ok, Id, _Pid} = dyn_reg_test(),
+    set_conf(rotation_run, 1),
     redirect_to_provider(Id, Req).
 
 check_rp_key_rotation(true, _TokenMap) ->
-    {ok, Id} = appplication:get_env(conformance, provider_id),
-    {in_progress, provider_url(Id)};
+    case get_conf(rotation_run) of
+        1 ->
+            set_conf(rotation_run, 2),
+            {ok, Id} = appplication:get_env(conformance, provider_id),
+            {in_progress, provider_url(Id)};
+        2 ->
+            true
+    end;
 check_rp_key_rotation(_, _) ->
     false.
 
@@ -400,12 +427,10 @@ check_rp_key_rotation(_, _) ->
 %%
 %% Successful signature verification of the UserInfo Response.
 test_rp_userinfo_sig(Req) ->
-    start_debug(["oidcc_http_util"]),
     {ok, Id, _Pid} = dyn_reg_test(),
     redirect_to_provider(Id, Req).
 
 check_rp_userinfo_sig(true, _TokenMap) ->
-    stop_debug(),
     false;
 check_rp_userinfo_sig(_, _) ->
     false.
@@ -426,8 +451,8 @@ check_rp_userinfo_sig(_, _) ->
 
 run_test(Id, Params, Req) ->
     case lists:keyfind(Id, 1, ?TESTS) of
-        {Id, TestFun, CheckFun} ->
-            register_test(Id, Params),
+        {Id, TestFun, CheckFun, Profile} ->
+            register_test(Id, Profile, Params),
             case CheckFun of
                 undefined ->
                     {ok, Path} = handle_result(TestFun(), Id),
@@ -452,7 +477,7 @@ check_result(LoggedIn, TokenOrError) ->
             log("User not logged in ~p~n", [TokenOrError])
     end,
     case lists:keyfind(Id, 1, ?TESTS) of
-        {Id, _, CheckFun} ->
+        {Id, _, CheckFun, _} ->
             handle_result(CheckFun(LoggedIn, TokenOrError), Id);
         Other ->
             handle_result(Other, Id)
@@ -461,14 +486,13 @@ check_result(LoggedIn, TokenOrError) ->
 handle_result({in_progress, Path}, _Id) ->
     {ok, Path};
 handle_result(true, Id) ->
-    log("*** ~p passed ***", [Id]),
+    log_result("*** ~p passed ***~n", [Id]),
     {ok, <<"/">>};
 handle_result(false, Id) ->
-    log("*** ~p FAILED ***", [Id]),
+    log_result("*** ~p FAILED ***~n", [Id]),
     {ok, <<"/">>};
 handle_result(_Unknown, Id) ->
-    lager:error("unknown or unimplemented check ~p",[Id]),
-    log("*** ~p FAILED ***"),
+    log_result("*** ~p FAILED (unknown) ***~n", [Id]),
     {ok, <<"/">>}.
 
 
@@ -491,7 +515,7 @@ dyn_reg(Issuer, Name, Scopes) ->
                       Scopes
                                          ),
     log("registration at ~p started with id ~p~n",[Issuer, Id]),
-    application:set_env(?MODULE, provider_id, Id),
+    set_conf(provider_id, Id),
     case wait_for_provider_to_be_ready(Pid) of
         ok ->
             {ok, Config} = oidcc:get_openid_provider_info(Pid),
@@ -573,14 +597,18 @@ redirect_to(Url, Req) ->
     Req2.
 
 
-register_test(Id, Params) ->
+register_test(Id, Profile, Params) ->
     set_conf(test_id, Id),
+    set_conf(test_profile, Profile),
     set_conf(params, Params),
     CurrentTime = cowboy_clock:rfc1123(),
     log("starting test ~p at ~p~n",[Id, CurrentTime]).
 
 get_test_id() ->
     get_conf(test_id).
+
+get_test_profile() ->
+    get_conf(test_profile).
 
 get_rp_id() ->
     get_conf(rp_id, <<"oidcc.temp.code">>).
@@ -601,8 +629,39 @@ log(Format, Args) ->
 
 log(Msg) ->
     {ok, TestId} = get_test_id(),
-    {ok, LogDir} = get_conf(log_dir),
-    Ext = <<".txt">>,
+    {ok, LogDir} = get_profile_dir(),
+    Ext = <<".log">>,
     FileName = << LogDir/binary, TestId/binary, Ext/binary >>,
     ok = file:write_file(FileName, Msg, [append]),
     lager:info(Msg).
+
+
+log_result(Format, Args) ->
+    Msg = io_lib:format(Format, Args),
+    download_log(),
+    log(Msg),
+    {ok, LogDir} =  get_conf(log_dir),
+    Name = <<"summary.log">>,
+    FileName = << LogDir/binary, Name/binary >>,
+    ok = file:write_file(FileName, Msg, [append]).
+
+
+download_log() ->
+    {ok, TestId} = get_test_id(),
+    RPId = get_rp_id(),
+    {ok, LogDir} = get_profile_dir(),
+    C= "cd ~s && wget -nv https://rp.certification.openid.net:8080/log/~s/~s.txt",
+    Cmd = io_lib:format(C, [binary_to_list(LogDir), binary_to_list(RPId),
+                            binary_to_list(TestId)]),
+    Result = os:cmd(Cmd),
+    log(Result),
+    ok.
+
+
+get_profile_dir() ->
+    {ok, Profile} = get_test_profile(),
+    case Profile of
+        code -> get_conf(code_dir);
+        configuration -> get_conf(conf_dir);
+        dynamic -> get_conf(dyn_dir)
+    end.

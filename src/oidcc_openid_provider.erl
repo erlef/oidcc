@@ -40,6 +40,7 @@
           meta_data = #{},
 
           config_tries = 1,
+          config_deadline = undefined,
           http_result = undefined,
           retrieving = undefined,
           request_id = undefined
@@ -79,6 +80,10 @@ update_and_get_keys(Pid) ->
 get_error( Pid) ->
     gen_server:call(Pid, get_error).
 
+%% timeout in seconds
+-define(TIMEOUT, 60).
+-define(GEN_TIMEOUT, ?TIMEOUT * 1000).
+
 %% gen_server.
 init({Id, Config}) ->
 
@@ -105,36 +110,45 @@ init({Id, Config}) ->
                }}.
 
 handle_call(get_config, _From, State) ->
+    trigger_config_retrieval_if_needed(State),
     Conf = create_config(State),
-    {reply, {ok, Conf}, State};
+    {reply, {ok, Conf}, State, ?GEN_TIMEOUT};
 handle_call(update_and_get_keys, From, #state{key_requests = Requests}=State) ->
+    trigger_config_retrieval_if_needed(State),
     trigger_key_retrieval(),
     NewRequests = [ From | Requests ],
     NewState = State#state{key_requests = NewRequests},
-    {noreply, NewState};
+    {noreply, NewState, ?GEN_TIMEOUT};
 handle_call(get_error, _From, #state{error=Error} = State) ->
-    {reply, {ok, Error}, State};
+    trigger_config_retrieval_if_needed(State),
+    {reply, {ok, Error}, State, ?GEN_TIMEOUT};
 handle_call(update_config, _From, State) ->
+    trigger_config_retrieval_if_needed(State),
     ok = trigger_config_retrieval(),
-    {reply, ok, State#state{config_tries=0}};
+    {reply, ok, State#state{config_tries=0}, ?GEN_TIMEOUT};
 handle_call({is_issuer, Issuer}, _From, #state{config=Config}=State) ->
+    trigger_config_retrieval_if_needed(State),
     Result = (Issuer == maps:get(issuer, Config, undefined)),
-    {reply, Result , State};
+    {reply, Result , State, ?GEN_TIMEOUT};
 handle_call(is_ready, _From, #state{ready=Ready}=State) ->
-    {reply, Ready, State};
+    trigger_config_retrieval_if_needed(State),
+    {reply, Ready, State, ?GEN_TIMEOUT};
 handle_call(_Request, _From, State) ->
-    {reply, ignored, State}.
+    trigger_config_retrieval_if_needed(State),
+    {reply, ignored, State, ?GEN_TIMEOUT}.
 
 
 handle_cast(retrieve_config, #state{ request_id = undefined,
                                      config_ep=ConfigEndpoint} = State) ->
+    trigger_config_retrieval_if_needed(State),
     NewState = http_async_get(config, ConfigEndpoint, [], State),
-    {noreply, NewState};
+    {noreply, NewState, ?GEN_TIMEOUT};
 handle_cast(retrieve_config, State) ->
-    trigger_config_retrieval(120000),
-    {noreply, State};
+    trigger_config_retrieval_if_needed(State),
+    {noreply, State#state{config_deadline=deadline_in(120)}, ?GEN_TIMEOUT};
 handle_cast(retrieve_keys, #state{ request_id = undefined,
                                    config = Config} = State) ->
+    trigger_config_retrieval_if_needed(State),
     NewState =
         case maps:get(jwks_uri, Config, undefined) of
             undefined ->
@@ -144,15 +158,17 @@ handle_cast(retrieve_keys, #state{ request_id = undefined,
                            "application/json;q=0.7,application/jwk+json"}],
                 http_async_get(keys, KeyEndpoint, Header, State)
         end,
-    {noreply, NewState};
+    {noreply, NewState, ?GEN_TIMEOUT};
 handle_cast(retrieve_keys, State) ->
+    trigger_config_retrieval_if_needed(State),
     trigger_key_retrieval(),
-    {noreply, State};
+    {noreply, State, ?GEN_TIMEOUT};
 handle_cast(register_if_needed, #state{ request_id = undefined,
                                         client_id = undefined,
                                         local_endpoint=LocalEndpoint,
                                         config = Config
                                       } = State) ->
+    trigger_config_retrieval_if_needed(State),
     Body = jsone:encode(#{application_type => <<"web">>,
                           redirect_uris => [LocalEndpoint]
                           %TODO: add more and make this configurable
@@ -160,21 +176,25 @@ handle_cast(register_if_needed, #state{ request_id = undefined,
     RegistrationEndpoint = maps:get(registration_endpoint, Config),
     NewState = http_async_post(registration, RegistrationEndpoint, [],
                                    "application/json", Body, State),
-    {noreply, NewState};
+    {noreply, NewState, ?GEN_TIMEOUT};
 handle_cast(register_if_needed, State) ->
-    {noreply, State#state{ready=true} };
+    trigger_config_retrieval_if_needed(State),
+    {noreply, State#state{ready=true}, ?GEN_TIMEOUT};
 handle_cast(stop, State) ->
     {stop, normal, State};
 handle_cast(_Msg, State) ->
-    {noreply, State}.
+    trigger_config_retrieval_if_needed(State),
+    {noreply, State, ?GEN_TIMEOUT}.
 
 
 handle_info({http, {RequestId, Result}}, #state{request_id = RequestId} =
                 State) ->
+    trigger_config_retrieval_if_needed(State),
     NewState = handle_http_result(State#state{http_result = Result}),
-    {noreply, NewState};
+    {noreply, NewState, ?GEN_TIMEOUT};
 handle_info(_Info, State) ->
-    {noreply, State}.
+    trigger_config_retrieval_if_needed(State),
+    {noreply, State, ?GEN_TIMEOUT}.
 
 http_async_get(Type, Url, Header, State) ->
     case oidcc_http_util:async_http(get, Url, Header) of
@@ -207,8 +227,8 @@ handle_http_result(true, _,  Header, Body, keys, State) ->
 handle_http_result(true, _, Header, Body, registration, State) ->
     handle_registration(Body, Header, State);
 handle_http_result(false, Status, _Header, Body, Retrieve, State) ->
-    trigger_config_retrieval(600000),
-    State#state{error = {retrieving, Retrieve, Status, Body}}.
+    State#state{error = {retrieving, Retrieve, Status, Body},
+                config_deadline = deadline_in(600)}.
 
 
 handle_http_result(#state{http_result={error, Reason}} = State) ->
@@ -228,19 +248,20 @@ create_config(#state{id = Id, desc = Desc, client_id = ClientId,
                      config=Config, keys = Keys, issuer = Issuer,
                      lasttime_updated = LastTimeUpdated, ready = Ready,
                      local_endpoint = LocalEndpoint, name = Name,
-                     request_scopes = Scopes, meta_data = MetaData}) ->
+                     request_scopes = Scopes, meta_data = MetaData,
+                     config_deadline = ConfDeadline
+                    }) ->
     StateList = [{id, Id}, {name, Name}, {description, Desc},
                  {client_id, ClientId}, {client_secret, ClientSecret},
                  {config_endpoint, ConfEp}, {lasttime_updated, LastTimeUpdated},
                  {ready, Ready}, {local_endpoint, LocalEndpoint}, {keys, Keys},
                  {request_scopes, Scopes}, {issuer, Issuer},
-                 {meta_data, MetaData}],
+                 {meta_data, MetaData}, {config_deadline, ConfDeadline}],
     maps:merge(Config, maps:from_list(StateList)).
 
 
 
-handle_config(Data, _Header, #state{issuer=Issuer} = State) ->
-    %TODO: implement update at expire data/time
+handle_config(Data, Header, #state{issuer=Issuer} = State) ->
     Config = decode_json(Data),
     ConfIssuer = maps:get(issuer, Config, undefined),
 
@@ -248,17 +269,18 @@ handle_config(Data, _Header, #state{issuer=Issuer} = State) ->
     AuthCodeFlow = supports_auth_code(Config),
     case {SameIssuer, AuthCodeFlow} of
         {true, true} ->
-            ok = trigger_key_retrieval(),
-            trigger_config_retrieval(3600000),
+            Deadline = header_to_deadline(Header),
+            trigger_registration(),
             State#state{config = Config, issuer=ConfIssuer,
-                        request_id=undefined};
+                        request_id=undefined, config_deadline=Deadline};
         {true, false} ->
             Error = no_authcode_support,
             State#state{error = Error, ready=false, request_id=undefined};
         _ ->
-            trigger_config_retrieval(600000),
+            Deadline = deadline_in(600),
             Error = {bad_issuer_config, Issuer, ConfIssuer, Data},
-            State#state{error = Error, ready=false, request_id=undefined}
+            State#state{error = Error, ready=false, request_id=undefined,
+                        config_deadline=Deadline}
     end.
 
 
@@ -274,7 +296,35 @@ supports_auth_code(_) ->
     false.
 
 
+
+header_to_deadline(Header) ->
+    Cache = lists:keyfind(<<"cache-control">>, 1, Header),
+    Delta =
+        try
+            cache_deadline(Cache)
+        catch _:_ ->
+                3600
+        end,
+    deadline_in(Delta).
+
+cache_deadline({_, Cache}) ->
+    Entries = binary:split(Cache, [<<",">>, <<"=">>, <<" ">>],
+                           [global, trim_all]),
+    MaxAge = fun(Entry, true) ->
+                     binary_to_integer(Entry);
+                (<<"max-age">>, _) ->
+                     true;
+                (_, Res) ->
+                     Res
+             end,
+    lists:foldl(MaxAge, false, Entries).
+
+deadline_in(Seconds) ->
+    timestamp() + Seconds.
+
+
 handle_keys(Data, _Header, State) ->
+    %TODO: maybe also implement a keys deadline
     KeyConfig=decode_json(Data),
     KeyList = maps:get(keys, KeyConfig, []),
     Keys = extract_supported_keys(KeyList, []),
@@ -284,10 +334,8 @@ handle_keys(Data, _Header, State) ->
     send_key_replies(Keys, State),
     case length(Keys) > 0 of
         true ->
-            ok = trigger_registration(),
             NewState;
         false ->
-            trigger_config_retrieval(600000),
             NewState#state{error = {no_keys, Data}, request_id = undefined}
     end.
 
@@ -388,18 +436,27 @@ handle_http_client_crash(Reason, #state{config_tries=Tries} = State) ->
         true ->
             State#state{error = Reason};
         false ->
-            trigger_config_retrieval(30000),
             State#state{request_id=undefined, retrieving=undefined,
-                        http_result={},
-                        config_tries=Tries+1}
+                        http_result={}, config_tries=Tries+1,
+                        config_deadline = deadline_in(300)}
     end.
 
 
 trigger_config_retrieval() ->
     gen_server:cast(self(), retrieve_config).
 
-trigger_config_retrieval(Time) ->
-    timer:apply_after(Time, gen_server, cast, [self(), retrieve_config]).
+trigger_config_retrieval_if_needed(#state{config_deadline=Deadline} = State)
+  when is_integer(Deadline) ->
+    Soon = timestamp() + ?TIMEOUT,
+    case Soon >= Deadline of
+        true ->
+            trigger_config_retrieval(),
+            {ok, State#state{config_deadline = undefined}};
+        _ ->
+            {ok, State}
+    end;
+trigger_config_retrieval_if_needed(State) ->
+    {ok, State}.
 
 trigger_key_retrieval() ->
     gen_server:cast(self(), retrieve_keys).

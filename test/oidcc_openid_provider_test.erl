@@ -99,9 +99,9 @@ fetch_config_test() ->
        jwks_uri := <<"https://my.provider/keys">>
      } = Config1,
 
+    gen_server:cast(Pid, retrieve_keys),
     Pid ! {http, {key_id, {{tcp, 200, good}, [], KeyBody }}},
     {ok, Config2} = oidcc_openid_provider:get_config(Pid),
-
     #{ config_endpoint := ConfigEndpoint,
        keys := [_Keys],
        issuer := <<"https://my.provider">>,
@@ -142,10 +142,12 @@ real_config_fetch_test() ->
 
     {ok, Config2} = oidcc_openid_provider:get_config(Pid),
     #{ config_endpoint := ConfigEndpoint,
-       keys := Keys,
+       keys := [],
        issuer := Issuer,
        jwks_uri := <<"https://www.googleapis.com/oauth2/v3/certs">>
      } = Config2,
+
+    {ok, Keys} = oidcc_openid_provider:update_and_get_keys(Pid),
     true = (length(Keys) >= 1),
     application:unset_env(oidcc, cert_depth),
     application:unset_env(oidcc, cacertfile),

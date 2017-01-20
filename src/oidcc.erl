@@ -2,7 +2,7 @@
 
 -export([add_openid_provider/6]).
 -export([add_openid_provider/7]).
--export([add_openid_provider/8]).
+-export([add_openid_provider/9]).
 -export([find_openid_provider/1]).
 -export([get_openid_provider_info/1]).
 -export([get_openid_provider_list/0]).
@@ -38,7 +38,7 @@
 add_openid_provider(Name, Description, ClientId, ClientSecret, IssuerOrConfigEP,
                     LocalEndpoint) ->
     add_openid_provider(undefined, Name, Description, ClientId, ClientSecret,
-                        IssuerOrConfigEP, LocalEndpoint, undefined).
+                        IssuerOrConfigEP, LocalEndpoint, undefined, #{}).
 
 %% @doc
 %% add an OpenID Connect Provider to the list of possible Providers, giving the
@@ -55,10 +55,10 @@ add_openid_provider(Name, Description, ClientId, ClientSecret, IssuerOrConfigEP,
 add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
                     IssuerOrConfigEP, LocalEndpoint) ->
     add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
-                        IssuerOrConfigEP, LocalEndpoint, undefined).
+                        IssuerOrConfigEP, LocalEndpoint, undefined, #{}).
 
 -spec add_openid_provider(Id, Name, Description, ClientId, ClientSecret,
-                          IssuerOrConfigEP, LocalEndpoint, Scopes) ->
+                          IssuerOrConfigEP, LocalEndpoint, Scopes, RegParams) ->
                                  {ok, Id::binary(), Pid::pid()}|
                                  {error, id_already_used} when
       Id :: binary() | undefined,
@@ -68,16 +68,18 @@ add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
       ClientSecret :: binary(),
       IssuerOrConfigEP :: binary(),
       LocalEndpoint :: binary(),
-      Scopes :: list() | undefined.
+      Scopes :: list() | undefined,
+      RegParams :: map().
 add_openid_provider(IdIn, Name, Description, ClientId, ClientSecret,
-                    IssuerOrConfigEP, LocalEndpoint, Scopes) ->
+                    IssuerOrConfigEP, LocalEndpoint, Scopes, RegParams) ->
     Config = #{name => Name,
                description => Description,
                client_id => ClientId,
                client_secret => ClientSecret,
                issuer_or_endpoint => IssuerOrConfigEP,
                local_endpoint => LocalEndpoint,
-               request_scopes => Scopes
+               request_scopes => Scopes,
+               registration_params => RegParams
               },
     oidcc_openid_provider_mgr:add_openid_provider(IdIn, Config).
 

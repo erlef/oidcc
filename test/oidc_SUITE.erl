@@ -90,17 +90,22 @@ retrieve_configuration(ConfigEndpoint) ->
     {ok, _, Pid} = oidcc:add_openid_provider(Name, Description, ClientId, ClientSecret,
 					     ConfigEndpoint, LocalEndpoint),
     ok = wait_for_config(Pid),
-    ok = ensure_has_signing_keys(Pid),
+    ok = fetch_signing_keys(Pid),
     ok.
 
 
-ensure_has_signing_keys(Pid) ->
+fetch_signing_keys(Pid) ->
+    {ok, Keys} = oidcc_openid_provider:update_and_get_keys(Pid),
     {ok, Config} = oidcc:get_openid_provider_info(Pid),
-    #{keys := Keys} = Config,
+    #{keys := Keys,
+      config_deadline := Deadline
+     } = Config,
     Filter = fun(#{use := Use}) ->
                      Use == sign
              end,
+    Now = erlang:system_time(seconds),
     ct:log("all keys: ~p", [Keys]),
+    ct:log("config deadline in ~p seconds", [Deadline - Now]),
     case lists:filter(Filter, Keys) of
         [] -> {error, no_signing_keys};
         SigKeys ->

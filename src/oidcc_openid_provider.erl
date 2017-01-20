@@ -24,6 +24,7 @@
           ready = false,
           error = undefined,
           key_requests = [],
+          registration_params = #{},
 
           id = undefined,
           name = undefined,
@@ -93,6 +94,7 @@ init({Id, Config}) ->
       issuer_or_endpoint := IssuerOrEndpoint,
       local_endpoint := LocalEndpoint
      } = Config,
+    RegistrationParams = maps:get(registration_params, Config, #{}),
     ClientSecret = maps:get(client_secret, Config, undefined),
     ClientId = case ClientSecret of
                    undefined ->
@@ -106,7 +108,7 @@ init({Id, Config}) ->
     {ok, #state{id = Id, name = Name, desc = Description, client_id = ClientId,
                 client_secret = ClientSecret, config_ep = ConfigEndpoint,
                 request_scopes = Scopes, local_endpoint = LocalEndpoint,
-                issuer = Issuer
+                issuer = Issuer, registration_params = RegistrationParams
                }}.
 
 handle_call(get_config, _From, State) ->
@@ -166,13 +168,14 @@ handle_cast(retrieve_keys, State) ->
 handle_cast(register_if_needed, #state{ request_id = undefined,
                                         client_id = undefined,
                                         local_endpoint=LocalEndpoint,
+                                        registration_params=RegistrationParams,
                                         config = Config
                                       } = State) ->
     trigger_config_retrieval_if_needed(State),
-    Body = jsone:encode(#{application_type => <<"web">>,
-                          redirect_uris => [LocalEndpoint]
-                          %TODO: add more and make this configurable
-                         }),
+    BasicParams = #{application_type => <<"web">>,
+                    redirect_uris => [LocalEndpoint]},
+    RegParams = maps:merge(RegistrationParams, BasicParams),
+    Body = jsone:encode(RegParams),
     RegistrationEndpoint = maps:get(registration_endpoint, Config),
     NewState = http_async_post(registration, RegistrationEndpoint, [],
                                    "application/json", Body, State),

@@ -158,20 +158,8 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone)
     % Header Parameter. The Client MUST use the keys provided by the Issuer.
     %
     % 9. The current time MUST be before the time represented by the exp Claim.
-    PubKey = case Algo == <<"none">> of
-                 true -> undefined;
-                 false -> get_needed_key(PubKeys, Kid)
-             end,
-    JWT = case erljwt:parse_jwt(IdToken, PubKey, <<"JWT">>) of
-              invalid ->
-                  %% it might be the case that our keys expired ...
-                  %% so refetch them
-                  NewKeys = refetch_keys(OpenIdProviderId),
-                  NewPubKey = get_needed_key(NewKeys, Kid),
-                  erljwt:parse_jwt(IdToken, NewPubKey, <<"JWT">>);
-              Other -> Other
-          end,
-    case JWT of
+    SignedClaims = validate_signature(IdToken, Kid, PubKeys, OpenIdProviderId),
+    case SignedClaims of
         Claims -> ok;
         invalid -> throw(invalid_signature);
         expired -> throw(expired);
@@ -242,11 +230,33 @@ has_other_audience(ClientId, Audience) when is_binary(Audience) ->
 has_other_audience(ClientId, Audience) when is_list(Audience) ->
     length(lists:delete(ClientId, Audience)) >= 1.
 
+
+validate_signature(IdToken, Kid, PubKeys, ProviderId) ->
+    PubKey = get_needed_key(PubKeys, Kid),
+    case {PubKey, ProviderId} of
+        {Error, undefined} when is_atom(Error) ->
+            throw(Error);
+        _ -> ok
+    end,
+    case {erljwt:parse_jwt(IdToken, PubKey, <<"JWT">>), ProviderId} of
+        {invalid, undefined} ->
+            invalid;
+        {invalid, ProviderId} ->
+            %% it might be the case that our keys expired ...
+            %% so refetch them
+            NewPubKeys = refetch_keys(ProviderId),
+            validate_signature(IdToken, Kid, NewPubKeys,
+                                             undefined);
+        {Claims, _Provider} -> Claims
+    end.
+
+
 refetch_keys(ProviderId) ->
     case oidcc_openid_provider:update_and_get_keys(ProviderId) of
         {ok, Keys} -> Keys;
         _ -> []
     end.
+
 
 get_needed_key(List, Id) ->
     Filter = fun(#{use := Use, kty := Kty}) ->
@@ -255,11 +265,11 @@ get_needed_key(List, Id) ->
     find_needed_key(lists:filter(Filter, List), Id).
 
 find_needed_key([], _) ->
-    throw(no_key);
+    no_key;
 find_needed_key([#{key := Key}], none) ->
     Key;
 find_needed_key(_, none) ->
-    throw(too_many_keys);
+    too_many_keys;
 find_needed_key([#{kid := KeyId, key := Key } |_], KeyId) ->
     Key;
 find_needed_key([_Key | T], KeyId) ->

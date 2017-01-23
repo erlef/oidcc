@@ -82,13 +82,10 @@ retrieve_eudat(_Conf) ->
     retrieve_configuration(ConfigEndpoint).
 
 retrieve_configuration(ConfigEndpoint) ->
-    Name = <<"name">>,
-    Description = <<"description">>,
-    ClientId = <<"some id">>,
-    ClientSecret = <<"secret">>,
     LocalEndpoint = <<"http://localhost:8080/oidc">>,
-    {ok, _, Pid} = oidcc:add_openid_provider(Name, Description, ClientId, ClientSecret,
-					     ConfigEndpoint, LocalEndpoint),
+    Config = #{client_id => <<"some_id">>},
+    {ok, _, Pid} = oidcc:add_openid_provider(ConfigEndpoint, LocalEndpoint,
+                                             Config),
     ok = wait_for_config(Pid),
     ok = fetch_signing_keys(Pid),
     ok.

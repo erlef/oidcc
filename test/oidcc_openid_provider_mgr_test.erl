@@ -35,23 +35,24 @@ simple_add_test() ->
 
 
 id_add_test() ->
+    Id = <<"123">>,
     Config = #{name => <<"some name">>,
                description => <<"some description">>,
                client_id => <<"123">>,
                client_secret => <<"dont tell">>,
                issuer_or_endpoint => <<"well.known">>,
-               local_endpoint => <<"/here">>
+               local_endpoint => <<"/here">>,
+               id => Id
               },
     MyPid = self(),
     AddFun = fun(_Id, _Config) ->
                      {ok, MyPid}
              end,
-    Id = <<"123">>,
     ok = meck:new(oidcc_openid_provider_sup),
     ok = meck:expect(oidcc_openid_provider_sup, add_openid_provider, AddFun),
 
     {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
-    {ok, Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(Id, Config),
+    {ok, Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
     {ok, [{Id, MyPid}]} = oidcc_openid_provider_mgr:get_openid_provider_list(),
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
@@ -78,9 +79,10 @@ double_add_test() ->
 
     {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
     {ok, Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
-    {error, id_already_used} = oidcc_openid_provider_mgr:add_openid_provider(Id,
-                                                                            Config),
-    {ok, _Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(undefined),
+    NewConfig = maps:put(id, Id, Config),
+    {error, id_already_used} =
+        oidcc_openid_provider_mgr:add_openid_provider(NewConfig),
+    {ok, _Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(#{}),
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
 

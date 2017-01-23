@@ -252,7 +252,8 @@ validate_signature(IdToken, Kid, PubKeys, ProviderId) ->
 
 
 refetch_keys(ProviderId) ->
-    case oidcc_openid_provider:update_and_get_keys(ProviderId) of
+    {ok, Pid} = oidcc_openid_provider_mgr:get_openid_provider(ProviderId),
+    case oidcc_openid_provider:update_and_get_keys(Pid) of
         {ok, Keys} -> Keys;
         _ -> []
     end.

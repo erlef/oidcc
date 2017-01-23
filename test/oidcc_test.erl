@@ -4,7 +4,8 @@
 add_openid_provider_test() ->
     MyPid = self(),
     RandomId = <<"6">>,
-    AddFun = fun(Id, _Config) ->
+    AddFun = fun(Config) ->
+                     Id = maps:get(id, Config, undefined),
                      case Id of
                          undefined ->
                              {ok, RandomId, MyPid};
@@ -18,25 +19,18 @@ add_openid_provider_test() ->
 
     ok = meck:expect(oidcc_openid_provider_mgr, add_openid_provider, AddFun),
 
-    Name = <<"My Test Oidc">>,
-    Id = <<"123345456">>,
-    Description = <<"my Test Oidc">>,
-    ClientId = <<"123">>,
-    ClientSecret = <<"secret">>,
     ConfigEndpoint = <<"some_remote_url">>,
     LocalEndpoint = <<"some_local_url">>,
+    Id = <<"123345456">>,
+    Config = #{ client_id => <<"123">>,
+                client_secret => <<"secret">>
+              },
 
-    {ok, RandomId, MyPid} = oidcc:add_openid_provider(Name,
-                                                      Description, ClientId,
-                                                      ClientSecret,
-                                                      ConfigEndpoint,
-                                                      LocalEndpoint),
+    {ok, RandomId, MyPid} = oidcc:add_openid_provider(ConfigEndpoint,
+                                                      LocalEndpoint, Config),
 
-    {ok, Id, MyPid} = oidcc:add_openid_provider(Id, Name,
-                                                      Description, ClientId,
-                                                      ClientSecret,
-                                                      ConfigEndpoint,
-                                                      LocalEndpoint),
+    {ok, Id, MyPid} = oidcc:add_openid_provider(ConfigEndpoint, LocalEndpoint,
+                                               maps:put(id, Id, Config)),
     true = meck:validate(oidcc_openid_provider),
     true = meck:validate(oidcc_openid_provider_mgr),
     meck:unload(oidcc_openid_provider),
@@ -115,10 +109,17 @@ create_redirect_url_test() ->
     ok = meck:expect(oidcc_openid_provider, get_config, ConfigFun),
     ok = meck:expect(oidcc_openid_provider_mgr, get_openid_provider, MapFun),
 
+    Config1 = #{scopes => ["email", <<"openid">>]},
+    Config2 = #{scopes => ["email", <<"profile">>, openid],
+                state => State},
+    Config3 = #{scopes => [email, profile, openid],
+                state => State,
+                nonce => Nonce},
+
     {ok, Url1} = oidcc:create_redirect_url(ProviderId),
-    {ok, Url2} = oidcc:create_redirect_url(ProviderId, ["email", <<"openid">>]),
-    {ok, Url3} = oidcc:create_redirect_url(ProviderId, [<<"email">>, "profile", openid], State),
-    {ok, Url4} = oidcc:create_redirect_url(ProviderId, [email, profile, openid], State, Nonce),
+    {ok, Url2} = oidcc:create_redirect_url(ProviderId, Config1),
+    {ok, Url3} = oidcc:create_redirect_url(ProviderId, Config2),
+    {ok, Url4} = oidcc:create_redirect_url(ProviderId, Config3),
 
     ExpUrl1 = <<"https://my.provider/auth?scope=openid&response_type=code&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
     ?assertEqual(ExpUrl1, Url1),
@@ -141,21 +142,81 @@ create_redirect_url_test() ->
     meck:unload(oidcc_openid_provider_mgr),
     ok.
 
-retrieve_token_basic_test() ->
-    retrieve_token([]).
+%% retrieve_token_basic_test() ->
+%%     retrieve_token([]).
 
-retrieve_token_post_test() ->
-    retrieve_token([<<"unsupporeted_auth">>,<<"client_secret_post">>]).
+%% retrieve_token_post_test() ->
+%%     retrieve_token([<<"unsupporeted_auth">>,<<"client_secret_post">>]).
 
-retrieve_token(AuthMethods) ->
+%% retrieve_token(AuthMethods) ->
+%%     MyPid = self(),
+%%     ProviderId = <<"6">>,
+%%     ClientId = <<"123">>,
+%%     ClientSecret = <<"secret">>,
+
+%%     TokenEndpoint = <<"https://my.provider/token">>,
+%%     LocalEndpoint = <<"https://my.server/auth">>,
+%%     HttpBody = <<"TokenRawData">>,
+%%     ConfigFun = fun(Pid)->
+%%                      Pid = MyPid,
+%%                      {ok, #{local_endpoint => LocalEndpoint,
+%%                             client_id => ClientId,
+%%                             client_secret => ClientSecret,
+%%                             token_endpoint => TokenEndpoint,
+%%                             token_endpoint_auth_methods_supported => AuthMethods
+%%                            }}
+%%                 end,
+%%     MapFun = fun(Id) ->
+%%                      case Id of
+%%                          ProviderId -> {ok, MyPid};
+%%                          _ -> {error, not_found}
+%%                      end
+%%              end,
+
+%%     HttpFun = fun(Method, Url, _Header, _ContentType, _Body)  ->
+%%                       Method = post,
+%%                       Url = TokenEndpoint,
+%%                       {ok, #{status => 200, header => [], body => HttpBody}}
+%%               end,
+
+%%     PassThrough = fun(Data) ->
+%%                           meck:passthrough([Data])
+%%                   end,
+%%     ok = meck:new(oidcc_openid_provider),
+%%     ok = meck:new(oidcc_openid_provider_mgr),
+%%     ok = meck:new(oidcc_http_util),
+
+%%     ok = meck:expect(oidcc_openid_provider, get_config, ConfigFun),
+%%     ok = meck:expect(oidcc_openid_provider_mgr, get_openid_provider, MapFun),
+%%     ok = meck:expect(oidcc_http_util, sync_http, HttpFun),
+%%     ok = meck:expect(oidcc_http_util, urlencode, PassThrough ),
+%%     ok = meck:expect(oidcc_http_util, qs, PassThrough),
+
+%%     AuthCode = <<"1234567890">>,
+
+%%     {ok,_} = oidcc:retrieve_token(AuthCode,ProviderId),
+
+%%     true = meck:validate(oidcc_openid_provider),
+%%     true = meck:validate(oidcc_openid_provider_mgr),
+%%     true = meck:validate(oidcc_http_util),
+%%     meck:unload(oidcc_openid_provider),
+%%     meck:unload(oidcc_openid_provider_mgr),
+%%     meck:unload(oidcc_http_util),
+%%     ok.
+
+
+retrieve_and_validate_token_test() ->
     MyPid = self(),
-    ProviderId = <<"6">>,
     ClientId = <<"123">>,
     ClientSecret = <<"secret">>,
 
     TokenEndpoint = <<"https://my.provider/token">>,
     LocalEndpoint = <<"https://my.server/auth">>,
-    HttpBody = <<"TokenRawData">>,
+    TokenData = <<"TokenData">>,
+    IdToken = <<"IdToken">>,
+    ProviderId = <<"ID123">>,
+    AuthMethods = [<<"unsupporeted_auth">>,<<"client_secret_post">>],
+
     ConfigFun = fun(Pid)->
                      Pid = MyPid,
                      {ok, #{local_endpoint => LocalEndpoint,
@@ -175,12 +236,25 @@ retrieve_token(AuthMethods) ->
     HttpFun = fun(Method, Url, _Header, _ContentType, _Body)  ->
                       Method = post,
                       Url = TokenEndpoint,
-                      {ok, #{status => 200, header => [], body => HttpBody}}
+                      {ok, #{status => 200, header => [], body => TokenData}}
               end,
 
     PassThrough = fun(Data) ->
                           meck:passthrough([Data])
                   end,
+    ExtractFun = fun(Data) ->
+                         Data = TokenData,
+                         #{id => IdToken}
+                 end,
+    ValidateFun = fun(TokenMap,Provider,_Nonce, _NoneAllowed) ->
+                          Provider = ProviderId,
+                          #{id := IdToken} = TokenMap,
+                          {ok,#{ id => #{}}}
+                  end,
+
+    ok = meck:new(oidcc_token),
+    ok = meck:expect(oidcc_token, extract_token_map, ExtractFun),
+    ok = meck:expect(oidcc_token, validate_token_map, ValidateFun),
     ok = meck:new(oidcc_openid_provider),
     ok = meck:new(oidcc_openid_provider_mgr),
     ok = meck:new(oidcc_http_util),
@@ -192,39 +266,15 @@ retrieve_token(AuthMethods) ->
     ok = meck:expect(oidcc_http_util, qs, PassThrough),
 
     AuthCode = <<"1234567890">>,
+    {ok, #{id := #{}}} = oidcc:retrieve_and_validate_token(AuthCode, ProviderId),
 
-    {ok,_} = oidcc:retrieve_token(AuthCode,ProviderId),
-
+    true = meck:validate(oidcc_token),
     true = meck:validate(oidcc_openid_provider),
     true = meck:validate(oidcc_openid_provider_mgr),
     true = meck:validate(oidcc_http_util),
     meck:unload(oidcc_openid_provider),
     meck:unload(oidcc_openid_provider_mgr),
     meck:unload(oidcc_http_util),
-    ok.
-
-
-parse_and_validate_token_test() ->
-    TokenData = <<"TokenData">>,
-    IdToken = <<"IdToken">>,
-    ProviderId = <<"ID123">>,
-    ExtractFun = fun(Data) ->
-                         Data = TokenData,
-                         #{id => IdToken}
-                 end,
-    ValidateFun = fun(TokenMap,Provider,_Nonce) ->
-                          Provider = ProviderId,
-                          #{id := IdToken} = TokenMap,
-                          {ok,#{ id => #{}}}
-                  end,
-
-    ok = meck:new(oidcc_token),
-    ok = meck:expect(oidcc_token, extract_token_map, ExtractFun),
-    ok = meck:expect(oidcc_token, validate_token_map, ValidateFun),
-
-    {ok, #{id := #{}}} = oidcc:parse_and_validate_token(TokenData, ProviderId),
-
-    true = meck:validate(oidcc_token),
     meck:unload(oidcc_token),
     ok.
 

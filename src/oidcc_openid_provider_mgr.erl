@@ -4,7 +4,6 @@
 %% API.
 -export([start_link/0]).
 -export([stop/0]).
--export([add_openid_provider/2]).
 -export([add_openid_provider/1]).
 -export([get_openid_provider/1]).
 -export([find_openid_provider/1]).
@@ -35,13 +34,10 @@ start_link() ->
 stop() ->
     gen_server:cast(?MODULE, stop).
 
--spec add_openid_provider(Config::map()) -> {ok, Id::binary(), pid()}.
-add_openid_provider(Config) ->
-    add_openid_provider(undefined, Config).
-
--spec add_openid_provider(Id::binary() | undefined, Config::map()) ->
+-spec add_openid_provider(Config::map()) ->
     {ok, Id::binary(), pid()} | {error, Reason::atom()}.
-add_openid_provider(Id, Config) ->
+add_openid_provider(Config) ->
+    Id = maps:get(id, Config, undefined),
     gen_server:call(?MODULE, {add_provider, Id, Config}).
 
 

@@ -331,8 +331,7 @@ handle_keys(Data, _Header, State) ->
     KeyConfig=decode_json(Data),
     KeyList = maps:get(keys, KeyConfig, []),
     Keys = extract_supported_keys(KeyList, []),
-    NewState = State#state{keys  = Keys, ready = false,
-                           lasttime_updated = timestamp(),
+    NewState = State#state{keys  = Keys, lasttime_updated = timestamp(),
                            request_id = undefined},
     send_key_replies(Keys, State),
     case length(Keys) > 0 of

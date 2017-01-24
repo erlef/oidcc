@@ -669,9 +669,9 @@ download_log() ->
     {ok, TestId} = get_test_id(),
     {ok, Profile} = get_test_profile(),
     RPId = get_rp_id(),
-    WgetParams = "--no-check-certificate --check-certificate=quiet",
+    WgetParams = "-nv",
     Host = "https://rp.certification.openid.net:8080",
-    C= "cd ~s && wget ~s -nv ~s/log/~s/~s.txt",
+    C= "cd ~s && wget ~s ~s/log/~s/~s.txt",
     Download =
         fun(Prof, _) ->
                 {ok, LogDir} = get_profile_dir(Prof),

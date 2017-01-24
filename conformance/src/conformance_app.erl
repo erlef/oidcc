@@ -53,4 +53,19 @@ init() ->
     conformance:set_conf(dyn_dir, DynDir),
     conformance:set_conf(rp_id, <<"oidcc.code">>),
     lager:info("using log dir ~p",[LogDir]),
+
+    Url = <<"https://rp.certification.openid.net:8080/">>,
+    SSLResult =
+        case oidcc_http_util:sync_http(get, Url ,[]) of
+            {ok, #{status := 200}}  -> "successful";
+            Error ->
+                OidccInfo = application:get_all_env(oidcc),
+                lager:info("oidcc settings: ~p",[OidccInfo]),
+                Error
+        end,
+    lager:info("checking ssl: ~p~n", [SSLResult]),
+
+    lager:info("cleaning logs ..."),
+    ClearLog = <<"https://rp.certification.openid.net:8080/clear/oidcc.code">>,
+    oidcc_http_util:sync_http(get, ClearLog, []),
     ok.

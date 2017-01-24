@@ -44,7 +44,7 @@
                 {<<"rp-id_token-sig-none">>,
                  fun test_rp_id_token/1,
                  fun check_rp_id_token_sig_none/2,
-                 code},
+                 [code, configuration]},
                 {<<"rp-id_token-issuer-mismatch">>,
                  fun test_rp_id_token/1,
                  fun check_rp_id_token_issuer_mismatch/2,
@@ -85,7 +85,7 @@
 
                 %% mandatory configuration
                 {<<"rp-discovery-jwks_uri-keys">>,
-                 fun test_rp_discovery/0,
+                 fun test_rp_discovery_keys/0,
                  undefined,
                  configuration},
                 {<<"rp-discovery-issuer-not-matching-config">>,
@@ -99,11 +99,12 @@
                 {<<"rp-key-rotation-op-sign-key">>,
                  fun test_rp_key_rotation/1,
                  fun check_rp_key_rotation/2,
-                 configuration},
-                {<<"rp-userinfo-sig">>,
-                 fun test_rp_userinfo_sig/1,
-                 fun check_rp_userinfo_sig/2,
                  configuration}
+                %% been removed
+                %% {<<"rp-userinfo-sig">>,
+                %%  fun test_rp_userinfo_sig/1,
+                %%  fun check_rp_userinfo_sig/2,
+                %%  configuration}
                ]).
 
 %% *** CODE - MANDATORY ***
@@ -366,10 +367,9 @@ check_rp_user_info_bearer_header(_, _) ->
 %%
 %% Should be able to verify signed responses and/or encrypt requests using
 %% obtained keys.
-test_rp_discovery() ->
+test_rp_discovery_keys() ->
     {ok, _Id, Pid} = dyn_reg_test(),
-    {ok, Config} = oidcc_openid_provider:get_config(Pid),
-    Keys = maps:get(keys, Config, []),
+    {ok, Keys} = oidcc_openid_provider:update_and_get_keys(Pid),
     KeysOk = length(Keys) > 0,
     Ready = oidcc_openid_provider:is_ready(Pid),
     KeysOk and Ready.
@@ -392,8 +392,9 @@ test_rp_discovery_not_matching() ->
 %%  Retrieve and use the OpenID Provider Configuration Information.
 %%
 %% Read and use the JSON object returned from the OpenID Connect Provider.
-%% @see rp-discovery-jwks_uri-keys
-
+test_rp_discovery() ->
+    {ok, _Id, Pid} = dyn_reg_test(),
+    oidcc_openid_provider:is_ready(Pid).
 
 
 %% rp-key-rotation-op-sign-key
@@ -410,30 +411,30 @@ test_rp_key_rotation(Req) ->
 
 check_rp_key_rotation(true, _TokenMap) ->
     case get_conf(rotation_run) of
-        1 ->
+        {ok, 1} ->
             set_conf(rotation_run, 2),
-            {ok, Id} = appplication:get_env(conformance, provider_id),
+            {ok, Id} = get_conf(provider_id),
             {in_progress, provider_url(Id)};
-        2 ->
+        {ok, 2} ->
             true
     end;
 check_rp_key_rotation(_, _) ->
     false.
 
-
+%% BEEN REMOVED
 %% rp-userinfo-sig
 %%
 %% Request signed UserInfo.
 %%
 %% Successful signature verification of the UserInfo Response.
-test_rp_userinfo_sig(Req) ->
-    {ok, Id, _Pid} = dyn_reg_test(),
-    redirect_to_provider(Id, Req).
+%% test_rp_userinfo_sig(Req) ->
+%%     {ok, Id, _Pid} = dyn_reg_test(),
+%%     redirect_to_provider(Id, Req).
 
-check_rp_userinfo_sig(true, _TokenMap) ->
-    false;
-check_rp_userinfo_sig(_, _) ->
-    false.
+%% check_rp_userinfo_sig(true, _TokenMap) ->
+%%     false;
+%% check_rp_userinfo_sig(_, _) ->
+%%     false.
 
 
 %% *** DYNAMIC - MANDATORY ***
@@ -508,12 +509,14 @@ dyn_reg_test(Options) ->
     dyn_reg(Issuer, TestId, Scopes).
 
 dyn_reg(Issuer, Name, Scopes) ->
-    {ok, Id, Pid} = oidcc:add_openid_provider(
-                      undefined, Name, <<"description">>,
-                     undefined, undefined, Issuer,
-                     <<"https://localhost:8080/oidc">>,
-                      Scopes
-                                         ),
+    ProviderConf = #{
+      name => Name,
+      description => <<"">>,
+      request_scopes => Scopes
+     },
+    {ok, Id, Pid} = oidcc:add_openid_provider(Issuer,
+                                              <<"https://localhost:8080/oidc">>,
+                                              ProviderConf),
     log("registration at ~p started with id ~p~n",[Issuer, Id]),
     set_conf(provider_id, Id),
     case wait_for_provider_to_be_ready(Pid) of
@@ -627,12 +630,26 @@ log(Format, Args) ->
     Msg = io_lib:format(Format, Args),
     log(Msg).
 
+
 log(Msg) ->
+    {ok, Profile} = get_test_profile(),
+    log_profile(Msg, Profile).
+
+log_profile(Msg, Profile) ->
     {ok, TestId} = get_test_id(),
-    {ok, LogDir} = get_profile_dir(),
-    Ext = <<".log">>,
-    FileName = << LogDir/binary, TestId/binary, Ext/binary >>,
-    ok = file:write_file(FileName, Msg, [append]),
+    LogProfile =
+        fun(Prof, _) ->
+                {ok, LogDir} = get_profile_dir(Prof),
+                Ext = <<".log">>,
+                log_file(<< LogDir/binary, TestId/binary, Ext/binary >>, Msg),
+                ok
+        end,
+    ProfileList =
+        case is_list(Profile) of
+            true -> Profile;
+            false -> [Profile]
+        end,
+    lists:foldl(LogProfile, ok, ProfileList),
     lager:info(Msg).
 
 
@@ -642,24 +659,39 @@ log_result(Format, Args) ->
     log(Msg),
     {ok, LogDir} =  get_conf(log_dir),
     Name = <<"summary.log">>,
-    FileName = << LogDir/binary, Name/binary >>,
-    ok = file:write_file(FileName, Msg, [append]).
+    log_file(<< LogDir/binary, Name/binary >>, Msg).
 
+log_file(FileName, Msg) ->
+    ok = file:write_file(FileName, Msg, [append]),
+    ok.
 
 download_log() ->
     {ok, TestId} = get_test_id(),
+    {ok, Profile} = get_test_profile(),
     RPId = get_rp_id(),
-    {ok, LogDir} = get_profile_dir(),
-    C= "cd ~s && wget -nv https://rp.certification.openid.net:8080/log/~s/~s.txt",
-    Cmd = io_lib:format(C, [binary_to_list(LogDir), binary_to_list(RPId),
-                            binary_to_list(TestId)]),
-    Result = os:cmd(Cmd),
-    log(Result),
+    WgetParams = "--no-check-certificate --check-certificate=quiet",
+    Host = "https://rp.certification.openid.net:8080",
+    C= "cd ~s && wget ~s -nv ~s/log/~s/~s.txt",
+    Download =
+        fun(Prof, _) ->
+                {ok, LogDir} = get_profile_dir(Prof),
+                Cmd = io_lib:format(C, [binary_to_list(LogDir), WgetParams,
+                                        Host, binary_to_list(RPId),
+                                        binary_to_list(TestId)]),
+                Result = os:cmd(Cmd),
+                Msg = io_lib:format("download: ~p~n", [Result]),
+                log_profile(Msg, Prof)
+        end,
+    ProfileList =
+        case is_list(Profile) of
+            true -> Profile;
+            false -> [Profile]
+        end,
+    lists:foldl(Download, ok, ProfileList),
     ok.
 
 
-get_profile_dir() ->
-    {ok, Profile} = get_test_profile(),
+get_profile_dir(Profile) ->
     case Profile of
         code -> get_conf(code_dir);
         configuration -> get_conf(conf_dir);

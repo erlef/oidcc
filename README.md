@@ -9,86 +9,96 @@ for authentication purposes.
 ## Usage
 ### Setup an Openid Connect Provider
 First an OpenId Connect Provider needs to be added, this is done by either
-`oidcc:add_openid_provider/6` or `oidcc:add_openid_provider/7`.
+`oidcc:add_openid_provider/2` or `oidcc:add_openid_provider/3`.
 The parameter are:
-* ID: the ID to give this provider, this is used to look up the provider again
-  (only passed with `add_openid_provider/7`), if it is not given an Id will be
-  generated.
-* Name: the name you give this provider, no fuctionality
-* Description: some description of this provider, no fuctionality
-* ClientId: The OpenId Connect client id of your application, at this provider
-* ClientSecret: The OpenId Connect client secret of your application
-* ConfigEndpoint: The configuration endpoint of the OpenId Connect provider.
+* Issuer or ConfigEndpoint: The url of the issuer or its configuration endpoint.
+  Oidcc will figure out what it is and generate the needed configuration url.
   This url is used to receive the configuration and set up the client, no
   configuration needs to be done.
 * LocalEndpoint: The local URL where the user will be redirected back to once
   logged in at the OpenId Connect provider, this MUST be the same as the path that
   is handled by an oidcc_client behaviour (see [oidcc_cowboy](https://github.com/indigo-dc/oidcc_cowboy) ).
+* Additional configuration, using a map. possible configurations are:
+  * name: a name for the provider, just some text (no functional usage)
+  * description: a longer descriptive text (no functional usage)
+  * client_id: the client id, if this is not given oidcc tries to dynamically register
+  * client_secret: the client secret which has been generated during manual registration
+  * request_scopes: the scopes to request by default when using this provider
+  * registration_params: a map of parameter to use during the dynamic registration.
 
 
+### Login Users
+It is highly encouraged to implement the oidcc_client behaviour.
 
-### Login Users: by hand
-It is recommended to use one implementation of the oidcc_client behaviour instead
-of handlign this all 'by hand'.
-
-List of oidcc_client implementations:
+List of web-server modules that support the oidcc_client behaviour:
  * [oidcc_cowboy](https://github.com/indigo-dc/oidcc_cowboy) for cowboy
 
-#### Create Redirection to Login Page
-Creating a redirection is done with one of the `oidcc:create_redirect_url`
-functions.
-The parameters are:
-* The Id of the OpenId Provider to use (result from the setup above).
-* The scopes to request (if not given is set to openid).
-* The state to receive when the user gets redirected back
-* The nonce that should be contained in the JWT
+if you implemented an plugin/module for another web-server please let me know, so I can add it to the list above.
 
-The returned URL needs to be set as redirection in http reply.
 
-Example:
-```Erlang
-{ok, Url} = oidcc:create_redirect_url( <<"234">>,
-                                       [openid, email],
-                                       <<"my state">>,
-                                       <<"random nonce, 4">>),
+### you application code
+This is a short description of the [basic_client example](https://github.com/indigo-dc/oidcc_cowboy/blob/master/example/basic_client)
+First add an openid connect provider:
+```
+ConfigEndpoint = <<"https://some-provider.com">>,
+LocalEndpoint = <<"http://localhost:8080/oidc">>,
+Config = #{
+  id => <<"someprovider">>,
+  client_id => <<"1234">>,
+  client_secret =>  <<"secret">>
+ },
+oidcc:add_openid_provider(ConfigEndpoint, LocalEndpoint, Config),
 ```
 
-#### Retrieving the Tokens
-When the user has been redirected back an auth code and ,if provided in the
-redirection, the state will be given. For fetching the Tokens only the first
-will be needed, yet the 2nd should be compared to the state used before.
-
-For retrieving the function `oidcc:retrieve_token/2` will be used:
-```Erlang
-{ok, TokenData} = oidcc:retrieve_token(OpenProviderId,
-                                       AuthCode),
+Second register your oidcc_client module:
 ```
-The parameter are:
-* OpenProviderId: The ID of the OpenId Connect Provider, returned during Setup
-* AuthCode: The AuthCode code received when the User is redirected back.
-
-#### Token Validation
-The Received Token needs to be parsed and validated, for this purpose the
-functions `oidcc:parse_and_validate_token` exist.
-
-```Erlang
-{ok, TokenMap} = oidcc:parse_and_validate_token(TokenData,
-                                                OpenProviderId,
-                                                Nonce),
+oidcc_client:register(my_client)
 ```
-The parameter are:
-* TokenData: The binary Data received in the previous step
-* OpenProviderId: The ID of the OpenId Connect Provider, returned during Setup
-* Nonce: The Nonce given during the redirect creation (optional).
 
-After this step the user is authenticated and the information about her can be
-gathered by inspecting the `TokenMap`.
+Third start the web-server (in this example cowboy).
+It is important, that you specify the correct path for the oidcc-server-module (oidcc_cowboy here).
+In this example it is at '/oidc', that is why the LocalEndpoint above has the trailing /oidc.
+```
+Dispatch = cowboy_router:compile( [{'_',
+  				[
+   				 {"/", my_http, []},
+   				 {"/oidc", oidcc_cowboy, []}
+   				]}]),
+{ok, _} = cowboy:start_http( http_handler
+   		       , 100
+   		       , [ {port, 8080} ]
+   		       , [{env, [{dispatch, Dispatch}]}]
+   		       ),
+```
 
-### Additional Operations
-* To receive more information about the user the function `oidcc:retrive_user_info` can be used.
-* To check e.g. the scopes of an access token the function `oidcc:introspect_token` can be used.
+Your oidcc_client implementation is just a module with two functions:
+```
+-module(my_client)
+
+-export([login_succeeded/1]).
+-export([login_failed/2]).
+
+login_succeeded(Token) ->
+    io:format("~n~n*************************************~nthe user logged in with~n ~p~n", [Token]),
+    % create e.g. a session and store it't id in a session to look it up on further usage
+    SessionId = <<"123">>,
+    CookieName = <<"MyClientSession">>,
+    CookieData = SessionId,
+    Path = <<"/">>,
+    Updates = [
+               {redirect, Path},
+               {cookie, CookieName, CookieData, [{max_age, 30}]}
+              ],
+    {ok, Updates}.
 
 
-## LICENSE
-This library was written as part of the INDIGO DataCould project and is realease
-under the Apache License.
+login_failed(Error, Desc) ->
+    io:format("~n~n*************************************~nlogin failed with~n ~p:~p~n", [Error, Desc]),
+    Path = <<"/">>,
+    Updates = [{redirect, Path}],
+    {ok, Updates}.
+```
+The possible updates depend upon the web-module in use.
+For oidcc_cowboy these are:
+* {redirect, Path} : redirect the browser to the new path/url
+* {cookie, Name, Data, Options} : create or delete a cookie

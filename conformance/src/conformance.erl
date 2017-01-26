@@ -669,7 +669,13 @@ download_log() ->
     {ok, TestId} = get_test_id(),
     {ok, Profile} = get_test_profile(),
     RPId = get_rp_id(),
-    WgetParams = "-nv",
+    WgetParams =
+        case application:get_env(conformance, no_cert_check) of
+            {ok, true} ->
+                "-nv --no-check-certificate --check-certificate=quiet";
+            _ ->
+                "-nv"
+        end,
     Host = "https://rp.certification.openid.net:8080",
     C= "cd ~s && wget ~s ~s/log/~s/~s.txt",
     Download =
@@ -678,6 +684,8 @@ download_log() ->
                 Cmd = io_lib:format(C, [binary_to_list(LogDir), WgetParams,
                                         Host, binary_to_list(RPId),
                                         binary_to_list(TestId)]),
+                %% CmdMsg = io_lib:format("wget cmd: ~s~n",[Cmd]),
+                %% log_profile(CmdMsg, Prof),
                 Result = os:cmd(Cmd),
                 Msg = io_lib:format("download: ~p~n", [Result]),
                 log_profile(Msg, Prof)

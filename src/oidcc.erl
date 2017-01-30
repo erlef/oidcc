@@ -151,34 +151,36 @@ retrieve_and_validate_token(AuthCode, ProviderId, Config) ->
     end.
 
 %% @doc
-%% retrieve the informations of a user given by its token map
+%% retrieve the informations of a user given by its token map or an access token
 %%
 %% this is done by looking up the UserInfoEndpoint from the configuration and
 %% then requesting info, using the access token as bearer token
 %% @end
 -spec retrieve_user_info(map() | binary(), binary()) ->
                                 {ok, map()} | {error, any()}.
-retrieve_user_info(#{access := _, id := _, refresh := _} = Token,
-                   OpenIdProvider) ->
-    Subject = extract_subject(Token),
-    retrieve_user_info(Token, OpenIdProvider, Subject);
+retrieve_user_info(#{access := _, id := _, refresh := _} = TokenMap,
+                   ProviderIdOrPid) ->
+    Subject = extract_subject(TokenMap),
+    retrieve_user_info(TokenMap, ProviderIdOrPid, Subject);
+retrieve_user_info(AccessToken, ProviderIdOrPid) when is_binary(AccessToken) ->
+    retrieve_user_info(AccessToken, ProviderIdOrPid, undefined);
 retrieve_user_info(_, _) ->
-    {error, bad_token_map}.
+    {error, bad_token}.
 
 
--spec retrieve_user_info(Token, ProviderOrConfig, Subject)-> {ok, map()} |
+-spec retrieve_user_info(Token, ProviderIdOrPid, Subject)-> {ok, map()} |
                                                              {error, any()} when
       Token :: binary() | map(),
-      ProviderOrConfig :: binary() | map(),
+      ProviderIdOrPid :: binary() | pid(),
       Subject :: binary() | undefined.
-retrieve_user_info(Token, #{userinfo_endpoint := Endpoint}, Subject) ->
+retrieve_user_info(Token, ProviderIdOrPid, Subject) ->
+    {ok,
+     #{userinfo_endpoint := Endpoint}
+    } = get_openid_provider_info(ProviderIdOrPid),
     AccessToken = extract_access_token(Token),
     Header = [bearer_auth(AccessToken)],
     HttpResult = oidcc_http_util:sync_http(get, Endpoint, Header),
-    return_validated_user_info(HttpResult, Subject);
-retrieve_user_info(Token, OpenIdProvider, Subject) ->
-    {ok, Config} = get_openid_provider_info(OpenIdProvider),
-    retrieve_user_info(Token, Config, Subject).
+    return_validated_user_info(HttpResult, Subject).
 
 
 

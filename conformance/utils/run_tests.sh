@@ -1,6 +1,6 @@
 #!/bin/bash
 BIN="./_build/default/rel/conformance/bin/conformance"
-echo -n "starting application ..."
+echo -n "starting application ... "
 $BIN start
 sleep 2
 echo "done"

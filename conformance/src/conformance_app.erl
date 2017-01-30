@@ -8,6 +8,7 @@ start(_, _) ->
     conformance_oidc_client:init(),
     PrivDir = code:priv_dir(conformance),
     ok = init(),
+    ok = copy_readme(PrivDir),
     Dispatch = cowboy_router:compile( [{'_',
 					[
                                          {"/", cowboy_static,
@@ -71,3 +72,8 @@ init() ->
         _ ->
             SSLResult
     end.
+
+copy_readme(PrivDir) ->
+    Target = binary_to_list(conformance:get_conf(log_dir,<<"">>))++"readme.txt",
+    {ok, _} = file:copy(PrivDir ++ "/readme.txt", Target),
+    ok.

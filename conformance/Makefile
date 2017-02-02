@@ -18,5 +18,7 @@ run:
 
 
 conformance_test:
+	# ensure the configured versions are used by upgrading
+	$(REBAR) upgrade
 	$(REBAR) release
 	./utils/run_tests.sh

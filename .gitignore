@@ -16,3 +16,4 @@ test/ct.cover.spec
 *.beam
 *~
 *#
+conformance/rebar.lock

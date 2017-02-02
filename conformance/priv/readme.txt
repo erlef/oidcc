@@ -2,11 +2,11 @@ This README describes how to reproduce and verify the conformance test
 results of oidcc as an RP.
 
 # Getting the Source
-The following lines clone the git repository, checkout version 1.0.0
+The following lines clone the git repository, there is no need to checkout a certain version
+of the library as the versions are configured in 'oidcc/conformance/rebar.conf'.
 ```
 git clone https://github.com/indigo-dc/oidcc.git
 cd oidcc
-git checkout v1.0.0
 ```
 
 # Running the tests

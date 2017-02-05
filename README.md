@@ -1,7 +1,8 @@
 # oidcc
-![OpenID Connect Certified Logo](./conformance/priv/static/oid_logo.png)
 OpenId Connect client library in Erlang.
 OpenID Certified by Bas Wegh at SCC/KIT to the basic and configuration profile of the OpenID Connect protocol.
+
+![OpenID Connect Certified Logo](./conformance/priv/static/oid_logo.png)
 ## The purpose
 The purpose is to enable Erlang applications to rely on OpenId Connect Provider
 for authentication purposes.

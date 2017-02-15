@@ -232,7 +232,13 @@ has_other_audience(ClientId, Audience) when is_list(Audience) ->
 
 
 validate_signature(IdToken, Kid, PubKeys, ProviderId) ->
-    PubKey = get_needed_key(PubKeys, Kid),
+    PubKeys1 =
+        case PubKeys of
+            [] -> refetch_keys(ProviderId);
+            _ -> PubKeys
+        end,
+
+    PubKey = get_needed_key(PubKeys1, Kid),
     case {PubKey, ProviderId} of
         {Error, undefined} when is_atom(Error) ->
             throw(Error);
@@ -244,9 +250,9 @@ validate_signature(IdToken, Kid, PubKeys, ProviderId) ->
         {invalid, ProviderId} ->
             %% it might be the case that our keys expired ...
             %% so refetch them
-            NewPubKeys = refetch_keys(ProviderId),
+            NewPubKeys =refetch_keys(ProviderId),
             validate_signature(IdToken, Kid, NewPubKeys,
-                                             undefined);
+                               undefined);
         {Claims, _Provider} -> Claims
     end.
 

@@ -208,10 +208,10 @@ retrieve_fresh_token(RefreshToken, Scopes, OpenIdProvider) ->
                                                    {error, any()} when
       Token :: binary() | map(),
       ProviderOrConfig :: binary() | map().
-introspect_token(Token, #{introspection_endpoint := Endpoint,
+introspect_token(TokenMapIn, #{introspection_endpoint := Endpoint,
                           client_id := ClientId,
                           client_secret := ClientSecret}) ->
-    AccessToken = extract_access_token(Token),
+    AccessToken = extract_access_token(TokenMapIn),
     Header = [
               {"accept", "application/json"},
               basic_auth(ClientId, ClientSecret)

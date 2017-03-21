@@ -3,9 +3,12 @@
 
 %% API
 -export([start_link/0]).
+-export([stop/0]).
 -export([succeeded/2]).
 -export([failed/3]).
 -export([register/1]).
+
+-export([get_module/1]).
 
 -callback login_succeeded( Token::map()) -> {ok, [term()]}.
 -callback login_failed( Reason::atom(), Description::binary() ) ->
@@ -21,14 +24,17 @@
 
 
 -record(state, {
-          default = undefined,
-          clients = []
+          ets_mod = undefined,
+          ets_id = undefined
          }).
 
 %% API.
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+stop() ->
+    gen_server:cast(?MODULE, stop).
 
 register(Module) when is_atom(Module) ->
     List = Module:module_info(exports),
@@ -47,19 +53,25 @@ failed(Error, Description, ModuleId) ->
     {ok, Updates} = Mod:login_failed(Error, Description),
     reorder_updates(Updates).
 
-
 get_module(Id) ->
-    gen_server:call(?MODULE, {get_module, Id}).
+    Ets = oidcc_ets_client_id,
+    case ets:lookup(Ets, Id) of
+        [{Id, Mod}] ->
+            {ok, Mod};
+        _ ->
+            [{default, DefMod}] =  ets:lookup(Ets, default),
+            {ok, DefMod}
+    end.
+
 
 init(_) ->
-    {ok, #state{}}.
+    EtsId = ets:new(oidcc_ets_client_id, [set, protected, named_table]),
+    EtsMod = ets:new(oidcc_ets_client_mod, [set, protected]),
+    {ok, #state{ets_id = EtsId, ets_mod = EtsMod}}.
 
-handle_call({get_module, ModuleId}, _From, State) ->
-    {ok, Module} = get_module(ModuleId, State),
-    {reply, {ok, Module}, State};
 handle_call({add_module, Module}, _From, State) ->
-    {ok, Id, NewState} = add_module(Module, State),
-    {reply, {ok, Id}, NewState};
+    {ok, Id} = add_module(Module, State),
+    {reply, {ok, Id}, State};
 handle_call(_Request, _From, State) ->
     {reply, ignored, State}.
 
@@ -78,32 +90,32 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-get_module(Id, #state{clients=Clients, default=DefMod}) ->
-    case lists:keyfind(Id, 1, Clients) of
-        {Id, Mod} ->
-            {ok, Mod};
-        _ ->
-            {ok, DefMod}
+
+add_module(Module, #state{ets_mod = EtsMod, ets_id = EtsId}) ->
+    case ets:lookup(EtsMod, Module) of
+        [{Module, Id}] ->
+            {ok, Id};
+        [] ->
+            insert_new_module(Module, EtsId, EtsMod)
     end.
 
-add_module(Module, State) ->
-    Id = gen_unique_id(State),
-    {ok, NewState} = add_module(Id, Module, State),
-    {ok, Id, NewState}.
-add_module(Id, Module, #state{default=undefined} = State) ->
-    add_module(Id, Module, State#state{default=Module});
-add_module(Id, Module, #state{clients = Clients} = State) ->
-    NewClients = [{Id, Module} | Clients],
-    {ok, State#state{clients = NewClients}}.
-
-gen_unique_id(#state{clients=Clients} = State) ->
+insert_new_module(Module, EtsId, EtsMod) ->
     Id = random_string(9),
-    case lists:keyfind(Id, 1, Clients) of
-        false ->
-            Id;
-        _ -> gen_unique_id(State)
+    case ets:insert_new(EtsId, {Id, Module}) of
+        true ->
+            true = ets:insert_new(EtsMod, {Module, Id}),
+            Default = ets:lookup(EtsId, default),
+            set_default_if_needed(Default, Module, EtsId),
+            {ok, Id};
+        _ ->
+            insert_new_module(Module, EtsId, EtsMod)
     end.
 
+set_default_if_needed([], Module, Ets) ->
+    true = ets:insert_new(Ets, {default, Module}),
+    ok;
+set_default_if_needed(_, _Module, _Ets) ->
+    ok.
 
 
 reorder_updates(Updates) ->

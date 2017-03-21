@@ -15,13 +15,11 @@ extract_token_map(Token, OrgScope) ->
     AccessExpire = maps:get(<<"expires_in">>, TokenMap, undefined),
     RefreshToken = maps:get(<<"refresh_token">>, TokenMap, none),
     Scope = maps:get(<<"scope">>, TokenMap, OrgScope),
-    ScopeList = binary:split(Scope, [<<" ">>], [trim_all, global]),
     #{id => #{token => IDToken, claims => undefined},
       access => #{token => AccessToken, expires => AccessExpire,
                   hash => undefined},
       refresh => #{token => RefreshToken},
-      scope => #{ scope => Scope,
-                  list => ScopeList }
+      scope => scope_map(Scope)
      }.
 
 introspect_token_map(Token, ThisClientId) ->
@@ -32,16 +30,13 @@ introspect_token_map(Token, ThisClientId) ->
 
              end,
     Scope = maps:get(<<"scope">>, TokenMap, <<"">>),
-    ScopeList = binary:split(Scope, [<<" ">>], [trim_all, global]),
     ClientId = maps:get(<<"client_id">>, TokenMap, undefined),
     SameClientId = (ClientId == ThisClientId),
     Username = maps:get(<<"username">>, TokenMap, undefined),
     Exp = maps:get(<<"exp">>, TokenMap, undefined),
     #{
        active => Active,
-       scope => #{ scope => Scope,
-                   list => ScopeList
-                   },
+       scope => scope_map(Scope),
        client_id => #{ id => ClientId,
                        same => SameClientId
                      },
@@ -50,7 +45,10 @@ introspect_token_map(Token, ThisClientId) ->
      }.
 
 
-
+scope_map(Scope) ->
+    #{ scope => Scope,
+       list => binary:split(Scope, [<<" ">>], [trim_all, global])
+       }.
 
 
 validate_token_map(TokenMap, OpenIdProvider, Nonce) ->

@@ -220,7 +220,9 @@ introspect_token(Token, #{introspection_endpoint := Endpoint,
     HttpResult = oidcc_http_util:sync_http(post, Endpoint, Header,
                                            "application/x-www-form-urlencoded",
                                            BodyQs),
-    return_json_info(HttpResult);
+    {ok, Token} = return_token(HttpResult),
+    TokenMap = oidcc_token:introspect_token(Token, ClientId),
+    {ok, TokenMap};
 introspect_token(Token, ProviderId) ->
     {ok, Config} = get_openid_provider_info(ProviderId),
     introspect_token(Token, Config).

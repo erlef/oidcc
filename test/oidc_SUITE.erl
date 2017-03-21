@@ -24,7 +24,7 @@ all() ->
      retrieve_google,
      retrieve_eudat,
      retrieve_iam,
-     %% retrieve_hbp,
+     retrieve_hbp,
      retrieve_egi
     ].
 

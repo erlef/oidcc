@@ -16,21 +16,14 @@ simple_add_test() ->
                issuer_or_endpoint => <<"well.known">>,
                local_endpoint => <<"/here">>
               },
-    MyPid = self(),
-    AddFun = fun(_Id, _Config) ->
-                     {ok, MyPid}
-             end,
-    ok = meck:new(oidcc_openid_provider_sup),
-    ok = meck:expect(oidcc_openid_provider_sup, add_openid_provider, AddFun),
+    ok = meck(),
 
     {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
     {ok, Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
     {ok, [{Id, MyPid}]} = oidcc_openid_provider_mgr:get_openid_provider_list(),
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
-
-    true = meck:validate(oidcc_openid_provider_sup),
-    ok = meck:unload(oidcc_openid_provider_sup),
+    ok = stop_meck(),
     ok.
 
 
@@ -44,12 +37,7 @@ id_add_test() ->
                local_endpoint => <<"/here">>,
                id => Id
               },
-    MyPid = self(),
-    AddFun = fun(_Id, _Config) ->
-                     {ok, MyPid}
-             end,
-    ok = meck:new(oidcc_openid_provider_sup),
-    ok = meck:expect(oidcc_openid_provider_sup, add_openid_provider, AddFun),
+    ok = meck(),
 
     {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
     {ok, Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
@@ -57,8 +45,7 @@ id_add_test() ->
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
 
-    true = meck:validate(oidcc_openid_provider_sup),
-    ok = meck:unload(oidcc_openid_provider_sup),
+    ok = stop_meck(),
     ok.
 
 
@@ -71,11 +58,8 @@ double_add_test() ->
                local_endpoint => <<"/here">>
               },
     MyPid = self(),
-    AddFun = fun(_Id, _Config) ->
-                     {ok, MyPid}
-             end,
-    ok = meck:new(oidcc_openid_provider_sup),
-    ok = meck:expect(oidcc_openid_provider_sup, add_openid_provider, AddFun),
+
+    ok = meck(),
 
     {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
     {ok, Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
@@ -86,8 +70,7 @@ double_add_test() ->
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
 
-    true = meck:validate(oidcc_openid_provider_sup),
-    ok = meck:unload(oidcc_openid_provider_sup),
+    ok = stop_meck(),
     ok.
 
 multiple_add_test() ->
@@ -99,12 +82,8 @@ multiple_add_test() ->
                local_endpoint => <<"/here">>
               },
     NumberToAdd = 1000,
-    MyPid = self(),
-    AddFun = fun(_Id, _Config) ->
-                     {ok, MyPid}
-             end,
-    ok = meck:new(oidcc_openid_provider_sup),
-    ok = meck:expect(oidcc_openid_provider_sup, add_openid_provider, AddFun),
+    ok = meck(),
+
     {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
     ok = add_provider(NumberToAdd, Config),
     {ok, List} = oidcc_openid_provider_mgr:get_openid_provider_list(),
@@ -112,8 +91,7 @@ multiple_add_test() ->
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
 
-    true = meck:validate(oidcc_openid_provider_sup),
-    ok = meck:unload(oidcc_openid_provider_sup),
+    ok = stop_meck(),
     ok.
 
 add_provider(0, _) ->
@@ -132,12 +110,7 @@ lookup_test() ->
                issuer_or_endpoint => <<"well.known">>,
                local_endpoint => <<"/here">>
               },
-    MyPid = self(),
-    AddFun = fun(_Id, _Config) ->
-                     {ok, MyPid}
-             end,
-    ok = meck:new(oidcc_openid_provider_sup),
-    ok = meck:expect(oidcc_openid_provider_sup, add_openid_provider, AddFun),
+    ok = meck(),
 
     {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
     {ok, Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
@@ -145,27 +118,20 @@ lookup_test() ->
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
 
-    true = meck:validate(oidcc_openid_provider_sup),
-    ok = meck:unload(oidcc_openid_provider_sup),
+    ok = stop_meck(),
     ok.
 
 
 bad_lookup_test() ->
-    MyPid = self(),
-    AddFun = fun(_Id, _Config) ->
-                     {ok, MyPid}
-             end,
+    ok = meck(),
     Id = <<"some random Id">>,
-    ok = meck:new(oidcc_openid_provider_sup),
-    ok = meck:expect(oidcc_openid_provider_sup, add_openid_provider, AddFun),
 
     {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
     {error, not_found} = oidcc_openid_provider_mgr:get_openid_provider(Id),
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
 
-    true = meck:validate(oidcc_openid_provider_sup),
-    ok = meck:unload(oidcc_openid_provider_sup),
+    ok = stop_meck(),
     ok.
 
 
@@ -176,4 +142,26 @@ garbage_test() ->
     Pid ! some_unsupported_message,
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
+    ok.
+
+
+meck() ->
+    MyPid = self(),
+    AddFun = fun(_Id, _Config) ->
+                     {ok, MyPid}
+             end,
+    GetFun = fun(_Id) ->
+                     {ok, <<"issuer">>}
+             end,
+    ok = meck:new(oidcc_openid_provider_sup),
+    ok = meck:new(oidcc_openid_provider),
+    ok = meck:expect(oidcc_openid_provider_sup, add_openid_provider, AddFun),
+    ok = meck:expect(oidcc_openid_provider, get_issuer, GetFun),
+    ok.
+
+stop_meck() ->
+    true = meck:validate(oidcc_openid_provider_sup),
+    true = meck:validate(oidcc_openid_provider),
+    ok = meck:unload(oidcc_openid_provider_sup),
+    ok = meck:unload(oidcc_openid_provider),
     ok.

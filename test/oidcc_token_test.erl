@@ -188,6 +188,26 @@ generate_id_token(bad_algo,ClientId,Nonce,Issuer) ->
     erljwt:jwt(hs256,ClaimSetMap,600,Key).
 
 
+introspect_test() ->
+    Token1 = <<"{\"active\":true,\"scope\":\"openid profile\",\"client_id\":\"id1\", \"username\":\"joe\", \"exp\":234}">>,
+    Exp1  = #{active => true, scope => #{scope => <<"openid profile">>,
+                                         list => [<<"openid">>, <<"profile">>]},
+              username => <<"joe">>, exp => 234,
+              client_id => #{ id => <<"id1">>, same => true}
+             },
+
+    Token2 = <<"{\"active\":true}">>,
+    Exp2  = #{active => true, scope => #{scope => <<"">>,
+                                         list => []},
+              username => undefined, exp => undefined,
+              client_id => #{ id => undefined, same => false}
+             },
+
+    ?assertEqual(Exp1, oidcc_token:introspect_token_map(Token1, <<"id1">>)),
+    ?assertEqual(Exp2, oidcc_token:introspect_token_map(Token2, <<"id1">>)),
+    ok.
+
+
 
 mock_oidcc(OpenIdProviderId, Issuer, ClientId) ->
      InfoFun = fun(Id) ->

@@ -1,6 +1,7 @@
 -module(oidcc_token).
 
 -export([extract_token_map/2]).
+-export([introspect_token_map/2]).
 -export([validate_token_map/3]).
 -export([validate_token_map/4]).
 -export([verify_access_token_map_hash/2]).
@@ -22,6 +23,34 @@ extract_token_map(Token, OrgScope) ->
       scope => #{ scope => Scope,
                   list => ScopeList }
      }.
+
+introspect_token_map(Token, ThisClientId) ->
+    TokenMap = jsone:decode(Token, [{object_format, map}]),
+    Active = case maps:get(<<"active">>, TokenMap, undefined) of
+                 true -> true;
+                 _ -> false
+
+             end,
+    Scope = maps:get(<<"scope">>, TokenMap, <<"">>),
+    ScopeList = binary:split(Scope, [<<" ">>], [trim_all, global]),
+    ClientId = maps:get(<<"client_id">>, TokenMap, undefined),
+    SameClientId = (ClientId == ThisClientId),
+    Username = maps:get(<<"username">>, TokenMap, undefined),
+    Exp = maps:get(<<"exp">>, TokenMap, undefined),
+    #{
+       active => Active,
+       scope => #{ scope => Scope,
+                   list => ScopeList
+                   },
+       client_id => #{ id => ClientId,
+                       same => SameClientId
+                     },
+       username => Username,
+       exp => Exp
+     }.
+
+
+
 
 
 validate_token_map(TokenMap, OpenIdProvider, Nonce) ->

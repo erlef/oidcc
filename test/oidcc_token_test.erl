@@ -8,8 +8,11 @@ extract_test() ->
     ExpectedOutput = #{access => #{expires => 600,token => <<"fimr6kVbXlCueoTDvHIofHAaGDeE7DM8">>, hash => undefined},
                        refresh => #{ token => <<"Aw2FafLPDAeysVkPPiQUkOdhtBPpXyNS">>},
                         id => #{token => <<"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE0NjA5NjI0NzUsImlzcyI6Imh0dHBzOi8vcHJvdG9uLnNjYy5raXQuZWR1Iiwic3ViIjoiam9lIiwiYXVkIjoiMTIzIiwiaWF0IjoxNDYwOTYyMTc0LCJhdXRoX3RpbWUiOjE0NjA5NjIxNzR9.bJUAXVktgAAIIlw6fshlF035NfpNJ4aF8VfoIt4Kf5UyfTBzG1m9AGClvEFWieWnSJ6AxAV5dLJd3L-_tPs3cM9qUxssuY5CoKtc659X0B8cAOR4vK3ImyEAnipnUGYXcP3Ju8vkqtP75_GOUnbWEtNtxT-GK_2ysRQyF6wpRQHL-lj5u-lhZBHXDDJmGB5A4pex_zdtemlPFc9Ij_XDbmMEh-BoT9r9orC7prJ-ih3cGz3YKfOyxYQO8VPueucwouFcR8FCKasN3IOgyPfUnJl5wtsbm54u94dgu_uMpaIOeDnWbyEUsFldUvhGVJKlXlsk3Q34sFR-0FT1IOvCke">>
-                      , claims => undefined}},
-    ExpectedOutput = oidcc_token:extract_token_map(RawData),
+                      , claims => undefined},
+                       scope => #{ scope => <<"openid profile">>,
+                                   list => [<<"openid">>, <<"profile">>]}
+                      },
+    ExpectedOutput = oidcc_token:extract_token_map(RawData, <<"openid profile">>),
     ok.
 
 

@@ -1,22 +1,26 @@
 -module(oidcc_token).
 
--export([extract_token_map/1]).
+-export([extract_token_map/2]).
 -export([validate_token_map/3]).
 -export([validate_token_map/4]).
 -export([verify_access_token_map_hash/2]).
 -export([validate_id_token/3]).
 -export([validate_id_token/4]).
 
-extract_token_map(Token) ->
+extract_token_map(Token, OrgScope) ->
     TokenMap = jsone:decode(Token, [{object_format, map}]),
     IDToken = maps:get(<<"id_token">>, TokenMap, none),
     AccessToken = maps:get(<<"access_token">>, TokenMap, none),
     AccessExpire = maps:get(<<"expires_in">>, TokenMap, undefined),
     RefreshToken = maps:get(<<"refresh_token">>, TokenMap, none),
+    Scope = maps:get(<<"scope">>, TokenMap, OrgScope),
+    ScopeList = binary:split(Scope, [<<" ">>], [trim_all, global]),
     #{id => #{token => IDToken, claims => undefined},
       access => #{token => AccessToken, expires => AccessExpire,
                   hash => undefined},
-      refresh => #{token => RefreshToken}
+      refresh => #{token => RefreshToken},
+      scope => #{ scope => Scope,
+                  list => ScopeList }
      }.
 
 

@@ -80,10 +80,10 @@ handle_info({'DOWN', MRef, process, _Object, _Info},
     case ets:lookup(MonEts, MRef) of
         [{MRef, Id, Issuer}] ->
             [Issuer1, Issuer2] = to_issuer(Issuer),
-            true = ets:delete(MRef, MonEts),
-            true = ets:delete(Id, ProvEts),
-            true = ets:delete(Issuer1, IssEts),
-            true = ets:delete(Issuer2, IssEts),
+            true = ets:delete(MonEts, MRef),
+            true = ets:delete(ProvEts, Id),
+            true = ets:delete(IssEts, Issuer1),
+            true = ets:delete(IssEts, Issuer2),
             ok;
         _ -> ok
     end,

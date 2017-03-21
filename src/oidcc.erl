@@ -222,7 +222,7 @@ introspect_token(TokenMapIn, #{introspection_endpoint := Endpoint,
                                            BodyQs),
     case return_token(HttpResult) of
         {ok, Token} ->
-            TokenMap = oidcc_token:introspect_token(Token, ClientId),
+            TokenMap = oidcc_token:introspect_token_map(Token, ClientId),
             {ok, TokenMap};
         Error -> Error
     end;

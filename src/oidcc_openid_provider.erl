@@ -80,7 +80,7 @@ get_config( Pid) ->
 
 -spec update_and_get_keys( Pid :: pid() ) -> {ok, Keys :: map()}.
 update_and_get_keys(Pid) ->
-    gen_server:call(Pid, update_and_get_keys, 20000).
+    gen_server:call(Pid, update_and_get_keys, 60000).
 
 -spec get_error( Pid :: pid() ) -> {ok, term()}.
 get_error( Pid) ->

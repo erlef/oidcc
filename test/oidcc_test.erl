@@ -180,7 +180,7 @@ retrieve_and_validate_token_test() ->
     PassThrough = fun(Data) ->
                           meck:passthrough([Data])
                   end,
-    ExtractFun = fun(Data) ->
+    ExtractFun = fun(Data, _Scopes) ->
                          Data = TokenData,
                          #{id => IdToken}
                  end,

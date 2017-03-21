@@ -21,7 +21,9 @@
 
 
 -record(state, {
-          provider = []
+          ets_prov = undefined,
+          ets_iss = undefined,
+          ets_mon = undefined
          }).
 
 
@@ -42,31 +44,28 @@ add_openid_provider(Config) ->
 
 
 get_openid_provider(Id) ->
-    gen_server:call(?MODULE, {get_provider, Id}).
+    get_provider(Id).
 
 get_openid_provider_list() ->
-    gen_server:call(?MODULE, get_provider_list).
+    get_provider_list().
 
 -spec find_openid_provider(Issuer::binary()) -> {ok, pid()}
                                                 | {error, not_found}.
 find_openid_provider(Issuer) ->
-    gen_server:call(?MODULE, {find_provider, Issuer}).
+    find_provider(Issuer).
 
 %% gen_server.
 
 init([]) ->
-    {ok, #state{}}.
+    ProvEts = ets:new(oidcc_ets_provider, [set, protected, named_table]),
+    IssEts = ets:new(oidcc_ets_issuer, [set, protected, named_table]),
+    MonEts = ets:new(oidcc_ets_monitor, [set, protected]),
+    {ok, #state{ets_prov=ProvEts, ets_iss=IssEts, ets_mon = MonEts}}.
 
 handle_call({add_provider, undefined, Config}, _From, State) ->
     add_provider(Config, State);
 handle_call({add_provider, Id, Config}, _From, State) ->
     try_adding_provider(Id, Config, State);
-handle_call({get_provider, Id}, _From, State) ->
-    get_provider(Id, State);
-handle_call(get_provider_list, _From, State) ->
-    get_provider_list(State);
-handle_call({find_provider, Issuer}, _From, State) ->
-    find_provider(Issuer, State);
 handle_call(_Request, _From, State) ->
     {reply, ignored, State}.
 
@@ -77,9 +76,16 @@ handle_cast(_Msg, State) ->
 
 
 handle_info({'DOWN', MRef, process, _Object, _Info},
-            #state{provider=Provider} = State) ->
-    NewProvider = lists:keydelete(MRef, 3, Provider),
-    {noreply, State#state{provider = NewProvider}};
+            #state{ets_mon=MonEts, ets_prov=ProvEts, ets_iss=IssEts} = State) ->
+    case ets:lookup(MonEts, MRef) of
+        [{MRef, Id, Issuer}] ->
+            true = ets:delete(MRef, MonEts),
+            true = ets:delete(Id, ProvEts),
+            true = ets:delete(Issuer, IssEts),
+            ok;
+        _ -> ok
+    end,
+    {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -101,41 +107,52 @@ add_provider(Config, State) ->
 
 add_provider(Id, Config, State) ->
     {ok, Pid} = start_provider(Id, Config),
-    NewState = insert_provider(Id, Pid, State),
-    {reply, {ok, Id, Pid}, NewState}.
+    ok = insert_provider(Id, Pid, State),
+    {reply, {ok, Id, Pid}, State}.
 
-get_provider_list(#state{provider=Provider}=State) ->
-    Filter = fun({Id, Pid, _Mref}, Acc) ->
-                     [{Id, Pid} | Acc]
-             end,
-    List = lists:foldl(Filter, [], Provider),
-    {reply, {ok, List}, State}.
+get_provider_list() ->
+    Ets = oidcc_ets_provider,
+    true = ets:safe_fixtable(Ets, true),
+    Last = ets:first(Ets),
+    List = create_provider_list(Last, [], Ets),
+    true = ets:safe_fixtable(Ets, false),
+    {ok, List}.
 
-get_provider(Id, #state{provider=Provider}=State) ->
-    case lists:keyfind(Id, 1, Provider) of
-        false -> {reply, {error, not_found}, State};
-        {Id, Pid, _MRef} -> {reply, {ok, Pid}, State}
+
+get_provider(Id) ->
+    case ets:lookup(oidcc_ets_provider, Id) of
+        [{Id, _Issuer, Pid, _MRef}] -> {ok, Pid};
+        _ -> {error, not_found}
     end.
 
-find_provider(Issuer, #state{provider=Provider}=State) ->
-    Filter = fun({_Id, Pid, _Mref}, List) ->
-                     case oidcc_openid_provider:is_issuer(Issuer, Pid) of
-                         true -> [ Pid | List];
-                         _ -> List
-                     end
-             end,
-    case lists:foldl(Filter, [], Provider) of
-        [Pid | _ ] -> {reply, {ok, Pid}, State};
-        [] -> {reply, {error, not_found}, State}
+find_provider(Issuer) ->
+    Ets = oidcc_ets_issuer,
+    case ets:lookup(Ets, Issuer) of
+        [{Issuer, Pid}] ->
+            {ok, Pid};
+        _ ->
+            {error, not_found}
     end.
 
 start_provider(Id, Config) ->
     oidcc_openid_provider_sup:add_openid_provider(Id, Config).
 
-insert_provider(Id, Pid, #state{provider=Provider} = State) ->
+insert_provider(Id, Pid, #state{ets_prov=ProvEts, ets_iss=IssEts,
+                                ets_mon=MonEts}) ->
     MRef = monitor(process, Pid),
-    NewProvider = [{Id, Pid, MRef} | lists:keydelete(Id, 1, Provider)],
-    State#state{provider=NewProvider}.
+    {ok, Issuer} = oidcc_openid_provider:get_issuer(Pid),
+    true = ets:insert(ProvEts, {Id, Issuer, Pid, MRef}),
+    true = ets:insert(IssEts, {Issuer, Pid}),
+    true = ets:insert(MonEts, {MRef, Id, Issuer}),
+    ok.
+
+create_provider_list('$end_of_table', List, _) ->
+    lists:reverse(List);
+create_provider_list(Current , List, Ets) ->
+    [{Id, _Iss, Pid, _MRef}] = ets:lookup(Ets, Current),
+    Next = ets:next(Ets, Current),
+    create_provider_list(Next, [{Id, Pid} | List], Ets).
+
 
 
 get_unique_id(State) ->
@@ -145,9 +162,9 @@ get_unique_id(State) ->
         false -> get_unique_id(State)
     end.
 
-is_unique_id(Id, #state{provider=Provider}) ->
-    case lists:keyfind(Id, 1, Provider) of
-        false -> true;
+is_unique_id(Id, #state{ets_prov=Ets}) ->
+    case ets:lookup(Ets, Id) of
+        [] -> true;
         _ -> false
     end.
 

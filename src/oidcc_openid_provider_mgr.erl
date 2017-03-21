@@ -79,9 +79,11 @@ handle_info({'DOWN', MRef, process, _Object, _Info},
             #state{ets_mon=MonEts, ets_prov=ProvEts, ets_iss=IssEts} = State) ->
     case ets:lookup(MonEts, MRef) of
         [{MRef, Id, Issuer}] ->
+            [Issuer1, Issuer2] = to_issuer(Issuer),
             true = ets:delete(MRef, MonEts),
             true = ets:delete(Id, ProvEts),
-            true = ets:delete(Issuer, IssEts),
+            true = ets:delete(Issuer1, IssEts),
+            true = ets:delete(Issuer2, IssEts),
             ok;
         _ -> ok
     end,
@@ -107,7 +109,8 @@ add_provider(Config, State) ->
 
 add_provider(Id, Config, State) ->
     {ok, Pid} = start_provider(Id, Config),
-    ok = insert_provider(Id, Pid, State),
+    IssuerOrEndpoint = maps:get(issuer_or_endpoint, Config),
+    ok = insert_provider(Id, IssuerOrEndpoint, Pid, State),
     {reply, {ok, Id, Pid}, State}.
 
 get_provider_list() ->
@@ -137,13 +140,15 @@ find_provider(Issuer) ->
 start_provider(Id, Config) ->
     oidcc_openid_provider_sup:add_openid_provider(Id, Config).
 
-insert_provider(Id, Pid, #state{ets_prov=ProvEts, ets_iss=IssEts,
-                                ets_mon=MonEts}) ->
+insert_provider(Id, IssuerOrEndpoint, Pid,
+                #state{ets_prov=ProvEts, ets_iss=IssEts, ets_mon=MonEts}) ->
     MRef = monitor(process, Pid),
-    {ok, Issuer} = oidcc_openid_provider:get_issuer(Pid),
-    true = ets:insert(ProvEts, {Id, Issuer, Pid, MRef}),
-    true = ets:insert(IssEts, {Issuer, Pid}),
-    true = ets:insert(MonEts, {MRef, Id, Issuer}),
+    %% {ok, Issuer} = oidcc_openid_provider:get_issuer(Pid),
+    [Issuer1, Issuer2] = to_issuer(IssuerOrEndpoint),
+    true = ets:insert(ProvEts, {Id, Issuer1, Pid, MRef}),
+    true = ets:insert(IssEts, {Issuer1, Pid}),
+    true = ets:insert(IssEts, {Issuer2, Pid}),
+    true = ets:insert(MonEts, {MRef, Id, Issuer1}),
     ok.
 
 create_provider_list('$end_of_table', List, _) ->
@@ -181,3 +186,22 @@ random_id(Length) ->
                      random_id(Length)
              end,
     base64url:encode(Random).
+
+to_issuer(IssuerOrEndpoint) ->
+    Slash = <<"/">>,
+    Config = <<".well-known/openid-configuration">>,
+    ConfigS = << Slash/binary, Config/binary >>,
+    Issuer = case binary:match(IssuerOrEndpoint, ConfigS) of
+        {Pos, 33} ->
+            binary:part(IssuerOrEndpoint, 0, Pos);
+       _  ->
+            case binary:last(IssuerOrEndpoint) of
+                $/ ->
+                    Len = byte_size(IssuerOrEndpoint),
+                    binary:part(IssuerOrEndpoint, 0, Len-1);
+                _ ->
+                    IssuerOrEndpoint
+            end
+    end,
+                    [Issuer, <<Issuer/binary, Slash/binary>>]
+.

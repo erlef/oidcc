@@ -6,6 +6,7 @@
 -export([stop/1]).
 -export([is_issuer/2]).
 -export([is_ready/1]).
+-export([get_issuer/1]).
 -export([get_config/1]).
 -export([update_config/1]).
 -export([update_and_get_keys/1]).
@@ -69,6 +70,10 @@ is_issuer(Issuer, Pid) ->
 is_ready(Pid) ->
     gen_server:call(Pid, is_ready).
 
+-spec get_issuer( Pid :: pid() ) -> {ok, Issuer :: binary()}.
+get_issuer( Pid) ->
+    gen_server:call(Pid, get_issuer).
+
 -spec get_config( Pid :: pid() ) -> {ok, Config :: map()}.
 get_config( Pid) ->
     gen_server:call(Pid, get_config).
@@ -111,6 +116,8 @@ init({Id, Config}) ->
                 issuer = Issuer, registration_params = RegistrationParams
                }}.
 
+handle_call(get_issuer, _From, #state{issuer = Issuer} = State) ->
+    {reply, {ok, Issuer}, State};
 handle_call(get_config, _From, State) ->
     trigger_config_retrieval_if_needed(State),
     Conf = create_config(State),

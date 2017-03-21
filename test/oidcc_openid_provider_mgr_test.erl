@@ -66,7 +66,7 @@ double_add_test() ->
     NewConfig = maps:put(id, Id, Config),
     {error, id_already_used} =
         oidcc_openid_provider_mgr:add_openid_provider(NewConfig),
-    {ok, _Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(#{}),
+    {ok, _Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
 
@@ -150,18 +150,11 @@ meck() ->
     AddFun = fun(_Id, _Config) ->
                      {ok, MyPid}
              end,
-    GetFun = fun(_Id) ->
-                     {ok, <<"issuer">>}
-             end,
     ok = meck:new(oidcc_openid_provider_sup),
-    ok = meck:new(oidcc_openid_provider),
     ok = meck:expect(oidcc_openid_provider_sup, add_openid_provider, AddFun),
-    ok = meck:expect(oidcc_openid_provider, get_issuer, GetFun),
     ok.
 
 stop_meck() ->
     true = meck:validate(oidcc_openid_provider_sup),
-    true = meck:validate(oidcc_openid_provider),
     ok = meck:unload(oidcc_openid_provider_sup),
-    ok = meck:unload(oidcc_openid_provider),
     ok.

@@ -180,7 +180,7 @@ retrieve_user_info(Token, ProviderIdOrPid, Subject) ->
     } = get_openid_provider_info(ProviderIdOrPid),
     AccessToken = extract_access_token(Token),
     Header = [bearer_auth(AccessToken)],
-    HttpResult = oidcc_http_util:sync_http(get, Endpoint, Header),
+    HttpResult = oidcc_http_util:sync_http(get, Endpoint, Header, true),
     return_validated_user_info(HttpResult, Subject).
 
 
@@ -219,7 +219,7 @@ introspect_token(TokenMapIn, #{introspection_endpoint := Endpoint,
     BodyQs = oidcc_http_util:qs([{<<"token">>, AccessToken}]),
     HttpResult = oidcc_http_util:sync_http(post, Endpoint, Header,
                                            "application/x-www-form-urlencoded",
-                                           BodyQs),
+                                           BodyQs, true),
     case return_token(HttpResult) of
         {ok, Token} ->
             TokenMap = oidcc_token:introspect_token_map(Token, ClientId),

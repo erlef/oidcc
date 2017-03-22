@@ -234,7 +234,7 @@ retrieve_user_info_test() ->
                          _ -> {error, not_found}
                      end
              end,
-    HttpFun = fun(Method, Url, _Header)  ->
+    HttpFun = fun(Method, Url, _Header, _UseCache)  ->
                       Method = get,
                       Url = UserInfoEndpoint,
                       {ok, #{status => 200, header => [], body => HttpBody}}

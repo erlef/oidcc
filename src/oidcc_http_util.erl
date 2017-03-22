@@ -2,41 +2,70 @@
 
 -export([async_http/3, async_http/5]).
 -export([sync_http/3, sync_http/5]).
+-export([sync_http/4, sync_http/6]).
 -export([uncompress_body_if_needed/2]).
 -export([qs/1, urlencode/1]).
 
 -include_lib("public_key/include/public_key.hrl").
 -type qs_vals() :: [{binary(), binary() | true}].
 
+
+
 sync_http(Method, Url, Header) ->
-    perform_request(Method, Url, Header, undefined, undefined,
-                    [{body_format, binary}]).
+    sync_http(Method, Url, Header, false).
 
 sync_http(Method, Url, Header, ContentType, Body) ->
+    sync_http(Method, Url, Header, ContentType, Body, false).
+
+sync_http(Method, Url, Header, UseCache) ->
+    perform_request(Method, Url, Header, undefined, undefined,
+                    [{body_format, binary}], UseCache).
+
+sync_http(Method, Url, Header, ContentType, Body, UseCache) ->
     perform_request(Method, Url, Header, ContentType, Body,
-                    [{body_format, binary}]).
+                    [{body_format, binary}], UseCache).
 
 async_http(Method, Url, Header) ->
     perform_request(Method, Url, Header, undefined, undefined,
-                    [{sync, false}]).
+                    [{sync, false}], false).
 
 
 async_http(Method, Url, Header, ContentType, Body) ->
     perform_request(Method, Url, Header, ContentType, Body,
-                    [{sync, false}]).
+                    [{sync, false}], false).
 
 
 
 
-perform_request(Method, Url, Header, ContentType, Body, Options) ->
+perform_request(Method, Url, Header, ContentType, Body, Options, UseCache) ->
     case options(Url) of
         {ok, HttpOptions} ->
             Request = gen_request(Url, Header, ContentType, Body),
-            Result = httpc:request(Method, Request, HttpOptions, Options),
-            normalize_result(Result);
+            perform_request_or_lookup_cache(Method, Request, HttpOptions,
+                                            Options, UseCache);
         Error ->
             Error
     end.
+
+perform_request_or_lookup_cache(Method, Request, HttpOptions, Options, true) ->
+    case oidcc_http_cache:lookup_http_call(Method, Request) of
+        {ok, Res} ->
+            Res;
+
+        {error, not_found} ->
+            Res = perform_http_request(Method, Request, HttpOptions, Options),
+            oidcc_http_cache:cache_http_result(Method, Request, Res),
+            Res
+    end;
+perform_request_or_lookup_cache(Method, Request, HttpOptions, Options, false) ->
+    perform_http_request(Method, Request, HttpOptions, Options).
+
+perform_http_request(Method, Request, HttpOptions, Options) ->
+    Res = httpc:request(Method, Request, HttpOptions,
+                        Options),
+    normalize_result(Res).
+
+
 
 gen_request(Url, Header, undefined, undefined) ->
     {normalize(Url), normalize_headers(Header)};
@@ -179,6 +208,7 @@ normalize_headers(L) when is_list(L) ->
 
 normalize_header(K, V) ->
     {normalize(K), normalize(V)}.
+
 
 
 %%% copied from cowlib, so there is no dependecy anymore

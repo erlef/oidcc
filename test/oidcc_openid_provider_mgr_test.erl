@@ -16,14 +16,14 @@ simple_add_test() ->
                issuer_or_endpoint => <<"well.known">>,
                local_endpoint => <<"/here">>
               },
-    ok = meck(),
+    {ok, ProvPid} = meck(),
 
     {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
-    {ok, Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
-    {ok, [{Id, MyPid}]} = oidcc_openid_provider_mgr:get_openid_provider_list(),
+    {ok, Id, ProvPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
+    {ok, [{Id, ProvPid}]} = oidcc_openid_provider_mgr:get_openid_provider_list(),
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
-    ok = stop_meck(),
+    ok = stop_meck(ProvPid),
     ok.
 
 
@@ -37,15 +37,15 @@ id_add_test() ->
                local_endpoint => <<"/here">>,
                id => Id
               },
-    ok = meck(),
+    {ok, ProvPid} = meck(),
 
     {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
-    {ok, Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
-    {ok, [{Id, MyPid}]} = oidcc_openid_provider_mgr:get_openid_provider_list(),
+    {ok, Id, ProvPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
+    {ok, [{Id, ProvPid}]} = oidcc_openid_provider_mgr:get_openid_provider_list(),
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
 
-    ok = stop_meck(),
+    ok = stop_meck(ProvPid),
     ok.
 
 
@@ -57,20 +57,18 @@ double_add_test() ->
                issuer_or_endpoint => <<"well.known">>,
                local_endpoint => <<"/here">>
               },
-    MyPid = self(),
-
-    ok = meck(),
+    {ok, ProvPid} = meck(),
 
     {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
-    {ok, Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
+    {ok, Id, ProvPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
     NewConfig = maps:put(id, Id, Config),
     {error, id_already_used} =
         oidcc_openid_provider_mgr:add_openid_provider(NewConfig),
-    {ok, _Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
+    {ok, _Id, ProvPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
 
-    ok = stop_meck(),
+    ok = stop_meck(ProvPid),
     ok.
 
 multiple_add_test() ->
@@ -82,7 +80,7 @@ multiple_add_test() ->
                local_endpoint => <<"/here">>
               },
     NumberToAdd = 1000,
-    ok = meck(),
+    {ok, ProvPid} = meck(),
 
     {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
     ok = add_provider(NumberToAdd, Config),
@@ -91,7 +89,7 @@ multiple_add_test() ->
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
 
-    ok = stop_meck(),
+    ok = stop_meck(ProvPid),
     ok.
 
 add_provider(0, _) ->
@@ -110,20 +108,44 @@ lookup_test() ->
                issuer_or_endpoint => <<"well.known">>,
                local_endpoint => <<"/here">>
               },
-    ok = meck(),
+    {ok, ProvPid} = meck(),
 
     {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
-    {ok, Id, MyPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
-    {ok, MyPid} = oidcc_openid_provider_mgr:get_openid_provider(Id),
+    {ok, Id, ProvPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
+    {ok, ProvPid} = oidcc_openid_provider_mgr:get_openid_provider(Id),
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
 
-    ok = stop_meck(),
+    ok = stop_meck(ProvPid),
     ok.
 
+delete_test() ->
+    Config = #{name => <<"some name">>,
+               description => <<"some description">>,
+               client_id => <<"123">>,
+               client_secret => <<"dont tell">>,
+               issuer_or_endpoint => <<"well.known">>,
+               local_endpoint => <<"/here">>
+              },
+    {ok, ProvPid} = meck(),
+
+    {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
+    {ok, Id, ProvPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
+    {ok, ProvPid} = oidcc_openid_provider_mgr:get_openid_provider(Id),
+
+    ProvPid ! stop,
+    ok = test_util:wait_for_process_to_die(ProvPid, 100),
+    wait_for_ets(),
+
+    {error, not_found} = oidcc_openid_provider_mgr:get_openid_provider(Id),
+    ok = oidcc_openid_provider_mgr:stop(),
+    ok = test_util:wait_for_process_to_die(Pid, 100),
+
+    ok = stop_meck(ProvPid),
+    ok.
 
 bad_lookup_test() ->
-    ok = meck(),
+    {ok, ProvPid} = meck(),
     Id = <<"some random Id">>,
 
     {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
@@ -131,7 +153,7 @@ bad_lookup_test() ->
     ok = oidcc_openid_provider_mgr:stop(),
     ok = test_util:wait_for_process_to_die(Pid, 100),
 
-    ok = stop_meck(),
+    ok = stop_meck(ProvPid),
     ok.
 
 
@@ -146,15 +168,36 @@ garbage_test() ->
 
 
 meck() ->
-    MyPid = self(),
+    Pid = provider(),
     AddFun = fun(_Id, _Config) ->
-                     {ok, MyPid}
+                     {ok, Pid}
              end,
     ok = meck:new(oidcc_openid_provider_sup),
     ok = meck:expect(oidcc_openid_provider_sup, add_openid_provider, AddFun),
-    ok.
+    {ok, Pid}.
 
-stop_meck() ->
+stop_meck(Pid) ->
     true = meck:validate(oidcc_openid_provider_sup),
     ok = meck:unload(oidcc_openid_provider_sup),
+    Pid ! stop,
+    test_util:wait_for_process_to_die(Pid, 100),
     ok.
+
+
+provider() ->
+    WaitForStop = fun() ->
+                          receive
+                              stop ->
+                                  ok
+                          end
+                  end,
+    erlang:spawn(WaitForStop).
+
+wait_for_ets() ->
+    case ets:info(oidcc_ets_provider, size) of
+        0 ->
+            ok;
+        _ ->
+            timer:sleep(10),
+            wait_for_ets()
+    end.

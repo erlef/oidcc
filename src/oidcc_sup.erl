@@ -13,7 +13,8 @@ init([]) ->
              openid_session_manager(),
              openid_client(),
              openid_provider_supervisor(),
-             session_supervisor()
+             session_supervisor(),
+             http_cache()
             ],
     {ok, {{one_for_one, 1, 5}, Procs}}.
 
@@ -45,5 +46,11 @@ openid_session_manager() ->
 openid_client() ->
     #{ id => client,
        start => {oidcc_client, start_link, []},
+       type => worker
+     }.
+
+http_cache() ->
+    #{ id => cache,
+       start => {oidcc_http_cache, start_link, []},
        type => worker
      }.

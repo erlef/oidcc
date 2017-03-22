@@ -52,9 +52,9 @@ perform_request_or_lookup_cache(Method, Request, HttpOptions, Options, true) ->
         {ok, Res} ->
             Res;
 
-        {error, not_found} ->
+        {error, _} ->
             Res = perform_http_request(Method, Request, HttpOptions, Options),
-            oidcc_http_cache:cache_http_result(Method, Request, Res),
+            ok = oidcc_http_cache:cache_http_result(Method, Request, Res),
             Res
     end;
 perform_request_or_lookup_cache(Method, Request, HttpOptions, Options, false) ->

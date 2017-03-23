@@ -6,6 +6,7 @@
 -export([stop/0]).
 -export([cache_http_result/3]).
 -export([lookup_http_call/2]).
+-export([enqueue_http_call/2]).
 -export([trigger_cleaning/0]).
 
 
@@ -43,6 +44,10 @@ lookup_http_call(Method, Request) ->
     Key = {Method, Request},
     read_cache(Key).
 
+enqueue_http_call(Method, Request) ->
+    Key = {Method, Request},
+    gen_server:call(?MODULE, {enqueue, Key}, 30000).
+
 trigger_cleaning() ->
     gen_server:cast(?MODULE, clean_cache).
 
@@ -60,24 +65,28 @@ init(_) ->
                 last_clean = Now
                }}.
 
-handle_call({cache_http, Key, Result}, _From,
-            #state{ets_cache = EtsCache, ets_time = EtsTime,
-                   cache_duration=CacheDuration} = State) ->
+handle_call({enqueue, Key}, _From, State) ->
+    Now = erlang:system_time(seconds),
+    Timeout = Now + 600,
+    Result = ets:insert_new(oidcc_ets_http_cache, {Key, Timeout, pending}),
+    {reply, Result, State};
+handle_call({cache_http, Key, Result}, _From, State) ->
     ok = trigger_cleaning_if_needed(State),
-    ok = insert_into_cache(Key, Result, EtsCache, EtsTime, CacheDuration),
+    ok = insert_into_cache(Key, Result, State),
     {reply, ok, State};
 handle_call(_Request, _From, State) ->
     {reply, ignored, State}.
 
 
-insert_into_cache(Key, Result, EtsCache, EtsTime, Duration)
+insert_into_cache(Key, Result, #state{ets_cache = EtsCache, ets_time = EtsTime,
+                   cache_duration=Duration})
   when is_integer(Duration), Duration > 0 ->
     Now = erlang:system_time(seconds),
     Timeout = Now + Duration,
     true = ets:insert(EtsCache, {Key, Timeout, Result}),
     true = ets:insert(EtsTime, {Timeout, Key}),
     ok;
-insert_into_cache(_Key, _Result, _EtsCache, _EtsTime, _Duration)  ->
+insert_into_cache(_Key, _Result, _State)  ->
     ok.
 
 

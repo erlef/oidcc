@@ -33,6 +33,25 @@ insert_lookup_conf_test() ->
     test_util:wait_for_process_to_die(Pid, 100),
     ok.
 
+enqueue_test() ->
+    application:set_env(oidcc, http_cache_duration, 30),
+    {ok, Pid} = oidcc_http_cache:start_link(),
+    application:unset_env(oidcc, http_cache_duration),
+
+    ?assertEqual({error, not_found}, oidcc_http_cache:lookup_http_call(a, b)),
+    ?assertEqual(true, oidcc_http_cache:enqueue_http_call(a, b)),
+    ?assertEqual(false, oidcc_http_cache:enqueue_http_call(a, b)),
+    ?assertEqual({ok, pending}, oidcc_http_cache:lookup_http_call(a, b)),
+    ?assertEqual(false, oidcc_http_cache:enqueue_http_call(a, b)),
+
+    ?assertEqual(ok, oidcc_http_cache:cache_http_result(a, b, c)),
+    ?assertEqual({ok, c}, oidcc_http_cache:lookup_http_call(a, b)),
+
+    ok = oidcc_http_cache:stop(),
+    test_util:wait_for_process_to_die(Pid, 100),
+    ok.
+
+
 clean_test() ->
     application:set_env(oidcc, http_cache_duration, 1),
     {ok, Pid} = oidcc_http_cache:start_link(),

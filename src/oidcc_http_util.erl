@@ -49,13 +49,14 @@ perform_request(Method, Url, Header, ContentType, Body, Options, UseCache) ->
 
 perform_request_or_lookup_cache(Method, Request, HttpOptions, Options, true) ->
     case oidcc_http_cache:lookup_http_call(Method, Request) of
+        {ok, pending} ->
+            wait_for_cache(Method, Request);
+
         {ok, Res} ->
             Res;
 
         {error, _} ->
-            Res = perform_http_request(Method, Request, HttpOptions, Options),
-            ok = oidcc_http_cache:cache_http_result(Method, Request, Res),
-            Res
+            request_or_wait(Method, Request, HttpOptions, Options)
     end;
 perform_request_or_lookup_cache(Method, Request, HttpOptions, Options, false) ->
     perform_http_request(Method, Request, HttpOptions, Options).
@@ -64,6 +65,29 @@ perform_http_request(Method, Request, HttpOptions, Options) ->
     Res = httpc:request(Method, Request, HttpOptions,
                         Options),
     normalize_result(Res).
+
+
+request_or_wait(Method, Request, HttpOpts, Opts) ->
+    case oidcc_http_cache:enqueue_http_call(Method, Request) of
+        true ->
+            Result = perform_http_request(Method, Request, HttpOpts, Opts),
+            ok = oidcc_http_cache:cache_http_result(Method, Request, Result),
+            Result;
+        _ ->
+            wait_for_cache(Method, Request)
+    end.
+
+
+
+wait_for_cache(Method, Request) ->
+    case oidcc_http_cache:lookup_http_call(Method, Request) of
+        {ok, pending} ->
+            timer:sleep(500),
+            wait_for_cache(Method, Request);
+        {ok, Result} ->
+            Result
+    end.
+
 
 
 

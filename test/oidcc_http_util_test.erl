@@ -38,12 +38,11 @@ http_async_get_test() ->
 
 
 http_cache_test() ->
-    application:set_env(oidcc, http_cache_duration, 1),
+    application:set_env(oidcc, http_cache_duration, 2),
     {ok, Pid} = oidcc_http_cache:start_link(),
     application:unset_env(oidcc, http_cache_duration),
 
     Url1 = <<"http://google.de">>,
-    {ok, #{status := 200}} = oidcc_http_util:sync_http(get, Url1, [], true),
     {ok, #{status := 200}} = oidcc_http_util:sync_http(get, Url1, [], true),
     timer:sleep(1),
     {ok, #{status := 200}} = oidcc_http_util:sync_http(get, Url1, [], true),
@@ -52,3 +51,60 @@ http_cache_test() ->
     ok = oidcc_http_cache:stop(),
     test_util:wait_for_process_to_die(Pid, 50),
     ok.
+
+
+basic_parallel_test() ->
+    parallel_request(50).
+
+advanced_parallel_test() ->
+    parallel_request(1000).
+
+extreme_parallel_test() ->
+    parallel_request(10000).
+
+parallel_request(NumRequests) ->
+    application:set_env(oidcc, cert_depth, 5),
+    application:set_env(oidcc, cacertfile, "/etc/ssl/certs/ca-certificates.crt"),
+    application:set_env(oidcc, http_cache_duration, 60),
+    {ok, Pid} = oidcc_http_cache:start_link(),
+    application:unset_env(oidcc, http_cache_duration),
+
+    Url = <<"https://openid.net">>,
+    ok = start_requests(self(), Url, NumRequests),
+    timer:sleep(1),
+    {ok, #{status := 200}} = oidcc_http_util:sync_http(get, Url, [], true),
+
+    ok = receive_oks(NumRequests),
+    ok = oidcc_http_cache:stop(),
+    test_util:wait_for_process_to_die(Pid, 50),
+    application:unset_env(oidcc, cert_depth),
+    application:unset_env(oidcc, cacertfile),
+    ok.
+
+start_requests(_Pid, _Url, 0) ->
+    ok;
+start_requests(Pid, Url, Num) ->
+    start_request(Pid, Url),
+    start_requests(Pid, Url, Num - 1).
+
+start_request(Pid, Url) ->
+    Fun = fun() ->
+                  case oidcc_http_util:sync_http(get, Url, [], true) of
+                      {ok, #{status := 200}} ->
+                          Pid ! ok;
+                      Other ->
+                          Pid ! {error, Other}
+                  end
+          end,
+    spawn(Fun).
+
+receive_oks(0) ->
+    ok;
+receive_oks(Num) ->
+    ok = receive
+             ok ->
+                 ok;
+             Other  ->
+                 Other
+         end,
+    receive_oks(Num -1).

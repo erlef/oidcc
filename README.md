@@ -5,8 +5,24 @@ OpenID Certified by Bas Wegh at SCC/KIT to the basic and configuration profile o
 ![OpenID Connect Certified Logo](./conformance/priv/static/oid_logo.png)
 ## The purpose
 The purpose is to enable Erlang applications to rely on OpenId Connect Provider
-for authentication purposes.
+for authentication and authorization purposes.
 
+## Configuration
+The oidcc library has some knobs to adjust the behaviour. The default behaviour is
+as secure as possible while still being completely standard compliant.
+
+| Key | Description | Allowed Values (Default) |
+| --- | ---- | ---- |
+| http_cache_duration | The duration in seconds to keep http results in cache, this is to reduce the load at the IdPs at request spikes coming from the same source. Only UserInfo and TokenIntrospection are cached, if enabled. This is especially useful for e.g. REST interfaces | integer, atom none (none) |
+| http_cache_clean | The time in seconds after which the cleaning of the cache will be triggered (trigger happens only on writes) | integer (60) |
+| cacertfile | The file containing all trusted Root CAs | path to a file (not set) |
+| cert_depth | The number of intermediate CAs allowed between the root and the server | integer (1) |
+| provider_max_tries | The number of tries to perform http request to a provider for setup before giving up | integer (5) |
+| scopes | The scope to request at the OpenID Connect provider | list of scopes ([openid]) |
+| session_timeout | The time to keep a login session alive in ms | integer (30000) |
+| support_none_algorithm | Wether the none algorithm should be supported. Oidcc allows the none algorithm only on direct communication with the provider. It is part of the OpenID Connect specification. The developer encourages to set this to 'false' | boolean (true) |
+
+All these settings need to be set in the environment of oidcc.
 
 ## Usage
 ### Setup an Openid Connect Provider
@@ -19,7 +35,7 @@ The parameter are:
   configuration needs to be done.
 * LocalEndpoint: The local URL where the user will be redirected back to once
   logged in at the OpenId Connect provider, this MUST be the same as the path that
-  is handled by an oidcc_client behaviour (see [oidcc_cowboy](https://github.com/indigo-dc/oidcc_cowboy) ).
+  is handled by an http-handler for your web-server (see [oidcc_cowboy](https://github.com/indigo-dc/oidcc_cowboy) ).
 * Additional configuration, using a map. possible configurations are:
   * name: a name for the provider, just some text (no functional usage)
   * description: a longer descriptive text (no functional usage)
@@ -31,6 +47,9 @@ The parameter are:
 
 ### Login Users
 It is highly encouraged to implement the oidcc_client behaviour.
+The oidcc_client behaviour expect two methods in your module:
+ - login_succeeded/1 : Called when the login succeeded with the Token received
+ - login_failed/2 : Called when the login failed with Error and Description
 
 List of web-server modules that support the oidcc_client behaviour:
  * [oidcc_cowboy](https://github.com/indigo-dc/oidcc_cowboy) for cowboy
@@ -76,6 +95,7 @@ Dispatch = cowboy_router:compile( [{'_',
 Your oidcc_client implementation is just a module with two functions:
 ```
 -module(my_client)
+-behaviour(oidcc_client).
 
 -export([login_succeeded/1]).
 -export([login_failed/2]).
@@ -100,7 +120,7 @@ login_failed(Error, Desc) ->
     Updates = [{redirect, Path}],
     {ok, Updates}.
 ```
-The possible updates depend upon the web-module in use.
+The possible updates depend on the web-module in use.
 For oidcc_cowboy these are:
 * {redirect, Path} : redirect the browser to the new path/url
 * {cookie, Name, Data, Options} : create or delete a cookie

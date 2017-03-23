@@ -65,10 +65,11 @@ init(_) ->
                 last_clean = Now
                }}.
 
-handle_call({enqueue, Key}, _From, State) ->
+handle_call({enqueue, Key}, _From, #state{ets_time = Ets} = State) ->
     Now = erlang:system_time(seconds),
-    Timeout = Now + 600,
+    Timeout = Now + 30,
     Result = ets:insert_new(oidcc_ets_http_cache, {Key, Timeout, pending}),
+    true = ets:insert(Ets, {Timeout, Key}),
     {reply, Result, State};
 handle_call({cache_http, Key, Result}, _From, State) ->
     ok = trigger_cleaning_if_needed(State),

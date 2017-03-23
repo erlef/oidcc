@@ -66,9 +66,7 @@ init(_) ->
                }}.
 
 handle_call({enqueue, Key}, _From, State) ->
-    Now = erlang:system_time(seconds),
-    Timeout = Now + 600,
-    Result = ets:insert_new(oidcc_ets_http_cache, {Key, Timeout, pending}),
+    Result = insert_into_cache(Key, pending, State),
     {reply, Result, State};
 handle_call({cache_http, Key, Result}, _From, State) ->
     ok = trigger_cleaning_if_needed(State),
@@ -79,14 +77,28 @@ handle_call(_Request, _From, State) ->
 
 
 insert_into_cache(Key, Result, #state{ets_cache = EtsCache, ets_time = EtsTime,
-                   cache_duration=Duration})
+                                      cache_duration=Duration})
   when is_integer(Duration), Duration > 0 ->
     Now = erlang:system_time(seconds),
     Timeout = Now + Duration,
-    true = ets:insert(EtsCache, {Key, Timeout, Result}),
-    true = ets:insert(EtsTime, {Timeout, Key}),
-    ok;
-insert_into_cache(_Key, _Result, _State)  ->
+    Inserted = ets:insert_new(EtsCache, {Key, Timeout, Result}),
+    case {Result, Inserted} of
+        {pending, true} ->
+            true = ets:insert(EtsTime, {Timeout, Key}),
+            true;
+
+        {pending, false} ->
+            false;
+
+        {_, _} ->
+            true = ets:insert(EtsCache, {Key, Timeout, Result}),
+            true = ets:insert(EtsTime, {Timeout, Key}),
+            ok
+    end;
+insert_into_cache(_Key, pending, _NoDuration) ->
+    %% if not using cache always perform the request
+    true;
+insert_into_cache(_Key, _Result, _NoDuration) ->
     ok.
 
 

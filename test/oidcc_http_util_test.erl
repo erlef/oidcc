@@ -11,6 +11,18 @@ https_sync_get_test() ->
     application:unset_env(oidcc, cacertfile),
     ok.
 
+https_sync_get_cache_test() ->
+    {ok, Pid} = oidcc_http_cache:start_link(),
+    application:set_env(oidcc, cert_depth, 5),
+    application:set_env(oidcc, cacertfile, "/etc/ssl/certs/ca-certificates.crt"),
+    Url = <<"https://www.openid.net">>,
+    {ok,#{status := 200} } = oidcc_http_util:sync_http(get,Url,[], true),
+    application:unset_env(oidcc, cert_depth),
+    application:unset_env(oidcc, cacertfile),
+    ok = oidcc_http_cache:stop(),
+    test_util:wait_for_process_to_die(Pid, 50),
+    ok.
+
 https_async_get_test() ->
     application:set_env(oidcc, cert_depth, 5),
     application:set_env(oidcc, cacertfile, "/etc/ssl/certs/ca-certificates.crt"),

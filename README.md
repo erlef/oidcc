@@ -13,6 +13,7 @@ as secure as possible while still being completely standard compliant.
 
 | Key | Description | Allowed Values (Default) |
 | --- | ---- | ---- |
+| http_request_timeout | The time an http request may take until it is cancelled, in seconds | integer (300) |
 | http_cache_duration | The duration in seconds to keep http results in cache, this is to reduce the load at the IdPs at request spikes coming from the same source. Only UserInfo and TokenIntrospection are cached, if enabled. This is especially useful for e.g. REST interfaces | integer, atom none (none) |
 | http_cache_clean | The time in seconds after which the cleaning of the cache will be triggered (trigger happens only on writes) | integer (60) |
 | cacertfile | The file containing all trusted Root CAs | path to a file (not set) |

@@ -5,6 +5,7 @@
 -export([sync_http/4, sync_http/6]).
 -export([uncompress_body_if_needed/2]).
 -export([qs/1, urlencode/1]).
+-export([request_timeout/1]).
 
 -include_lib("public_key/include/public_key.hrl").
 -type qs_vals() :: [{binary(), binary() | true}].
@@ -34,6 +35,18 @@ async_http(Method, Url, Header, ContentType, Body) ->
     perform_request(Method, Url, Header, ContentType, Body,
                     [{sync, false}], false).
 
+
+request_timeout(Unit) ->
+    Timeout =
+        case application:get_env(oidcc, http_request_timeout, undefined) of
+            T when is_integer(T), T >0 ->
+                T;
+            _ -> 300
+        end,
+    case Unit of
+        ms -> Timeout * 1000;
+        s -> Timeout
+    end.
 
 
 
@@ -122,9 +135,10 @@ uncompress_body_if_needed(_Body, {_, Compression})  ->
 
 options(Url) when is_list(Url) ->
     {ok, {Schema, _, HostName, _, _,  _}} = http_uri:parse(normalize(Url)),
+    BaseOptions = [{timeout, request_timeout(ms)} ],
      case Schema of
-        http -> {ok, []};
-        https -> ssl_options(HostName)
+        http -> {ok, BaseOptions};
+        https -> {ok, BaseOptions ++ ssl_options(HostName)}
     end;
 options(Url) when is_binary(Url) ->
     options(binary_to_list(Url)).
@@ -135,14 +149,13 @@ ssl_options(HostName) ->
     Depth = application:get_env(oidcc, cert_depth, 1),
     case CaCert of
         {ok, CaCertFile} ->
-            {ok, [
-                  {ssl, [
-                         {verify, verify_peer},
-                         {verify_fun, VerifyFun},
-                         {cacertfile, CaCertFile},
-                         {depth, Depth}
-                        ] }
-                 ]};
+            [{ssl, [
+                    {verify, verify_peer},
+                    {verify_fun, VerifyFun},
+                    {cacertfile, CaCertFile},
+                    {depth, Depth}
+                   ] }
+            ];
         _ ->
             {error, missing_cacertfile}
     end.

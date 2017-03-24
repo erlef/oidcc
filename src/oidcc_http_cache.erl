@@ -27,7 +27,6 @@
          }).
 
 %% API.
-
 -spec start_link() -> {ok, pid()}.
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -51,6 +50,7 @@ enqueue_http_call(Method, Request) ->
 trigger_cleaning() ->
     gen_server:cast(?MODULE, clean_cache).
 
+-define(REQUEST_BUFFER, 30).
 %% gen_server.
 init(_) ->
     EtsCache = ets:new(oidcc_ets_http_cache, [set, protected, named_table]),
@@ -80,7 +80,13 @@ insert_into_cache(Key, Result, #state{ets_cache = EtsCache, ets_time = EtsTime,
                                       cache_duration=Duration})
   when is_integer(Duration), Duration > 0 ->
     Now = erlang:system_time(seconds),
-    Timeout = Now + Duration,
+    Timeout =
+        case Result of
+            pending ->
+                Now + oidcc_http_util:request_timeout(s) + ?REQUEST_BUFFER;
+            _ ->
+                Now + Duration
+        end,
     Inserted = ets:insert_new(EtsCache, {Key, Timeout, Result}),
     case {Result, Inserted} of
         {pending, true} ->

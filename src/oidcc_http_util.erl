@@ -138,24 +138,24 @@ options(Url) when is_list(Url) ->
     BaseOptions = [{timeout, request_timeout(ms)} ],
      case Schema of
         http -> {ok, BaseOptions};
-        https -> {ok, BaseOptions ++ ssl_options(HostName)}
+        https -> ssl_options(HostName, BaseOptions)
     end;
 options(Url) when is_binary(Url) ->
     options(binary_to_list(Url)).
 
-ssl_options(HostName) ->
+ssl_options(HostName, BaseOptions) ->
     VerifyFun = ssl_verify_fun(HostName),
     CaCert = application:get_env(oidcc, cacertfile),
     Depth = application:get_env(oidcc, cert_depth, 1),
     case CaCert of
         {ok, CaCertFile} ->
-            [{ssl, [
+            {ok, [{ssl, [
                     {verify, verify_peer},
                     {verify_fun, VerifyFun},
                     {cacertfile, CaCertFile},
                     {depth, Depth}
                    ] }
-            ];
+            ] ++ BaseOptions};
         _ ->
             {error, missing_cacertfile}
     end.

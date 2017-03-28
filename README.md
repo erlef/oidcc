@@ -11,12 +11,16 @@ for authentication and authorization purposes.
 The oidcc library has some knobs to adjust the behaviour. The default behaviour is
 as secure as possible while still being completely standard compliant.
 
+For a first try mainly two settings are important:
+ - cacertfile, this *MUST* be set if you want to use any provider which offers SSL connections.
+ - cert_depth, you might need to increase this value for oidcc to accept your provider.
+
 | Key | Description | Allowed Values (Default) |
 | --- | ---- | ---- |
 | http_request_timeout | The time an http request may take until it is cancelled, in seconds | integer (300) |
 | http_cache_duration | The duration in seconds to keep http results in cache, this is to reduce the load at the IdPs at request spikes coming from the same source. Only UserInfo and TokenIntrospection are cached, if enabled. This is especially useful for e.g. REST interfaces | integer, atom none (none) |
 | http_cache_clean | The time in seconds after which the cleaning of the cache will be triggered (trigger happens only on writes) | integer (60) |
-| cacertfile | The file containing all trusted Root CAs | path to a file (not set) |
+| cacertfile | The file containing all trusted Root CAs. On Debian based systems this usually is '/etc/ssl/certs/ca-certificates.crt', on red-hat based systems it is '/etc/pki/tls/certs/ca-bundle.crt' | path to a file (not set) |
 | cert_depth | The number of intermediate CAs allowed between the root and the server | integer (1) |
 | provider_max_tries | The number of tries to perform http request to a provider for setup before giving up | integer (5) |
 | scopes | The scope to request at the OpenID Connect provider | list of scopes ([openid]) |

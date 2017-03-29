@@ -17,11 +17,11 @@ For a first try mainly two settings are important:
 
 | Key | Description | Allowed Values (Default) |
 | --- | ---- | ---- |
+| cacertfile | The file containing all trusted Root CAs. On Debian based systems this usually is '/etc/ssl/certs/ca-certificates.crt', on red-hat based systems it is '/etc/pki/tls/certs/ca-bundle.crt'. You can also download the CA-file, which is extracted from mozilla, at the [curl site](https://curl.haxx.se/docs/caextract.html) and specify the path of its location. | path to a file (not set) |
+| cert_depth | The number of signing steps allowed between the root and the server. A depth of '1' means the server certificate is directly signed by the CA. A chain of the Root CA, one intermediate CA and the server certificate results in a depth of '2'. | integer (1) |
 | http_request_timeout | The time an http request may take until it is cancelled, in seconds | integer (300) |
 | http_cache_duration | The duration in seconds to keep http results in cache, this is to reduce the load at the IdPs at request spikes coming from the same source. Only UserInfo and TokenIntrospection are cached, if enabled. This is especially useful for e.g. REST interfaces | integer, atom none (none) |
 | http_cache_clean | The time in seconds after which the cleaning of the cache will be triggered (trigger happens only on writes) | integer (60) |
-| cacertfile | The file containing all trusted Root CAs. On Debian based systems this usually is '/etc/ssl/certs/ca-certificates.crt', on red-hat based systems it is '/etc/pki/tls/certs/ca-bundle.crt' | path to a file (not set) |
-| cert_depth | The number of intermediate CAs allowed between the root and the server | integer (1) |
 | provider_max_tries | The number of tries to perform http request to a provider for setup before giving up | integer (5) |
 | scopes | The scope to request at the OpenID Connect provider | list of scopes ([openid]) |
 | session_timeout | The time to keep a login session alive in ms | integer (30000) |

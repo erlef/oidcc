@@ -41,7 +41,7 @@ init_per_suite(Conf) ->
     {ok, _} = application:ensure_all_started(oidcc),
     application:set_env(oidcc, cert_depth, 5),
     application:set_env(oidcc, provider_max_tries, 1),
-    application:set_env(oidcc, cacertfile, "/etc/ssl/certs/ca-certificates.crt"),
+    application:set_env(oidcc, cacertfile, ca_file()),
     Conf.
 
 end_per_suite(Conf) ->
@@ -127,3 +127,7 @@ wait_for_config(Pid) ->
         _ ->
             {error, Error}
     end.
+
+
+ca_file() ->
+    code:where_is_file("cacert.pem").

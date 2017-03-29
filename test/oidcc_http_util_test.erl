@@ -4,6 +4,13 @@
 ca_file() ->
     code:where_is_file("cacert.pem").
 
+https_bad_config_test() ->
+    Url = <<"https://www.openid.net">>,
+    ?assertEqual({error, missing_cacertfile},
+                 oidcc_http_util:sync_http(get,Url,[])),
+    ok.
+
+
 https_sync_get_openid_test() ->
     Url = <<"https://www.openid.net">>,
     https_sync_request(Url, 2).

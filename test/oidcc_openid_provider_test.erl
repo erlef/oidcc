@@ -72,7 +72,8 @@ fetch_config_test() ->
                client_secret => <<"dont tell">>,
                request_scopes => undefined,
                issuer_or_endpoint => ConfigEndpoint,
-               local_endpoint => <<"/here">>
+               local_endpoint => <<"/here">>,
+               test => <<"extra config">>
               },
     HttpFun = fun(Method, Url, _Header)  ->
                       Method = get,
@@ -96,7 +97,8 @@ fetch_config_test() ->
     #{ config_endpoint := ConfigEndpoint,
        keys := [],
        issuer := <<"https://my.provider">>,
-       jwks_uri := <<"https://my.provider/keys">>
+       jwks_uri := <<"https://my.provider/keys">>,
+       extra_config := #{ test := <<"extra config">>}
      } = Config1,
 
     gen_server:cast(Pid, retrieve_keys),
@@ -105,7 +107,8 @@ fetch_config_test() ->
     #{ config_endpoint := ConfigEndpoint,
        keys := [_Keys],
        issuer := <<"https://my.provider">>,
-       jwks_uri := <<"https://my.provider/keys">>
+       jwks_uri := <<"https://my.provider/keys">>,
+       extra_config := #{ test := <<"extra config">>}
      } = Config2,
 
     true = oidcc_openid_provider:is_issuer(<<"https://my.provider">>, Pid),

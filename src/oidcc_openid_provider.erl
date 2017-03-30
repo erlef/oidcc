@@ -44,7 +44,9 @@
           config_deadline = undefined,
           http_result = undefined,
           retrieving = undefined,
-          request_id = undefined
+          request_id = undefined,
+
+          extra_config = #{}
          }).
 
 %% API.
@@ -103,12 +105,16 @@ init({Id, Config}) ->
                        maps:get(client_id, Config, undefined)
                end,
     trigger_config_retrieval(),
+    DeleteKeys = [name, description, request_scopes, issuer_or_endpoint,
+                  local_endpoint, client_secret, client_id],
+    ExtraConfig = maps:without(DeleteKeys, Config),
     ConfigEndpoint = to_config_endpoint(IssuerOrEndpoint),
     Issuer = config_ep_to_issuer(ConfigEndpoint),
     {ok, #state{id = Id, name = Name, desc = Description, client_id = ClientId,
                 client_secret = ClientSecret, config_ep = ConfigEndpoint,
                 request_scopes = Scopes, local_endpoint = LocalEndpoint,
-                issuer = Issuer, registration_params = RegistrationParams
+                issuer = Issuer, registration_params = RegistrationParams,
+                extra_config = ExtraConfig
                }}.
 
 handle_call(get_config, _From, State) ->
@@ -252,14 +258,16 @@ create_config(#state{id = Id, desc = Desc, client_id = ClientId,
                      lasttime_updated = LastTimeUpdated, ready = Ready,
                      local_endpoint = LocalEndpoint, name = Name,
                      request_scopes = Scopes, meta_data = MetaData,
-                     config_deadline = ConfDeadline
+                     config_deadline = ConfDeadline, extra_config = ExtraConfig
                     }) ->
     StateList = [{id, Id}, {name, Name}, {description, Desc},
                  {client_id, ClientId}, {client_secret, ClientSecret},
                  {config_endpoint, ConfEp}, {lasttime_updated, LastTimeUpdated},
                  {ready, Ready}, {local_endpoint, LocalEndpoint}, {keys, Keys},
                  {request_scopes, Scopes}, {issuer, Issuer},
-                 {meta_data, MetaData}, {config_deadline, ConfDeadline}],
+                 {meta_data, MetaData}, {config_deadline, ConfDeadline},
+                 {extra_config, ExtraConfig}
+                ],
     maps:merge(Config, maps:from_list(StateList)).
 
 

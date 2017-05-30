@@ -5,7 +5,9 @@
 -export([start_link/0]).
 -export([stop/0]).
 -export([succeeded/2]).
+-export([succeeded/3]).
 -export([failed/3]).
+-export([failed/4]).
 -export([register/1]).
 
 -export([get_module/1]).
@@ -44,13 +46,19 @@ register(Module) when is_atom(Module) ->
 
 
 succeeded(Token, ModuleId) ->
+    succeeded(Token, ModuleId, #{}).
+
+succeeded(Token, ModuleId, Environment) when is_map(Environment) ->
     {ok, Mod} = get_module(ModuleId),
-    {ok, Updates} = Mod:login_succeeded(Token),
+    {ok, Updates} = call_succeeded(Mod, Token, Environment),
     reorder_updates(Updates).
 
 failed(Error, Description, ModuleId) ->
+    failed(Error, Description, ModuleId, #{}).
+
+failed(Error, Description, ModuleId, Environment) when is_map(Environment) ->
     {ok, Mod} = get_module(ModuleId),
-    {ok, Updates} = Mod:login_failed(Error, Description),
+    {ok, Updates} = call_failed(Mod, Error, Description, Environment),
     reorder_updates(Updates).
 
 get_module(Id) ->
@@ -101,15 +109,17 @@ add_module(Module, #state{ets_mod = EtsMod, ets_id = EtsId}) ->
 
 insert_new_module(Module, EtsId, EtsMod) ->
     Id = random_string(9),
-    case ets:insert_new(EtsId, {Id, Module}) of
-        true ->
+    InsertResult = ets:insert_new(EtsId, {Id, Module}),
+    handle_insert_result(InsertResult, EtsMod, Module, EtsId, Id).
+
+handle_insert_result(true, EtsMod, Module, EtsId, Id) ->
             true = ets:insert_new(EtsMod, {Module, Id}),
             Default = ets:lookup(EtsId, default),
             set_default_if_needed(Default, Module, EtsId),
             {ok, Id};
-        _ ->
-            insert_new_module(Module, EtsId, EtsMod)
-    end.
+handle_insert_result(_, EtsMod, Module, EtsId, _Id) ->
+            insert_new_module(Module, EtsId, EtsMod).
+
 
 set_default_if_needed([], Module, Ets) ->
     true = ets:insert_new(Ets, {default, Module}),
@@ -119,13 +129,37 @@ set_default_if_needed(_, _Module, _Ets) ->
 
 
 reorder_updates(Updates) ->
-    case lists:keyfind(redirect, 1, Updates) of
-        false -> {ok, Updates};
-        Tuple -> NewUpdates = lists:keydelete(redirect, 1, Updates),
-                 OrderedUpdates = NewUpdates ++ [Tuple],
-                 {ok, OrderedUpdates}
-    end.
+    append_redirect(lists:keyfind(redirect, 1, Updates), Updates).
+
+append_redirect(false, Updates) ->
+    {ok, Updates};
+append_redirect(Tuple, Updates) ->
+    NewUpdates = lists:keydelete(redirect, 1, Updates),
+    OrderedUpdates = NewUpdates ++ [Tuple],
+    {ok, OrderedUpdates}.
 
 
 random_string(Length) ->
     base64url:encode(crypto:strong_rand_bytes(Length)).
+
+
+call_succeeded(Mod, Token, Environment) ->
+    Exports = Mod:module_info(exports),
+    SucceededTwo = lists:member({login_succeeded, 2}, Exports),
+    call_matching_succeeded(SucceededTwo, Mod, Token, Environment).
+
+call_matching_succeeded(true, Mod, Token, Environment) ->
+    Mod:login_succeeded(Token, Environment);
+call_matching_succeeded(_, Mod, Token, _) ->
+    Mod:login_succeeded(Token).
+
+
+call_failed(Mod, Error, Description, Environment) ->
+    Exports = Mod:module_info(exports),
+    FailedThree = lists:member({login_failed, 3}, Exports),
+    call_matching_failed(FailedThree, Mod, Error, Description,  Environment).
+
+call_matching_failed(true, Mod, Error, Description, Environment) ->
+    Mod:login_failed(Error, Description, Environment);
+call_matching_failed(_, Mod, Error, Description, _) ->
+    Mod:login_failed(Error, Description).

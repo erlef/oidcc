@@ -11,8 +11,8 @@ https_bad_config_test() ->
     ok.
 
 
-https_sync_get_openid_test() ->
-    Url = <<"https://www.openid.net">>,
+https_sync_get_github_test() ->
+    Url = <<"https://www.github.com">>,
     https_sync_request(Url, 2).
 
 https_sync_get_google_test() ->
@@ -31,7 +31,7 @@ https_sync_get_cache_test() ->
     {ok, Pid} = oidcc_http_cache:start_link(),
     application:set_env(oidcc, cert_depth, 5),
     application:set_env(oidcc, cacertfile, ca_file()),
-    Url = <<"https://www.openid.net">>,
+    Url = <<"https://www.github.com">>,
     {ok,#{status := 200} } = oidcc_http_util:sync_http(get,Url,[], true),
     application:unset_env(oidcc, cert_depth),
     application:unset_env(oidcc, cacertfile),
@@ -42,7 +42,7 @@ https_sync_get_cache_test() ->
 https_async_get_test() ->
     application:set_env(oidcc, cert_depth, 5),
     application:set_env(oidcc, cacertfile, ca_file()),
-    Url = <<"https://www.openid.net">>,
+    Url = <<"https://www.github.com">>,
     {ok, Id} = oidcc_http_util:async_http(get,Url,[]),
     receive
         {http, {Id, _Result}} ->
@@ -97,7 +97,7 @@ parallel_request(NumRequests) ->
     {ok, Pid} = oidcc_http_cache:start_link(),
     application:unset_env(oidcc, http_cache_duration),
 
-    Url = <<"https://openid.net">>,
+    Url = <<"https://github.com">>,
     ok = start_requests(self(), Url, NumRequests),
     timer:sleep(1),
     {ok, #{status := 200}} = oidcc_http_util:sync_http(get, Url, [], true),

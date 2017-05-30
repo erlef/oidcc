@@ -40,8 +40,12 @@ stop() ->
 
 register(Module) when is_atom(Module) ->
     List = Module:module_info(exports),
-    true = lists:member({login_succeeded, 1}, List),
-    true = lists:member({login_failed, 2}, List),
+    SucceededOne = lists:member({login_succeeded, 1}, List),
+    SucceededTwo = lists:member({login_succeeded, 2}, List),
+    FailedTwo = lists:member({login_failed, 2}, List),
+    FailedThree = lists:member({login_failed, 3}, List),
+    true = SucceededOne or SucceededTwo,
+    true = FailedTwo or FailedThree,
     gen_server:call(?MODULE, {add_module, Module}).
 
 

@@ -338,11 +338,10 @@ handle_keys(Data, _Header, State) ->
     %TODO: maybe also implement a keys deadline
     KeyConfig=decode_json(Data),
     KeyList = maps:get(keys, KeyConfig, []),
-    Keys = extract_supported_keys(KeyList, []),
-    NewState = State#state{keys  = Keys, lasttime_updated = timestamp(),
+    NewState = State#state{keys  = KeyList, lasttime_updated = timestamp(),
                            request_id = undefined},
-    send_key_replies(Keys, State),
-    case length(Keys) > 0 of
+    send_key_replies(KeyList, State),
+    case length(KeyList) > 0 of
         true ->
             NewState;
         false ->
@@ -383,60 +382,6 @@ decode_json(Data) ->
             #{}
     end.
 
-
-extract_supported_keys(Keys, List) ->
-    extract_supported_keys(Keys, any, List).
-
-extract_supported_keys([], _, List) ->
-    List;
-extract_supported_keys([#{ kty := Kty0} = Map|T], ListTypeIn, List) ->
-    Kty = case Kty0 of
-              <<"RSA">> -> rsa;
-              _ ->  Kty0
-          end,
-    Alg0 = maps:get(alg, Map, undefined),
-    Alg = case Alg0 of
-              <<"RS256">> -> rs256;
-              undefined -> undefined;
-              _ -> unknown
-          end,
-    Kid = maps:get(kid, Map, undefined),
-    Use0 = maps:get(use, Map, undefined),
-    {Use, ListType} =
-        case {Use0, ListTypeIn} of
-              {<<"sig">>, any} -> {sign, combined};
-              {<<"sig">>, combined} -> {sign, combined};
-              {<<"enc">>, any} -> {enc, combined};
-              {<<"enc">>, combined} -> {enc, combined};
-              {undefined, any} -> {sign, pure_sign};
-              {undefined, pure_sign} -> {sign, pure_sign};
-              {_, cobined} -> {Use0, combined};
-              {_, any} -> {Use0, combined}
-          end,
-    Key =
-        case Kty of
-            rsa ->
-                N0 = maps:get(n, Map),
-                E0 = maps:get(e, Map),
-                N1 = binary:decode_unsigned(base64url:decode(N0)),
-                E1 = binary:decode_unsigned(base64url:decode(E0)),
-                [E1, N1];
-            _ ->
-                unknown
-        end,
-
-    case (Use /= unknown) of
-        true ->
-            Update = #{kty => Kty, use => Use, alg => Alg,
-                    key => Key, kid => Kid },
-            Entry = maps:merge(Map, Update),
-            extract_supported_keys(T, ListType, [Entry | List]);
-        _ ->
-            %% bad key, do exclude this provider
-            []
-    end;
-extract_supported_keys(_, _, _) ->
-    [].
 
 
 

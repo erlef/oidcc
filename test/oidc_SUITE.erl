@@ -97,16 +97,12 @@ fetch_signing_keys(Pid) ->
     #{keys := Keys,
       config_deadline := Deadline
      } = Config,
-    Filter = fun(#{use := Use}) ->
-                     Use == sign
-             end,
     Now = erlang:system_time(seconds),
     ct:log("all keys: ~p", [Keys]),
     ct:log("config deadline in ~p seconds", [Deadline - Now]),
-    case lists:filter(Filter, Keys) of
-        [] -> {error, no_signing_keys};
-        SigKeys ->
-            ct:log("signign keys: ~p", [SigKeys]),
+    case Keys of
+        [] -> {error, no_keys};
+        _ ->
             ok
     end.
 

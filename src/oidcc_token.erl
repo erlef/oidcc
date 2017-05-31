@@ -109,19 +109,31 @@ validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone) ->
 int_validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone)
     when is_binary(IdToken), byte_size(IdToken) > 5->
     {ok, OpInfo} = oidcc:get_openid_provider_info(OpenIdProviderId),
-    {Header, Claims} = case erljwt:pre_parse_jwt(IdToken) of
-                           #{ header := H, claims := C }  -> {H, C};
-                           _ -> throw(not_a_jwt)
-                       end,
-    case list_missing_required_claims(Claims) of
-        [] -> ok;
-        Missing -> throw({required_fields_missing, Missing})
-    end,
-    Kid = maps:get(kid, Header, none),
     #{ issuer := Issuer,
        client_id := ClientId,
        keys := PubKeys
      } = OpInfo,
+
+    % 6. If the ID Token is received via direct communication between the Client
+    % and the Token Endpoint (which it is in this flow), the TLS server
+    % validation MAY be used to validate the issuer in place of checking the
+    % token signature. The Client MUST validate the signature of all other ID
+    % Tokens according to JWS [JWS] using the algorithm specified in the JWT alg
+    % Header Parameter. The Client MUST use the keys provided by the Issuer.
+    %
+    % 9. The current time MUST be before the time represented by the exp Claim.
+    {Header, Claims} = case verify_jwt(IdToken, PubKeys, OpenIdProviderId) of
+                           #{ claims := C, header := H} ->
+                               {H, C};
+                           invalid -> throw(invalid_signature);
+                           Error when is_atom(Error) -> throw(Error);
+                           _ -> throw(unknown_error)
+                       end,
+
+    case list_missing_required_claims(Claims) of
+        [] -> ok;
+        Missing -> throw({required_fields_missing, Missing})
+    end,
     % 1. If the ID Token is encrypted, decrypt it using the keys and algorithms
     % that the Client specified during Registration that the OP was to use to
     % encrypt the ID Token. If encryption was negotiated with the OP at
@@ -179,22 +191,6 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone)
     case lists:member(Algo, AcceptedAlgorithms) of
         true -> ok;
         false -> throw(bad_algorithm)
-    end,
-
-    % 6. If the ID Token is received via direct communication between the Client
-    % and the Token Endpoint (which it is in this flow), the TLS server
-    % validation MAY be used to validate the issuer in place of checking the
-    % token signature. The Client MUST validate the signature of all other ID
-    % Tokens according to JWS [JWS] using the algorithm specified in the JWT alg
-    % Header Parameter. The Client MUST use the keys provided by the Issuer.
-    %
-    % 9. The current time MUST be before the time represented by the exp Claim.
-    SignedClaims = validate_signature(IdToken, Kid, PubKeys, OpenIdProviderId),
-    case SignedClaims of
-        Claims -> ok;
-        invalid -> throw(invalid_signature);
-        expired -> throw(expired);
-        _ -> throw(unknown_error)
     end,
 
     % 8. If the JWT alg Header Parameter uses a MAC based algorithm such as
@@ -262,23 +258,20 @@ has_other_audience(ClientId, Audience) when is_list(Audience) ->
     length(lists:delete(ClientId, Audience)) >= 1.
 
 
-validate_signature(IdToken, Kid, PubKeys, ProviderId) ->
-    PubKey = get_needed_key(PubKeys, Kid),
-    case {PubKey, ProviderId} of
-        {Error, undefined} when is_atom(Error) ->
-            throw(Error);
-        _ -> ok
-    end,
-    case {erljwt:parse_jwt(IdToken, PubKey, <<"JWT">>), ProviderId} of
+verify_jwt(IdToken, Pubkeys, ProviderId) ->
+    case {erljwt:parse(IdToken, Pubkeys), ProviderId} of
         {invalid, undefined} ->
             invalid;
-        {invalid, ProviderId} ->
+        {InvalNoKey, ProviderId}
+          when InvalNoKey==invalid; InvalNoKey==no_key_found ->
             %% it might be the case that our keys expired ...
             %% so refetch them
             NewPubKeys = refetch_keys(ProviderId),
-            validate_signature(IdToken, Kid, NewPubKeys,
-                                             undefined);
-        {Claims, _Provider} -> Claims
+            verify_jwt(IdToken, NewPubKeys, undefined);
+        {Jwt, _Provider} when is_map(Jwt)->
+            Jwt;
+        {Error, _} when is_atom(Error) ->
+            Error
     end.
 
 
@@ -288,21 +281,3 @@ refetch_keys(ProviderId) ->
         {ok, Keys} -> Keys;
         _ -> []
     end.
-
-
-get_needed_key(List, Id) ->
-    Filter = fun(#{use := Use, kty := Kty}) ->
-                     (Use == sign) and (Kty == rsa)
-             end,
-    find_needed_key(lists:filter(Filter, List), Id).
-
-find_needed_key([], _) ->
-    no_key;
-find_needed_key([#{key := Key}], none) ->
-    Key;
-find_needed_key(_, none) ->
-    too_many_keys;
-find_needed_key([#{kid := KeyId, key := Key } |_], KeyId) ->
-    Key;
-find_needed_key([_Key | T], KeyId) ->
-    get_needed_key(T, KeyId).

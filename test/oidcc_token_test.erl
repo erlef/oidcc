@@ -185,7 +185,7 @@ generate_id_token(bad_algo,ClientId,Nonce,Issuer) ->
                     iat => 123
                    },
     Key = <<"some shared secret">>,
-    erljwt:jwt(hs256,ClaimSetMap,600,Key).
+    erljwt:create(hs256,ClaimSetMap,600,Key).
 
 
 introspect_test() ->
@@ -210,23 +210,39 @@ introspect_test() ->
 
 
 mock_oidcc(OpenIdProviderId, Issuer, ClientId) ->
-     InfoFun = fun(Id) ->
+    Encode = fun(Int) ->
+                     base64url:encode(binary:encode_unsigned(Int))
+             end,
+
+    [E, N] = ?RSA_PUBLIC_KEY,
+    InfoFun = fun(Id) ->
                        Id = OpenIdProviderId,
                        {ok, #{issuer => Issuer,
                          client_id => ClientId,
-                         keys => [#{ kty => rsa, key => ?RSA_PUBLIC_KEY,
-                                     use => sign}]
+                         keys => [#{kty => <<"RSA">>,
+                                    n => Encode(N), e=> Encode(E) }
+                                 ]
                         }}
                end,
+    SelfFun = fun(_) ->  {ok, self()} end,
+    KeysFun = fun(_) ->  {ok, [<<"some shared secret">>]} end,
     ok = meck:new(oidcc),
+    ok = meck:new(oidcc_openid_provider_mgr),
+    ok = meck:new(oidcc_openid_provider),
     ok = meck:expect(oidcc, get_openid_provider_info, InfoFun),
+    ok = meck:expect(oidcc_openid_provider_mgr, get_openid_provider, SelfFun),
+    ok = meck:expect(oidcc_openid_provider, update_and_get_keys, KeysFun),
 
     ok.
 
 stop_mocking_oidcc() ->
     true = meck:validate(oidcc),
+    true = meck:validate(oidcc_openid_provider),
+    true = meck:validate(oidcc_openid_provider_mgr),
     meck:unload(oidcc),
+    meck:unload(oidcc_openid_provider),
+    meck:unload(oidcc_openid_provider_mgr),
     ok.
 
 generate_id_token(ClaimSetMap,Expiration) ->
-    erljwt:jwt(rs256,ClaimSetMap,Expiration,?RSA_PRIVATE_KEY).
+    erljwt:create(rs256,ClaimSetMap,Expiration,?RSA_PRIVATE_KEY).

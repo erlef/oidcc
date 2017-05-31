@@ -2,7 +2,7 @@
 [{<<"base64url">>,{pkg,<<"base64url">>,<<"0.0.1">>},1},
  {<<"erljwt">>,
   {git,"https://github.com/indigo-dc/erljwt.git",
-       {ref,"2ed2e84ed2cc7f88ac559bdceb804048d02facbf"}},
+       {ref,"50dea759cb629f825b902ffcf4876ce3d7587bba"}},
   0},
  {<<"jsone">>,{pkg,<<"jsone">>,<<"1.4.0">>},1}]}.
 [

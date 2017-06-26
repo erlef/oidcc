@@ -1,10 +1,10 @@
 {"1.1.0",
 [{<<"base64url">>,{pkg,<<"base64url">>,<<"0.0.1">>},1},
- {<<"erljwt">>,{pkg,<<"erljwt">>,<<"2.0.1">>},0},
+ {<<"erljwt">>,{pkg,<<"erljwt">>,<<"2.0.2">>},0},
  {<<"jsone">>,{pkg,<<"jsone">>,<<"1.4.0">>},1}]}.
 [
 {pkg_hash,[
  {<<"base64url">>, <<"36A90125F5948E3AFD7BE97662A1504B934DD5DAC78451CA6E9ABF85A10286BE">>},
- {<<"erljwt">>, <<"B8FC7443CC6263B727B1B56D4731D77F47300CA8FC53EBDC5686F7DE1F30E5EE">>},
+ {<<"erljwt">>, <<"3D17F4BFE965F712A58F3D6AD424FD100D028987FDED6834A64E94091F44D3C9">>},
  {<<"jsone">>, <<"6ECFD2C91E16F48E1535743B57D01A42C65D7DD51A8B43E5723B1F79927169A8">>}]}
 ].

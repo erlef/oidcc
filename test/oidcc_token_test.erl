@@ -1,5 +1,6 @@
 -module(oidcc_token_test).
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("public_key/include/OTP-PUB-KEY.hrl").
 
 
 extract_test() ->
@@ -77,7 +78,7 @@ validate_fail_issuer_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(valid,ClientId,Nonce,BadIssuer),
-    {error, {wrong_issuer, BadIssuer, Issuer}} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {error, {invalid_claims, [iss]}} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 
@@ -90,7 +91,7 @@ validate_fail_audience_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(valid,BadClientId,Nonce,Issuer),
-    {error, not_in_audience} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {error, {invalid_claims, [aud]}} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 
@@ -103,7 +104,7 @@ validate_fail_audience_group_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(valid_group,BadClientId,Nonce,Issuer),
-    {error, not_in_audience} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {error, {invalid_claims, [aud]}} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 
@@ -115,7 +116,7 @@ validate_fail_algo_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(bad_algo,ClientId,Nonce,Issuer),
-    {error, bad_algorithm} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {error, algo_not_allowed} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 
@@ -141,7 +142,7 @@ validate_fail_nonce_test() ->
     mock_oidcc(OpenIdProviderId,Issuer, ClientId),
 
     IdToken = generate_id_token(valid,ClientId,BadNonce,Issuer),
-    {error, wrong_nonce} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
+    {error, {invalid_claims, [nonce]}} = oidcc_token:validate_id_token(IdToken, OpenIdProviderId, Nonce),
     stop_mocking_oidcc(),
     ok.
 
@@ -184,7 +185,7 @@ generate_id_token(bad_algo,ClientId,Nonce,Issuer) ->
                     sub => <<"joe">>,
                     iat => 123
                    },
-    Key = <<"some shared secret">>,
+    Key = #{kty => <<"oct">>, k => <<"some shared secret">>},
     erljwt:create(hs256,ClaimSetMap,600,Key).
 
 
@@ -210,6 +211,7 @@ introspect_test() ->
 
 
 mock_oidcc(OpenIdProviderId, Issuer, ClientId) ->
+    application:set_env(erljwt, add_iat, false),
     Encode = fun(Int) ->
                      base64url:encode(binary:encode_unsigned(Int))
              end,
@@ -225,7 +227,7 @@ mock_oidcc(OpenIdProviderId, Issuer, ClientId) ->
                         }}
                end,
     SelfFun = fun(_) ->  {ok, self()} end,
-    KeysFun = fun(_) ->  {ok, [<<"some shared secret">>]} end,
+    KeysFun = fun(_) ->  {ok, [#{ kty => <<"oct">>, k => <<"some shared secret">>}]} end,
     ok = meck:new(oidcc),
     ok = meck:new(oidcc_openid_provider_mgr),
     ok = meck:new(oidcc_openid_provider),
@@ -242,7 +244,15 @@ stop_mocking_oidcc() ->
     meck:unload(oidcc),
     meck:unload(oidcc_openid_provider),
     meck:unload(oidcc_openid_provider_mgr),
+    application:unset_env(erljwt, add_iat),
     ok.
 
 generate_id_token(ClaimSetMap,Expiration) ->
-    erljwt:create(rs256,ClaimSetMap,Expiration,?RSA_PRIVATE_KEY).
+    erljwt:create(rs256,ClaimSetMap,Expiration,to_key(?RSA_PRIVATE_KEY)).
+
+to_key(#'RSAPrivateKey'{modulus = Modulus, publicExponent = PubExp,
+                        privateExponent = PrivExp})  ->
+    E = base64url:encode(binary:encode_unsigned(PubExp)),
+    N = base64url:encode(binary:encode_unsigned(Modulus)),
+    D = base64url:encode(binary:encode_unsigned(PrivExp)),
+    #{kty => <<"RSA">>, n => N, e => E , d => D}.

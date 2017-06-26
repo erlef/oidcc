@@ -114,26 +114,6 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone)
        keys := PubKeys
      } = OpInfo,
 
-    % 6. If the ID Token is received via direct communication between the Client
-    % and the Token Endpoint (which it is in this flow), the TLS server
-    % validation MAY be used to validate the issuer in place of checking the
-    % token signature. The Client MUST validate the signature of all other ID
-    % Tokens according to JWS [JWS] using the algorithm specified in the JWT alg
-    % Header Parameter. The Client MUST use the keys provided by the Issuer.
-    %
-    % 9. The current time MUST be before the time represented by the exp Claim.
-    {Header, Claims} = case verify_jwt(IdToken, PubKeys, OpenIdProviderId) of
-                           #{ claims := C, header := H} ->
-                               {H, C};
-                           invalid -> throw(invalid_signature);
-                           Error when is_atom(Error) -> throw(Error);
-                           _ -> throw(unknown_error)
-                       end,
-
-    case list_missing_required_claims(Claims) of
-        [] -> ok;
-        Missing -> throw({required_fields_missing, Missing})
-    end,
     % 1. If the ID Token is encrypted, decrypt it using the keys and algorithms
     % that the Client specified during Registration that the OP was to use to
     % encrypt the ID Token. If encryption was negotiated with the OP at
@@ -144,11 +124,6 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone)
     % 2.  The Issuer Identifier for the OpenID Provider (which is typically
     % obtained during Discovery) MUST exactly match the value of the iss
     % (issuer) Claim.
-    #{ iss := TokenIssuer} = Claims,
-    case (Issuer =:= TokenIssuer) of
-        true -> ok;
-        false -> throw({wrong_issuer, TokenIssuer, Issuer})
-    end,
 
     % 3. The Client MUST validate that the aud (audience) Claim contains its
     % client_id value registered at the Issuer identified by the iss (issuer)
@@ -156,42 +131,51 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone)
     % more than one element. The ID Token MUST be rejected if the ID Token does
     % not list the Client as a valid audience, or if it contains additional
     % audiences not trusted by the Client.
-    #{ aud := Audience} = Claims,
-    case is_part_of_audience(ClientId, Audience) of
-        true -> ok;
-        false -> throw(not_in_audience)
-    end,
 
-    % 4. If the ID Token contains multiple audiences, the Client SHOULD verify
-    % that an azp Claim is present.
-    % 5.  If an azp (authorized party) Claim is present, the Client SHOULD
-    % verify that its client_id is the Claim Value.
-    case {has_other_audience(ClientId, Audience),
-          maps:get(azp, Claims, undefined)} of
-        {false, _} ->  ok;
-        {true, ClientId} -> ok;
-        {true, Azp} when is_binary(Azp) -> throw(azp_bad);
-        {true, undefined} -> throw(azp_missing)
-    end,
+    % 11. If a nonce value was sent in the Authentication Request, a nonce Claim
+    % MUST be present and its value checked to verify that it is the same value
+    % as the one that was % sent in the Authentication Request. The Client
+    % SHOULD check the nonce value for replay attacks. The precise method for
+    % detecting replay attacks is Client specific.
+    %% NonceInToken = maps:get(nonce, Claims, undefined),
+    %% case Nonce of
+    %%     NonceInToken -> ok;
+    %%     any -> ok;
+    %%     _ -> throw(wrong_nonce)
+    %% end,
 
+    ExpClaims0 = #{aud => ClientId,
+                  iss => Issuer
+                 },
 
+    ExpClaims = case Nonce of
+                    any ->
+                        ExpClaims0;
+                    Bin when is_binary(Bin) ->
+                        maps:put(nonce, Nonce, ExpClaims0)
+                end,
+
+    % 6. If the ID Token is received via direct communication between the Client
+    % and the Token Endpoint (which it is in this flow), the TLS server
+    % validation MAY be used to validate the issuer in place of checking the
+    % token signature. The Client MUST validate the signature of all other ID
+    % Tokens according to JWS [JWS] using the algorithm specified in the JWT alg
+    % Header Parameter. The Client MUST use the keys provided by the Issuer.
+    %
     % 7. The alg value SHOULD be the default of RS256 or the algorithm sent by
     % the Client in the id_token_signed_response_alg parameter during
     % Registration.
-    #{ alg := Algo} = Header,
-    DefaultAlgorithms = [<<"RS256">>],
+
+    %% #{ alg := Algo} = Header,
+    DefaultAlgorithms = [rs256],
     AcceptedAlgorithms =
         case AllowNone
             and application:get_env(oidcc, support_none_algorithm, true) of
             true ->
-                [<<"none">> | DefaultAlgorithms];
+                [none | DefaultAlgorithms];
             _ ->
                 DefaultAlgorithms
         end,
-    case lists:member(Algo, AcceptedAlgorithms) of
-        true -> ok;
-        false -> throw(bad_algorithm)
-    end,
 
     % 8. If the JWT alg Header Parameter uses a MAC based algorithm such as
     % HS256, HS384, or HS512, the octets of the UTF-8 representation of the
@@ -207,17 +191,34 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone)
     % to be stored to prevent attacks. The acceptable range is Client specific.
     % TODO: maybe in the future, not for now
 
-    % 11. If a nonce value was sent in the Authentication Request, a nonce Claim
-    % MUST be present and its value checked to verify that it is the same value
-    % as the one that was % sent in the Authentication Request. The Client
-    % SHOULD check the nonce value for replay attacks. The precise method for
-    % detecting replay attacks is Client specific.
-    NonceInToken = maps:get(nonce, Claims, undefined),
-    case Nonce of
-        NonceInToken -> ok;
-        any -> ok;
-        _ -> throw(wrong_nonce)
+
+    % 9. The current time MUST be before the time represented by the exp Claim.
+    Claims = case verify_jwt(IdToken, AcceptedAlgorithms, ExpClaims, PubKeys,
+                             OpenIdProviderId) of
+                           #{claims := C} -> C;
+                           invalid -> throw(invalid_signature);
+                           Error  -> throw(Error)
+                       end,
+
+    case list_missing_required_claims(Claims) of
+        [] -> ok;
+        Missing -> throw({required_fields_missing, Missing})
     end,
+
+
+    % 4. If the ID Token contains multiple audiences, the Client SHOULD verify
+    % that an azp Claim is present.
+    % 5.  If an azp (authorized party) Claim is present, the Client SHOULD
+    % verify that its client_id is the Claim Value.
+    #{ aud := Audience} = Claims,
+    case {has_other_audience(ClientId, Audience),
+          maps:get(azp, Claims, undefined)} of
+        {false, _} ->  ok;
+        {true, ClientId} -> ok;
+        {true, Azp} when is_binary(Azp) -> throw(azp_bad);
+        {true, undefined} -> throw(azp_missing)
+    end,
+
 
     % 12. If the acr Claim was requested, the Client SHOULD check that the
     % asserted Claim Value is appropriate. The meaning and processing of acr
@@ -247,30 +248,26 @@ list_missing_required_claims(Jwt) ->
                 end,
     maps:fold(CheckKeys, Required, Jwt).
 
-is_part_of_audience(ClientId, Audience) when is_binary(Audience) ->
-    Audience == ClientId;
-is_part_of_audience(ClientId, Audience) when is_list(Audience) ->
-    lists:member(ClientId, Audience).
-
 has_other_audience(ClientId, Audience) when is_binary(Audience) ->
     Audience /= ClientId;
 has_other_audience(ClientId, Audience) when is_list(Audience) ->
     length(lists:delete(ClientId, Audience)) >= 1.
 
 
-verify_jwt(IdToken, Pubkeys, ProviderId) ->
-    case {erljwt:parse(IdToken, Pubkeys), ProviderId} of
-        {invalid, undefined} ->
+verify_jwt(IdToken, AllowedAlgos, ExpClaims, Pubkeys, ProviderId) ->
+    case {erljwt:validate(IdToken, AllowedAlgos, ExpClaims, Pubkeys),
+          ProviderId} of
+        {{error, _}, undefined} ->
             invalid;
-        {InvalNoKey, ProviderId}
-          when InvalNoKey==invalid; InvalNoKey==no_key_found ->
+        {{error, Reason}, ProviderId}
+          when Reason==invalid; Reason==no_key_found ->
             %% it might be the case that our keys expired ...
             %% so refetch them
             NewPubKeys = refetch_keys(ProviderId),
-            verify_jwt(IdToken, NewPubKeys, undefined);
-        {Jwt, _Provider} when is_map(Jwt)->
+            verify_jwt(IdToken, AllowedAlgos, ExpClaims, NewPubKeys, undefined);
+        {{ok, Jwt}, _Provider} when is_map(Jwt)->
             Jwt;
-        {Error, _} when is_atom(Error) ->
+        {{error, Error}, _} ->
             Error
     end.
 

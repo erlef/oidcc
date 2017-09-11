@@ -120,11 +120,30 @@ fetch_config_test() ->
     meck:unload(oidcc_http_util),
     ok.
 
+real_config_fetch_test_() ->
+    Setup = fun() ->
+                    application:set_env(oidcc, cert_depth, 5),
+                    application:set_env(oidcc, provider_max_tries, 1),
+                    application:set_env(oidcc, cacertfile, ca_file()),
+                    ok
+            end,
+    Cleanup = fun(_) ->
+                      application:unset_env(oidcc, cert_depth),
+                      application:unset_env(oidcc, provider_max_tries),
+                      application:unset_env(oidcc, cacertfile),
+                      ok
+              end,
+    WithoutKeys = {"real config fetch", fun() -> real_config_fetch(false) end},
+    WithKeys = {"real config and keys fetch", fun() -> real_config_fetch(true) end},
+    Instantiator = fun(_) ->
+                           [ WithoutKeys,
+                             {timeout, 70, [WithKeys ]}
+                           ]
+                   end,
+    {setup, Setup, Cleanup, Instantiator}.
 
 
-real_config_fetch_test() ->
-    application:set_env(oidcc, cert_depth, 5),
-    application:set_env(oidcc, cacertfile, "/etc/ssl/certs/ca-certificates.crt"),
+real_config_fetch(WithKeys) ->
     Id = <<"some id">>,
 
     ConfigEndpoint = <<"https://accounts.google.com/.well-known/openid-configuration">>,
@@ -141,7 +160,8 @@ real_config_fetch_test() ->
 
 
     {ok, Pid} = oidcc_openid_provider:start_link(Id, Config),
-    ok = wait_till_ready(Pid),
+    ok = oidcc_openid_provider:update_config(Pid),
+    ok = wait_for_config(Pid, 50),
 
     {ok, Config2} = oidcc_openid_provider:get_config(Pid),
     #{ config_endpoint := ConfigEndpoint,
@@ -150,18 +170,30 @@ real_config_fetch_test() ->
        jwks_uri := <<"https://www.googleapis.com/oauth2/v3/certs">>
      } = Config2,
 
-    {ok, Keys} = oidcc_openid_provider:update_and_get_keys(Pid),
-    true = (length(Keys) >= 1),
-    application:unset_env(oidcc, cert_depth),
-    application:unset_env(oidcc, cacertfile),
+    ok = case WithKeys of
+             true ->
+                 {ok, Keys} = oidcc_openid_provider:update_and_get_keys(Pid),
+                 true = (length(Keys) >= 1),
+                 ok;
+             _ ->
+                 ok
+         end,
+
     ok = oidcc_openid_provider:stop(Pid),
     ok = test_util:wait_for_process_to_die(Pid, 100).
 
 
-wait_till_ready(Pid) ->
-    case oidcc_openid_provider:is_ready(Pid) of
-        true -> ok;
+wait_for_config(_, 0) ->
+    timeout;
+wait_for_config(Pid, Timeout) ->
+    {ok, Config} = oidcc_openid_provider:get_config(Pid),
+    case maps:is_key(jwks_uri, Config) of
+        true ->
+            ok;
         false ->
             timer:sleep(100),
-            wait_till_ready(Pid)
+            wait_for_config(Pid, Timeout - 1)
     end.
+
+ca_file() ->
+    code:where_is_file("cacert.pem").

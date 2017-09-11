@@ -9,11 +9,11 @@ clean:
 	$(REBAR) clean
 
 eunit:
-	$(REBAR) do eunit, cover -v
+	$(REBAR) do eunit -v, cover -v
 	cp _build/test/cover/eunit.coverdata .
 
 ct:
-	$(REBAR) do ct, cover -v
+	$(REBAR) do ct -v, cover -v
 	cp _build/test/cover/ct.coverdata .
 
 tests:

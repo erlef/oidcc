@@ -122,7 +122,6 @@ handle_call(get_config, _From, State) ->
     Conf = create_config(State),
     {reply, {ok, Conf}, State, ?GEN_TIMEOUT};
 handle_call(update_and_get_keys, From, #state{key_requests = Requests}=State) ->
-    trigger_config_retrieval_if_needed(State),
     trigger_key_retrieval(),
     NewRequests = [ From | Requests ],
     NewState = State#state{key_requests = NewRequests},
@@ -131,7 +130,6 @@ handle_call(get_error, _From, #state{error=Error} = State) ->
     trigger_config_retrieval_if_needed(State),
     {reply, {ok, Error}, State, ?GEN_TIMEOUT};
 handle_call(update_config, _From, State) ->
-    trigger_config_retrieval_if_needed(State),
     ok = trigger_config_retrieval(),
     {reply, ok, State#state{config_tries=0}, ?GEN_TIMEOUT};
 handle_call({is_issuer, Issuer}, _From, #state{config=Config}=State) ->
@@ -148,7 +146,6 @@ handle_call(_Request, _From, State) ->
 
 handle_cast(retrieve_config, #state{ request_id = undefined,
                                      config_ep=ConfigEndpoint} = State) ->
-    trigger_config_retrieval_if_needed(State),
     NewState = http_async_get(config, ConfigEndpoint, [], State),
     {noreply, NewState, ?GEN_TIMEOUT};
 handle_cast(retrieve_config, State) ->
@@ -201,7 +198,7 @@ handle_info({http, {RequestId, Result}}, #state{request_id = RequestId} =
     trigger_config_retrieval_if_needed(State),
     NewState = handle_http_result(State#state{http_result = Result}),
     {noreply, NewState, ?GEN_TIMEOUT};
-handle_info(_Info, State) ->
+handle_info(timeout, State) ->
     trigger_config_retrieval_if_needed(State),
     {noreply, State, ?GEN_TIMEOUT}.
 
@@ -339,13 +336,13 @@ handle_keys(Data, _Header, State) ->
     KeyConfig=decode_json(Data),
     KeyList = maps:get(keys, KeyConfig, []),
     NewState = State#state{keys  = KeyList, lasttime_updated = timestamp(),
-                           request_id = undefined},
+                           request_id = undefined, key_requests = []},
     send_key_replies(KeyList, State),
     case length(KeyList) > 0 of
         true ->
             NewState;
         false ->
-            NewState#state{error = {no_keys, Data}, request_id = undefined}
+            NewState#state{error = {no_keys, Data}}
     end.
 
 send_key_replies(Keys, #state{key_requests = Requests}) ->
@@ -385,13 +382,20 @@ decode_json(Data) ->
 
 
 
-handle_http_client_crash(Reason, #state{config_tries=Tries} = State) ->
+handle_http_client_crash(Reason, #state{config_tries=Tries,
+                                        retrieving=Type} = State) ->
     MaxRetries = application:get_env(oidcc, provider_max_tries, 5),
     case Tries >= MaxRetries of
         true ->
             State#state{error = Reason};
         false ->
-            State#state{request_id=undefined, retrieving=undefined,
+            case Type of
+                keys ->
+                    trigger_key_retrieval();
+                config ->
+                    trigger_config_retrieval()
+            end,
+            State#state{request_id=undefined,
                         http_result={}, config_tries=Tries+1,
                         config_deadline = deadline_in(300)}
     end.

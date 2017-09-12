@@ -10,6 +10,9 @@ https_bad_config_test() ->
                  oidcc_http_util:sync_http(get,Url,[])),
     ok.
 
+https_sync_get_googleapis_test() ->
+    Url = <<"https://www.googleapis.com/oauth2/v3/certs">>,
+    https_sync_request(Url, 2).
 
 https_sync_get_github_test() ->
     Url = <<"https://www.github.com">>,

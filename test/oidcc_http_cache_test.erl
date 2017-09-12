@@ -53,19 +53,24 @@ enqueue_test() ->
 
 
 clean_test() ->
+    application:unset_env(oidcc, http_cache_clean),
     application:set_env(oidcc, http_cache_duration, 1),
     {ok, Pid} = oidcc_http_cache:start_link(),
     application:unset_env(oidcc, http_cache_duration),
 
     ?assertEqual(ok, oidcc_http_cache:cache_http_result(a, b, c)),
     ?assertEqual({ok, c}, oidcc_http_cache:lookup_http_call(a, b)),
+    io:format("ets: ~p~n",[ets:match(oidcc_ets_http_cache, {'$1', '$2', '$3'})]),
     oidcc_http_cache:trigger_cleaning(),
+    timer:sleep(200),
     ?assertEqual({ok, c}, oidcc_http_cache:lookup_http_call(a, b)),
 
-    timer:sleep(1000),
+    io:format("ets: ~p~n",[ets:match(oidcc_ets_http_cache, {'$1', '$2', '$3'})]),
+    timer:sleep(2000),
+    io:format("ets: ~p~n",[ets:match(oidcc_ets_http_cache, {'$1', '$2', '$3'})]),
     ?assertEqual({error, outdated}, oidcc_http_cache:lookup_http_call(a, b)),
-    oidcc_http_cache:trigger_cleaning(),
     wait_for_cache(),
+
     ?assertEqual({error, not_found}, oidcc_http_cache:lookup_http_call(a, b)),
 
     ok = oidcc_http_cache:stop(),
@@ -81,6 +86,8 @@ auto_clean_test() ->
 
 
     ?assertEqual(ok, oidcc_http_cache:cache_http_result(a, b, c)),
+    ?assertEqual({ok, c}, oidcc_http_cache:lookup_http_call(a, b)),
+    timer:sleep(1000),
     ?assertEqual({ok, c}, oidcc_http_cache:lookup_http_call(a, b)),
     timer:sleep(1000),
     ?assertEqual(ok, oidcc_http_cache:cache_http_result(b, c, d)),

@@ -20,7 +20,6 @@
 
 -record(state, {
           ets_cache = undefined,
-          ets_time = undefined,
           cache_duration = undefined,
           clean_timeout = undefined,
           last_clean = undefined
@@ -54,12 +53,10 @@ trigger_cleaning() ->
 %% gen_server.
 init(_) ->
     EtsCache = ets:new(oidcc_ets_http_cache, [set, protected, named_table]),
-    EtsTime = ets:new(oidcc_ets_http_cache_time, [ordered_set, private]),
     CacheDuration = application:get_env(oidcc, http_cache_duration, none),
     CleanTimeout = application:get_env(oidcc, http_cache_clean, 60),
     Now = erlang:system_time(seconds),
     {ok, #state{ets_cache=EtsCache,
-                ets_time = EtsTime,
                 cache_duration = CacheDuration,
                 clean_timeout = CleanTimeout,
                 last_clean = Now
@@ -76,7 +73,7 @@ handle_call(_Request, _From, State) ->
     {reply, ignored, State}.
 
 
-insert_into_cache(Key, Result, #state{ets_cache = EtsCache, ets_time = EtsTime,
+insert_into_cache(Key, Result, #state{ets_cache = EtsCache,
                                       cache_duration=Duration})
   when is_integer(Duration), Duration > 0 ->
     Now = erlang:system_time(seconds),
@@ -90,7 +87,6 @@ insert_into_cache(Key, Result, #state{ets_cache = EtsCache, ets_time = EtsTime,
     Inserted = ets:insert_new(EtsCache, {Key, Timeout, Result}),
     case {Result, Inserted} of
         {pending, true} ->
-            true = ets:insert(EtsTime, {Timeout, Key}),
             true;
 
         {pending, false} ->
@@ -98,7 +94,6 @@ insert_into_cache(Key, Result, #state{ets_cache = EtsCache, ets_time = EtsTime,
 
         {_, _} ->
             true = ets:insert(EtsCache, {Key, Timeout, Result}),
-            true = ets:insert(EtsTime, {Timeout, Key}),
             ok
     end;
 insert_into_cache(_Key, pending, _NoDuration) ->
@@ -108,17 +103,9 @@ insert_into_cache(_Key, _Result, _NoDuration) ->
     ok.
 
 
-handle_cast(clean_cache, #state{ets_cache=EtsCache,
-                                ets_time=EtsTime
-                               } = State) ->
-    Now = erlang:system_time(seconds),
-    case ets:first(EtsTime) of
-        '$end_of_table' ->
-            ok;
-        Timeout ->
-            delete_entry_if_outdated(Timeout, EtsCache, EtsTime, Now >= Timeout)
-    end,
-    {noreply, State#state{last_clean=Now}};
+handle_cast(clean_cache, State) ->
+    NewState = clean_cache(State),
+    {noreply, NewState};
 handle_cast(stop, State) ->
     {stop, normal, State};
 handle_cast(_Msg, State) ->
@@ -140,7 +127,7 @@ read_cache(Key) ->
     Now = erlang:system_time(seconds),
     case ets:lookup(oidcc_ets_http_cache, Key) of
         [{Key, Timeout, Result}] ->
-            return_if_not_outdated(Result, Timeout > Now);
+            return_if_not_outdated(Result, Timeout >= Now);
         [] ->
             {error, not_found}
     end.
@@ -156,18 +143,13 @@ trigger_cleaning_if_needed(#state{last_clean=LastClean,
             ok
     end.
 
+clean_cache(#state{ets_cache = CT} = State) ->
+    Now = erlang:system_time(seconds),
+    ets:select_delete(CT, [{{'_', '$1', '_'}, [{'<', '$1', Now}] , [true]}]),
+    State#state{last_clean = Now}.
 
 return_if_not_outdated(Result, true) ->
     {ok, Result};
 return_if_not_outdated(_, _) ->
     trigger_cleaning(),
     {error, outdated}.
-
-delete_entry_if_outdated(Timeout, EtsCache, EtsTime, true) ->
-    [{Timeout, Key}] = ets:lookup(EtsTime, Timeout),
-    true = ets:delete(EtsTime, Timeout),
-    true = ets:delete(EtsCache, Key),
-    trigger_cleaning(),
-    ok;
-delete_entry_if_outdated(_Timeout, _EtsCache, _EtsTime, _) ->
-    ok.

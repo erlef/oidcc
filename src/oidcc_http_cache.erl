@@ -20,8 +20,6 @@
 
 -record(state, {
           ets_cache = undefined,
-          cache_duration = undefined,
-          clean_timeout = undefined,
           last_clean = undefined
          }).
 
@@ -53,28 +51,25 @@ trigger_cleaning() ->
 %% gen_server.
 init(_) ->
     EtsCache = ets:new(oidcc_ets_http_cache, [set, protected, named_table]),
-    CacheDuration = application:get_env(oidcc, http_cache_duration, none),
-    CleanTimeout = application:get_env(oidcc, http_cache_clean, 60),
     Now = erlang:system_time(seconds),
     {ok, #state{ets_cache=EtsCache,
-                cache_duration = CacheDuration,
-                clean_timeout = CleanTimeout,
                 last_clean = Now
                }}.
 
 handle_call({enqueue, Key}, _From, State) ->
-    Result = insert_into_cache(Key, pending, State),
+    CacheDuration = application:get_env(oidcc, http_cache_duration, none),
+    Result = insert_into_cache(Key, pending, CacheDuration, State),
     {reply, Result, State};
 handle_call({cache_http, Key, Result}, _From, State) ->
+    CacheDuration = application:get_env(oidcc, http_cache_duration, none),
     ok = trigger_cleaning_if_needed(State),
-    ok = insert_into_cache(Key, Result, State),
+    ok = insert_into_cache(Key, Result, CacheDuration, State),
     {reply, ok, State};
 handle_call(_Request, _From, State) ->
     {reply, ignored, State}.
 
 
-insert_into_cache(Key, Result, #state{ets_cache = EtsCache,
-                                      cache_duration=Duration})
+insert_into_cache(Key, Result, Duration, #state{ets_cache = EtsCache})
   when is_integer(Duration), Duration > 0 ->
     Now = erlang:system_time(seconds),
     Timeout =
@@ -96,10 +91,10 @@ insert_into_cache(Key, Result, #state{ets_cache = EtsCache,
             true = ets:insert(EtsCache, {Key, Timeout, Result}),
             ok
     end;
-insert_into_cache(_Key, pending, _NoDuration) ->
+insert_into_cache(_Key, pending, _NoDuration, _State) ->
     %% if not using cache always perform the request
     true;
-insert_into_cache(_Key, _Result, _NoDuration) ->
+insert_into_cache(_Key, _Result, _NoDuration, _State) ->
     ok.
 
 
@@ -132,9 +127,9 @@ read_cache(Key) ->
             {error, not_found}
     end.
 
-trigger_cleaning_if_needed(#state{last_clean=LastClean,
-                                  clean_timeout=CleanTimeout}) ->
+trigger_cleaning_if_needed(#state{last_clean=LastClean}) ->
     Now = erlang:system_time(seconds),
+    CleanTimeout = application:get_env(oidcc, http_cache_clean, 60),
     case (Now - LastClean) >= CleanTimeout of
         true ->
             trigger_cleaning(),

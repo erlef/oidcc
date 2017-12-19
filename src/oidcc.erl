@@ -38,6 +38,7 @@ add_openid_provider(IssuerOrConfigEP, LocalEndpoint, AdditionalConfig) ->
                     client_id => undefined,
                     client_secret => <<"">>,
                     request_scopes => undefined,
+                    static_extend_url => #{},
                     registration_params => #{}
                    },
     ForceUpdate = #{ issuer_or_endpoint => IssuerOrConfigEP,
@@ -290,15 +291,17 @@ create_redirect_url_if_ready(#{ready := false}, _) ->
 create_redirect_url_if_ready(Info, Config) ->
     #{ local_endpoint := LocalEndpoint,
        client_id := ClientId,
-       authorization_endpoint := AuthEndpoint
+       authorization_endpoint := AuthEndpoint,
+       static_extend_url := StaticUrlKeyValues
      } = Info,
     #{
        scopes := Scopes,
        state := OidcState,
        nonce := OidcNonce,
        pkce := Pkce,
-       url_extension := UrlKeyValues
+       url_extension := DynUrlKeyValues
      } = Config,
+    UrlKeyValues = maps:merge(StaticUrlKeyValues, DynUrlKeyValues),
     UrlList = [
                {<<"response_type">>, <<"code">>},
                {<<"client_id">>, ClientId},

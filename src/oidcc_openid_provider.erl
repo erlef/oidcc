@@ -39,6 +39,7 @@
           lasttime_updated = undefined,
           local_endpoint = undefined,
           meta_data = #{},
+          static_extend_url = #{},
 
           config_tries = 1,
           config_deadline = undefined,
@@ -94,7 +95,8 @@ init({Id, Config}) ->
       description := Description,
       request_scopes := Scopes,
       issuer_or_endpoint := IssuerOrEndpoint,
-      local_endpoint := LocalEndpoint
+      local_endpoint := LocalEndpoint,
+      static_extend_url := ExtendUrl
      } = Config,
     RegistrationParams = maps:get(registration_params, Config, #{}),
     ClientSecret = maps:get(client_secret, Config, undefined),
@@ -114,7 +116,7 @@ init({Id, Config}) ->
                 client_secret = ClientSecret, config_ep = ConfigEndpoint,
                 request_scopes = Scopes, local_endpoint = LocalEndpoint,
                 issuer = Issuer, registration_params = RegistrationParams,
-                extra_config = ExtraConfig
+                static_extend_url = ExtendUrl, extra_config = ExtraConfig
                }}.
 
 handle_call(get_config, _From, State) ->
@@ -255,7 +257,8 @@ create_config(#state{id = Id, desc = Desc, client_id = ClientId,
                      lasttime_updated = LastTimeUpdated, ready = Ready,
                      local_endpoint = LocalEndpoint, name = Name,
                      request_scopes = Scopes, meta_data = MetaData,
-                     config_deadline = ConfDeadline, extra_config = ExtraConfig
+                     config_deadline = ConfDeadline, extra_config = ExtraConfig,
+                     static_extend_url = StaticExtUrl
                     }) ->
     StateList = [{id, Id}, {name, Name}, {description, Desc},
                  {client_id, ClientId}, {client_secret, ClientSecret},
@@ -263,7 +266,7 @@ create_config(#state{id = Id, desc = Desc, client_id = ClientId,
                  {ready, Ready}, {local_endpoint, LocalEndpoint}, {keys, Keys},
                  {request_scopes, Scopes}, {issuer, Issuer},
                  {meta_data, MetaData}, {config_deadline, ConfDeadline},
-                 {extra_config, ExtraConfig}
+                 {extra_config, ExtraConfig}, {static_extend_url, StaticExtUrl}
                 ],
     maps:merge(Config, maps:from_list(StateList)).
 

@@ -10,7 +10,8 @@ start_stop_test() ->
                client_secret => <<"dont tell">>,
                request_scopes => undefined,
                issuer_or_endpoint => <<"http://my.provider.com/">>,
-               local_endpoint => <<"/here">>
+               local_endpoint => <<"/here">>,
+               static_extend_url => #{}
               },
     Id = <<"some id">>,
     {ok, Pid} = oidcc_openid_provider:start_link(Id, Config),
@@ -33,7 +34,8 @@ set_test() ->
                client_secret => ClientSecret,
                request_scopes => undefined,
                issuer_or_endpoint => ConfigEndpoint,
-               local_endpoint => LocalEndpoint
+               local_endpoint => LocalEndpoint,
+               static_extend_url => #{}
               },
     {ok, Pid} = oidcc_openid_provider:start_link(Id, ConfigIn),
     {ok, Config} = oidcc_openid_provider:get_config(Pid),
@@ -73,7 +75,8 @@ fetch_config_test() ->
                request_scopes => undefined,
                issuer_or_endpoint => ConfigEndpoint,
                local_endpoint => <<"/here">>,
-               test => <<"extra config">>
+               test => <<"extra config">>,
+               static_extend_url => #{}
               },
     HttpFun = fun(Method, Url, _Header)  ->
                       Method = get,
@@ -155,7 +158,8 @@ real_config_fetch(WithKeys) ->
                client_secret => <<"dont tell">>,
                request_scopes => undefined,
                issuer_or_endpoint => Issuer,
-               local_endpoint => <<"/here">>
+               local_endpoint => <<"/here">>,
+               static_extend_url => #{}
               },
 
 

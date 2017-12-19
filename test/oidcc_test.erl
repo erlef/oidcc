@@ -94,7 +94,8 @@ create_redirect_url_test() ->
                      Pid = MyPid,
                      {ok, #{local_endpoint => LocalEndpoint,
                             client_id => ClientId,
-                            authorization_endpoint => AuthzEndpoint
+                            authorization_endpoint => AuthzEndpoint,
+                            static_extend_url => #{<<"test">> => <<"id">>}
                            }}
                 end,
     MapFun = fun(Id) ->
@@ -115,27 +116,34 @@ create_redirect_url_test() ->
     Config3 = #{scopes => [email, profile, openid],
                 state => State,
                 nonce => Nonce},
+    Config4 = #{scopes => ["email", <<"openid">>],
+                url_extension => #{<<"other">> => <<"green">>}},
+
 
     {ok, Url1} = oidcc:create_redirect_url(ProviderId),
     {ok, Url2} = oidcc:create_redirect_url(ProviderId, Config1),
     {ok, Url3} = oidcc:create_redirect_url(ProviderId, Config2),
     {ok, Url4} = oidcc:create_redirect_url(ProviderId, Config3),
+    {ok, Url5} = oidcc:create_redirect_url(ProviderId, Config4),
 
-    ExpUrl1 = <<"https://my.provider/auth?scope=openid&response_type=code&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
+    ExpUrl1 = <<"https://my.provider/auth?scope=openid&response_type=code&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
     ?assertEqual(ExpUrl1, Url1),
 
     ExpUrl2 =
-    <<"https://my.provider/auth?scope=openid+email&response_type=code&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
+    <<"https://my.provider/auth?scope=openid+email&response_type=code&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
     ?assertEqual(ExpUrl2, Url2),
 
     ExpUrl3 =
-    <<"https://my.provider/auth?scope=openid+profile+email&state=someimportantstate&response_type=code&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
+    <<"https://my.provider/auth?scope=openid+profile+email&state=someimportantstate&response_type=code&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
     ?assertEqual(ExpUrl3, Url3),
 
     ExpUrl4 =
-    <<"https://my.provider/auth?scope=openid+profile+email&nonce=noncenonce&state=someimportantstate&response_type=code&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
+    <<"https://my.provider/auth?scope=openid+profile+email&nonce=noncenonce&state=someimportantstate&response_type=code&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
     ?assertEqual(ExpUrl4, Url4),
 
+    ExpUrl5 =
+    <<"https://my.provider/auth?scope=openid+email&response_type=code&client_id=123&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id&other=green">>,
+    ?assertEqual(ExpUrl5, Url5),
     true = meck:validate(oidcc_openid_provider),
     true = meck:validate(oidcc_openid_provider_mgr),
     meck:unload(oidcc_openid_provider),

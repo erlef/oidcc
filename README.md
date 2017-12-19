@@ -48,6 +48,7 @@ The parameter are:
   * client_secret: the client secret which has been generated during manual registration
   * request_scopes: the scopes to request by default when using this provider
   * registration_params: a map of parameter to use during the dynamic registration.
+  * static_extend_url: a map used to create key/values in the redirection url
 
 
 ### Login Users

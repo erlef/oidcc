@@ -8,6 +8,7 @@
 -export([create_redirect_url/1]).
 -export([create_redirect_url/2]).
 -export([create_redirect_for_session/1]).
+-export([create_redirect_for_session/2]).
 -export([retrieve_and_validate_token/2]).
 -export([retrieve_and_validate_token/3]).
 -export([retrieve_user_info/2]).

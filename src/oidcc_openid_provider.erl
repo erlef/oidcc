@@ -276,7 +276,8 @@ handle_config(Data, Header, #state{issuer=Issuer} = State) ->
     Config = decode_json(Data),
     ConfIssuer = maps:get(issuer, Config, undefined),
 
-    SameIssuer = is_same_issuer(ConfIssuer, Issuer),
+    SameIssuer = application:get_env(oidcc, skip_verify_same_issuer, false)
+      or is_same_issuer(ConfIssuer, Issuer),
     AuthCodeFlow = supports_auth_code(Config),
     case {SameIssuer, AuthCodeFlow} of
         {true, true} ->

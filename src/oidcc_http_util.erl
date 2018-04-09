@@ -145,10 +145,11 @@ options(Url) when is_binary(Url) ->
 
 ssl_options(HostName, BaseOptions) ->
     VerifyFun = ssl_verify_fun(HostName),
-    CaCert = application:get_env(oidcc, cacertfile),
+    CaCertFileConfig = application:get_env(oidcc, cacertfile),
+    CaCertConfig = application:get_env(oidcc, cacerts, certifi:cacerts()),
     Depth = application:get_env(oidcc, cert_depth, 1),
-    case CaCert of
-        {ok, CaCertFile} ->
+    case {CaCertFileConfig, CaCertConfig} of
+        {{ok, CaCertFile}, _} ->
             {ok, [{ssl, [
                     {verify, verify_peer},
                     {verify_fun, VerifyFun},
@@ -156,8 +157,14 @@ ssl_options(HostName, BaseOptions) ->
                     {depth, Depth}
                    ] }
             ] ++ BaseOptions};
-        _ ->
-            {error, missing_cacertfile}
+        {_, CaCerts} ->
+          {ok, [{ssl, [
+                  {verify, verify_peer},
+                  {verify_fun, VerifyFun},
+                  {cacerts, CaCerts},
+                  {depth, Depth}
+                 ] }
+          ] ++ BaseOptions}
     end.
 
 

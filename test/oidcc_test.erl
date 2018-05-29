@@ -1,6 +1,16 @@
 -module(oidcc_test).
 -include_lib("eunit/include/eunit.hrl").
 
+remove_openid_provider_test() ->
+  ok = meck:expect(oidcc_openid_provider_mgr, remove_openid_provider, fun(_) -> ok end),
+
+  Id = <<"123345456">>,
+  ok = oidcc:remove_openid_provider(Id),
+
+  true = meck:validate(oidcc_openid_provider_mgr),
+  meck:unload(oidcc_openid_provider_mgr),
+  ok.
+
 add_openid_provider_test() ->
     MyPid = self(),
     RandomId = <<"6">>,

@@ -26,6 +26,35 @@ simple_add_test() ->
     ok = stop_meck(ProvPid),
     ok.
 
+remove_test() ->
+    Config = #{name => <<"some name">>,
+               description => <<"some description">>,
+               client_id => <<"123">>,
+               client_secret => <<"dont tell">>,
+               issuer_or_endpoint => <<"well.known">>,
+               local_endpoint => <<"/here">>
+              },
+    {ok, ProvPid} = meck(),
+    ok = meck:expect(oidcc_openid_provider_sup, remove_openid_provider, fun(_) -> ok end),
+
+    {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
+    {ok, Id, ProvPid} = oidcc_openid_provider_mgr:add_openid_provider(Config),
+    ok = oidcc_openid_provider_mgr:remove_openid_provider(Id),
+    ok = oidcc_openid_provider_mgr:stop(),
+    ok = test_util:wait_for_process_to_die(Pid, 100),
+
+    true = meck:validate(oidcc_openid_provider_sup),
+    ok = stop_meck(ProvPid),
+    ok.
+
+unknown_remove_test() ->
+  {ok, ProvPid} = meck(),
+  {ok, Pid} = oidcc_openid_provider_mgr:start_link(),
+  {error, not_found} = oidcc_openid_provider_mgr:remove_openid_provider("unknown"),
+  ok = oidcc_openid_provider_mgr:stop(),
+  ok = test_util:wait_for_process_to_die(Pid, 100),
+  ok = stop_meck(ProvPid),
+  ok.
 
 id_add_test() ->
     Id = <<"123">>,

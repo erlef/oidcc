@@ -4,6 +4,7 @@
 %% API.
 -export([start_link/0]).
 -export([stop/0]).
+-export([remove_openid_provider/1]).
 -export([add_openid_provider/1]).
 -export([get_openid_provider/1]).
 -export([find_openid_provider/1]).
@@ -36,6 +37,12 @@ start_link() ->
 stop() ->
     gen_server:cast(?MODULE, stop).
 
+-spec remove_openid_provider(Id::binary()) ->
+    ok | {error, Reason::atom()}.
+remove_openid_provider(Id) ->
+    gen_server:call(?MODULE, {remove_provider, Id}).
+
+
 -spec add_openid_provider(Config::map()) ->
     {ok, Id::binary(), pid()} | {error, Reason::atom()}.
 add_openid_provider(Config) ->
@@ -62,6 +69,8 @@ init([]) ->
     MonEts = ets:new(oidcc_ets_monitor, [set, protected]),
     {ok, #state{ets_prov=ProvEts, ets_iss=IssEts, ets_mon = MonEts}}.
 
+handle_call({remove_provider, Id}, _From, State) ->
+    remove_provider(Id, State);
 handle_call({add_provider, undefined, Config}, _From, State) ->
     add_provider(Config, State);
 handle_call({add_provider, Id, Config}, _From, State) ->
@@ -96,6 +105,14 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+remove_provider(Id, State) ->
+    case get_provider(Id) of
+      {ok, _Pid} ->
+        ok = stop_provider(Id),
+        {reply, ok, State};
+      {error, Error} -> {reply, {error, Error}, State}
+    end.
 
 try_adding_provider(Id, Config, State) ->
     case is_unique_id(Id, State) of
@@ -139,6 +156,9 @@ find_provider(Issuer) ->
 
 start_provider(Id, Config) ->
     oidcc_openid_provider_sup:add_openid_provider(Id, Config).
+
+stop_provider(Id) ->
+    oidcc_openid_provider_sup:remove_openid_provider(Id).
 
 insert_provider(Id, IssuerOrEndpoint, Pid,
                 #state{ets_prov=ProvEts, ets_iss=IssEts, ets_mon=MonEts}) ->

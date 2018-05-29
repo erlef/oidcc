@@ -1,5 +1,6 @@
 -module(oidcc).
 
+-export([remove_openid_provider/1]).
 -export([add_openid_provider/2]).
 -export([add_openid_provider/3]).
 -export([find_openid_provider/1]).
@@ -17,6 +18,15 @@
 -export([retrieve_fresh_token/3]).
 -export([introspect_token/2]).
 -export([register_module/1]).
+
+
+%% @doc
+%% remove an OpenID Connect Provider from the list of possible Providers
+%% @end
+-spec remove_openid_provider(binary()) -> ok | {error, Reason::any()}.
+remove_openid_provider(IssuerOrConfigEP) ->
+  oidcc_openid_provider_mgr:remove_openid_provider(IssuerOrConfigEP).
+
 
 
 

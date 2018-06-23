@@ -7,6 +7,7 @@
 -export([add_openid_provider/1]).
 -export([get_openid_provider/1]).
 -export([find_openid_provider/1]).
+-export([find_all_openid_provider/1]).
 -export([get_openid_provider_list/0]).
 
 
@@ -52,7 +53,12 @@ get_openid_provider_list() ->
 -spec find_openid_provider(Issuer::binary()) -> {ok, pid()}
                                                 | {error, not_found}.
 find_openid_provider(Issuer) ->
-    find_provider(Issuer).
+    find_provider(Issuer, false).
+
+-spec find_all_openid_provider(Issuer::binary()) -> {ok, [pid()]}
+                                                | {error, not_found}.
+find_all_openid_provider(Issuer) ->
+    find_provider(Issuer, true).
 
 %% gen_server.
 
@@ -128,11 +134,15 @@ get_provider(Id) ->
         _ -> {error, not_found}
     end.
 
-find_provider(Issuer) ->
+find_provider(Issuer, All) ->
     Ets = oidcc_ets_issuer,
-    case ets:lookup(Ets, Issuer) of
-        [{Issuer, Pid}] ->
+    case {ets:lookup(Ets, Issuer), All} of
+        {[{Issuer, Pid}], false} ->
             {ok, Pid};
+        {[], _} ->
+            {error, not_found};
+        {List, false} when is_list(List) ->
+            {ok, List};
         _ ->
             {error, not_found}
     end.

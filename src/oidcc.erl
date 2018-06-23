@@ -3,6 +3,7 @@
 -export([add_openid_provider/2]).
 -export([add_openid_provider/3]).
 -export([find_openid_provider/1]).
+-export([find_all_openid_provider/1]).
 -export([get_openid_provider_info/1]).
 -export([get_openid_provider_list/0]).
 -export([create_redirect_url/1]).
@@ -55,6 +56,11 @@ add_openid_provider(IssuerOrConfigEP, LocalEndpoint, AdditionalConfig) ->
                                                     | {error, not_found}.
 find_openid_provider(Issuer) ->
     oidcc_openid_provider_mgr:find_openid_provider(Issuer).
+
+-spec find_all_openid_provider(Issuer::binary()) -> {ok, [pid()]}
+                                                    | {error, not_found}.
+find_all_openid_provider(Issuer) ->
+    oidcc_openid_provider_mgr:find_all_openid_provider(Issuer).
 
 %% @doc
 %% get information from a given OpenId Connect Provider

@@ -142,7 +142,10 @@ find_provider(Issuer, All) ->
         {[], _} ->
             {error, not_found};
         {List, false} when is_list(List) ->
-            {ok, List};
+            ToPid = fun({_, Pid}, Pids) ->
+                            [Pid | Pids]
+                    end,
+            {ok, lists:fold(ToPid, [], List)};
         _ ->
             {error, not_found}
     end.

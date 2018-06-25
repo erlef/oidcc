@@ -64,7 +64,7 @@ find_all_openid_provider(Issuer) ->
 
 init([]) ->
     ProvEts = ets:new(oidcc_ets_provider, [set, protected, named_table]),
-    IssEts = ets:new(oidcc_ets_issuer, [set, protected, named_table]),
+    IssEts = ets:new(oidcc_ets_issuer, [bag, protected, named_table]),
     MonEts = ets:new(oidcc_ets_monitor, [set, protected]),
     {ok, #state{ets_prov=ProvEts, ets_iss=IssEts, ets_mon = MonEts}}.
 
@@ -81,15 +81,15 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 
-handle_info({'DOWN', MRef, process, _Object, _Info},
+handle_info({'DOWN', MRef, process, Pid, _Info},
             #state{ets_mon=MonEts, ets_prov=ProvEts, ets_iss=IssEts} = State) ->
     case ets:lookup(MonEts, MRef) of
         [{MRef, Id, Issuer}] ->
             [Issuer1, Issuer2] = to_issuer(Issuer),
             true = ets:delete(MonEts, MRef),
             true = ets:delete(ProvEts, Id),
-            true = ets:delete(IssEts, Issuer1),
-            true = ets:delete(IssEts, Issuer2),
+            true = ets:delete_object(IssEts, {Issuer1, Pid}),
+            true = ets:delete_object(IssEts, {Issuer2, Pid}),
             ok;
         _ -> ok
     end,

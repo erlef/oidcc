@@ -192,7 +192,7 @@ ssl_verify_fun(Hostname) ->
                 Valid = case lists:foldl(Compare, CrtList, BinHostList) of
                             [] -> true;
                             Other -> Other
-                        end,
+                        end == true,
                 case Valid and LongEnough of
                     true -> true;
                     _ -> CurValid

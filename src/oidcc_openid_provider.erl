@@ -162,7 +162,7 @@ handle_cast(retrieve_keys, #state{ request_id = undefined,
                 State#state{error=no_jwk_uri};
             KeyEndpoint ->
                 Header = [{"accept",
-                           "application/json;q=0.7,application/jwk+json"}],
+                           "application/json;q=0.7,application/jwk+json,application/jwk-set+json"}],
                 http_async_get(keys, KeyEndpoint, Header, State)
         end,
     {noreply, NewState, ?GEN_TIMEOUT};

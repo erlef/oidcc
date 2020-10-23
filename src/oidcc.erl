@@ -431,9 +431,7 @@ return_json_info({ok, Map}) ->
 
 
 basic_auth(User, Secret) ->
-    UserEnc = oidcc_http_util:urlencode(User),
-    SecretEnc = oidcc_http_util:urlencode(Secret),
-    RawAuth = <<UserEnc/binary, <<":">>/binary, SecretEnc/binary>>,
+    RawAuth = <<User/binary, <<":">>/binary, Secret/binary>>,
     AuthData = base64:encode(RawAuth),
     BasicAuth = << <<"Basic ">>/binary, AuthData/binary >>,
     {<<"authorization">>, BasicAuth}.

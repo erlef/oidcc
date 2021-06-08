@@ -200,4 +200,4 @@ wait_for_config(Pid, Timeout) ->
     end.
 
 ca_file() ->
-    code:where_is_file("cacert.pem").
+    certifi:cacertfile().

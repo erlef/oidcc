@@ -2,7 +2,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 ca_file() ->
-    code:where_is_file("cacert.pem").
+    certifi:cacertfile().
 
 https_bad_config_test() ->
     Url = <<"https://www.openid.net">>,

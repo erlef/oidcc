@@ -2,7 +2,7 @@
 [{<<"base64url">>,{pkg,<<"base64url">>,<<"1.0.1">>},1},
  {<<"erljwt">>,
   {git,"https://github.com/jshmrtn/erljwt.git",
-       {ref,"6f1f81eda4c746d867e12ff070b36d56c8dc86ba"}},
+       {ref,"17124ee1df5f23c763f213c28d792e64ed9301e9"}},
   0},
  {<<"jsone">>,{pkg,<<"jsone">>,<<"1.5.7">>},1}]}.
 [

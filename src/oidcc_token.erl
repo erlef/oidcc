@@ -164,17 +164,16 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone)
     %
     % 7. The alg value SHOULD be the default of RS256 or the algorithm sent by
     % the Client in the id_token_signed_response_alg parameter during
-    % Registration.
-
-    %% #{ alg := Algo} = Header,
-    DefaultAlgorithms = [rs256],
+    % Registration.    
+    
+    SupportedAlgorithms = supported_algos(OpenIdProviderId),
     AcceptedAlgorithms =
         case AllowNone
             and application:get_env(oidcc, support_none_algorithm, true) of
             true ->
-                [none | DefaultAlgorithms];
+                [none | SupportedAlgorithms];
             _ ->
-                DefaultAlgorithms
+                SupportedAlgorithms
         end,
 
     % 8. If the JWT alg Header Parameter uses a MAC based algorithm such as
@@ -183,17 +182,22 @@ int_validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone)
     % (audience) Claim are used as the key to validate the signature. For MAC
     % based algorithms, the behavior is unspecified if the aud is multi-valued
     % or if an azp value is present that is different than the aud value.
-    %
-    % won't be used for now, so not implemented
+
+    ExtraKeys = case 
+        lists:member(hs256, AcceptedAlgorithms) or 
+        lists:member(hs384, AcceptedAlgorithms) or
+        lists:member(hs512, AcceptedAlgorithms) of
+            true -> [build_mac_key(OpenIdProviderId)];
+            false -> []
+    end,        
 
     % 10. The iat Claim can be used to reject tokens that were issued too far
     % away from the current time, limiting the amount of time that nonces need
     % to be stored to prevent attacks. The acceptable range is Client specific.
-    % TODO: maybe in the future, not for now
-
+    % TODO: maybe in the future, not for now    
 
     % 9. The current time MUST be before the time represented by the exp Claim.
-    Claims = case verify_jwt(IdToken, AcceptedAlgorithms, ExpClaims, PubKeys,
+    Claims = case verify_jwt(IdToken, AcceptedAlgorithms, ExpClaims, PubKeys ++ ExtraKeys, ExtraKeys,
                              OpenIdProviderId) of
                            #{claims := C} -> C;
                            invalid -> throw(invalid_signature);
@@ -254,23 +258,42 @@ has_other_audience(ClientId, Audience) when is_list(Audience) ->
     length(lists:delete(ClientId, Audience)) >= 1.
 
 
-verify_jwt(IdToken, AllowedAlgos, ExpClaims, Pubkeys, ProviderId) ->
+verify_jwt(IdToken, AllowedAlgos, ExpClaims, Pubkeys, ExtraKeys, ProviderId) ->
     case {erljwt:validate(IdToken, AllowedAlgos, ExpClaims, Pubkeys),
           ProviderId} of
-        {{error, _}, undefined} ->
+        {{error, _}, undefined} ->            
             invalid;
         {{error, Reason}, ProviderId}
           when Reason==invalid; Reason==no_key_found ->
             %% it might be the case that our keys expired ...
             %% so refetch them
-            NewPubKeys = refetch_keys(ProviderId),
-            verify_jwt(IdToken, AllowedAlgos, ExpClaims, NewPubKeys, undefined);
+            NewPubKeys = refetch_keys(ProviderId),            
+            verify_jwt(IdToken, AllowedAlgos, ExpClaims, NewPubKeys ++ ExtraKeys, ExtraKeys, undefined);
         {{ok, Jwt}, _Provider} when is_map(Jwt)->
             Jwt;
         {{error, Error}, _} ->
             Error
     end.
 
+supported_algos(ProviderId) ->
+    {ok, Pid} = oidcc_openid_provider_mgr:get_openid_provider(ProviderId),    
+    {ok, Config} = oidcc:get_openid_provider_info(Pid),
+    #{
+        <<"id_token_signing_alg_values_supported">> := Algos                    
+    } = Config,
+    lists:map(fun(A) -> erljwt_sig:algo_to_atom(A) end, Algos).    
+
+build_mac_key(ProviderId) ->    
+    {ok, Pid} = oidcc_openid_provider_mgr:get_openid_provider(ProviderId),    
+    {ok, Config} = oidcc:get_openid_provider_info(Pid),    
+    #{
+        client_secret := ClientSecret                    
+    } = Config,    
+    #{                              
+        kty => <<"oct">>,    
+        k => ClientSecret,        
+        use => <<"sig">>
+    }.
 
 refetch_keys(ProviderId) ->
     {ok, Pid} = oidcc_openid_provider_mgr:get_openid_provider(ProviderId),

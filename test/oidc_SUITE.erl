@@ -3,7 +3,7 @@
 -include_lib("common_test/include/ct.hrl").
 
 -export([all/0, init_per_suite/1, end_per_suite/1, retrieve_google/1, retrieve_iam/1,
-         retrieve_hbp/1, retrieve_egi/1, retrieve_eudat/1]).
+         retrieve_hbp/1, retrieve_egi/1, retrieve_eudat/1, retrieve_zitadel/1]).
 
                                      %% groups/0,
                                      %% group/1,
@@ -16,10 +16,12 @@
 
 all() ->
     [retrieve_google,
-     retrieve_eudat,
+     % Disabled since GitHub Actions can't open a connection
+     % retrieve_eudat,
      retrieve_iam,
      %% retrieve_hbp,
-     retrieve_egi].
+     retrieve_egi,
+     retrieve_zitadel].
 
 %% groups() ->
 %%     [].
@@ -74,6 +76,10 @@ retrieve_egi(_Conf) ->
 retrieve_eudat(_Conf) ->
     ConfigEndpoint =
         <<"https://b2access.eudat.eu:8443/oauth2/.well-known/openid-configuration">>,
+    retrieve_configuration(ConfigEndpoint).
+
+retrieve_zitadel(_Conf) ->
+    ConfigEndpoint = <<"https://issuer.zitadel.ch/.well-known/openid-configuration">>,
     retrieve_configuration(ConfigEndpoint).
 
 retrieve_configuration(ConfigEndpoint) ->

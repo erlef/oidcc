@@ -34,7 +34,7 @@ https_sync_get_cache_test() ->
     {ok, Pid} = oidcc_http_cache:start_link(),
     application:set_env(oidcc, cert_depth, 5),
     application:set_env(oidcc, cacertfile, ca_file()),
-    Url = <<"https://accounts.google.com">>,
+    Url = <<"https://google.com">>,
     {ok, #{status := 200}} = oidcc_http_util:sync_http(get, Url, [], true),
     application:unset_env(oidcc, cert_depth),
     application:unset_env(oidcc, cacertfile),
@@ -45,7 +45,7 @@ https_sync_get_cache_test() ->
 https_async_get_test() ->
     application:set_env(oidcc, cert_depth, 5),
     application:set_env(oidcc, cacertfile, ca_file()),
-    Url = <<"https://accounts.google.com">>,
+    Url = <<"https://google.com">>,
     {ok, Id} = oidcc_http_util:async_http(get, Url, []),
     receive
         {http, {Id, _Result}} ->

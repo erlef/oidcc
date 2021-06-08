@@ -274,7 +274,5 @@ verify_jwt(IdToken, AllowedAlgos, ExpClaims, Pubkeys, ProviderId) ->
 
 refetch_keys(ProviderId) ->
     {ok, Pid} = oidcc_openid_provider_mgr:get_openid_provider(ProviderId),
-    case oidcc_openid_provider:update_and_get_keys(Pid) of
-        {ok, Keys} -> Keys;
-        _ -> []
-    end.
+    {ok, Keys} = oidcc_openid_provider:update_and_get_keys(Pid),
+    Keys.

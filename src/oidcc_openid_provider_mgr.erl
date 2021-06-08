@@ -1,4 +1,5 @@
 -module(oidcc_openid_provider_mgr).
+
 -behaviour(gen_server).
 
 %% API.
@@ -9,9 +10,6 @@
 -export([find_openid_provider/1]).
 -export([find_all_openid_provider/1]).
 -export([get_openid_provider_list/0]).
-
-
-
 %% gen_server.
 -export([init/1]).
 -export([handle_call/3]).
@@ -20,13 +18,7 @@
 -export([terminate/2]).
 -export([code_change/3]).
 
-
--record(state, {
-          ets_prov = undefined,
-          ets_iss = undefined,
-          ets_mon = undefined
-         }).
-
+-record(state, {ets_prov = undefined, ets_iss = undefined, ets_mon = undefined}).
 
 %% API.
 
@@ -37,12 +29,11 @@ start_link() ->
 stop() ->
     gen_server:cast(?MODULE, stop).
 
--spec add_openid_provider(Config::map()) ->
-    {ok, Id::binary(), pid()} | {error, Reason::atom()}.
+-spec add_openid_provider(Config :: map()) ->
+                             {ok, Id :: binary(), pid()} | {error, Reason :: atom()}.
 add_openid_provider(Config) ->
     Id = maps:get(id, Config, undefined),
     gen_server:call(?MODULE, {add_provider, Id, Config}).
-
 
 get_openid_provider(Id) ->
     get_provider(Id).
@@ -50,13 +41,11 @@ get_openid_provider(Id) ->
 get_openid_provider_list() ->
     get_provider_list().
 
--spec find_openid_provider(Issuer::binary()) -> {ok, pid()}
-                                                | {error, not_found}.
+-spec find_openid_provider(Issuer :: binary()) -> {ok, pid()} | {error, not_found}.
 find_openid_provider(Issuer) ->
     find_provider(Issuer, false).
 
--spec find_all_openid_provider(Issuer::binary()) -> {ok, [pid()]}
-                                                | {error, not_found}.
+-spec find_all_openid_provider(Issuer :: binary()) -> {ok, [pid()]} | {error, not_found}.
 find_all_openid_provider(Issuer) ->
     find_provider(Issuer, true).
 
@@ -66,7 +55,10 @@ init([]) ->
     ProvEts = ets:new(oidcc_ets_provider, [set, protected, named_table]),
     IssEts = ets:new(oidcc_ets_issuer, [bag, protected, named_table]),
     MonEts = ets:new(oidcc_ets_monitor, [set, protected]),
-    {ok, #state{ets_prov=ProvEts, ets_iss=IssEts, ets_mon = MonEts}}.
+    {ok,
+     #state{ets_prov = ProvEts,
+            ets_iss = IssEts,
+            ets_mon = MonEts}}.
 
 handle_call({add_provider, undefined, Config}, _From, State) ->
     add_provider(Config, State);
@@ -80,9 +72,11 @@ handle_cast(stop, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-
 handle_info({'DOWN', MRef, process, Pid, _Info},
-            #state{ets_mon=MonEts, ets_prov=ProvEts, ets_iss=IssEts} = State) ->
+            #state{ets_mon = MonEts,
+                   ets_prov = ProvEts,
+                   ets_iss = IssEts} =
+                State) ->
     case ets:lookup(MonEts, MRef) of
         [{MRef, Id, Issuer}] ->
             [Issuer1, Issuer2] = to_issuer(Issuer),
@@ -91,7 +85,8 @@ handle_info({'DOWN', MRef, process, Pid, _Info},
             true = ets:delete_object(IssEts, {Issuer1, Pid}),
             true = ets:delete_object(IssEts, {Issuer2, Pid}),
             ok;
-        _ -> ok
+        _ ->
+            ok
     end,
     {noreply, State};
 handle_info(_Info, State) ->
@@ -105,8 +100,10 @@ code_change(_OldVsn, State, _Extra) ->
 
 try_adding_provider(Id, Config, State) ->
     case is_unique_id(Id, State) of
-        true -> add_provider(Id, Config, State);
-        false -> {reply, {error, id_already_used}, State}
+        true ->
+            add_provider(Id, Config, State);
+        false ->
+            {reply, {error, id_already_used}, State}
     end.
 
 add_provider(Config, State) ->
@@ -127,11 +124,12 @@ get_provider_list() ->
     true = ets:safe_fixtable(Ets, false),
     {ok, List}.
 
-
 get_provider(Id) ->
     case ets:lookup(oidcc_ets_provider, Id) of
-        [{Id, _Issuer, Pid, _MRef}] -> {ok, Pid};
-        _ -> {error, not_found}
+        [{Id, _Issuer, Pid, _MRef}] ->
+            {ok, Pid};
+        _ ->
+            {error, not_found}
     end.
 
 find_provider(Issuer, All) ->
@@ -142,9 +140,7 @@ find_provider(Issuer, All) ->
         {[], _} ->
             {error, not_found};
         {List, true} when is_list(List) ->
-            ToPid = fun({_, Pid}, Pids) ->
-                            [Pid | Pids]
-                    end,
+            ToPid = fun({_, Pid}, Pids) -> [Pid | Pids] end,
             {ok, lists:foldl(ToPid, [], List)};
         _ ->
             {error, not_found}
@@ -153,8 +149,12 @@ find_provider(Issuer, All) ->
 start_provider(Id, Config) ->
     oidcc_openid_provider_sup:add_openid_provider(Id, Config).
 
-insert_provider(Id, IssuerOrEndpoint, Pid,
-                #state{ets_prov=ProvEts, ets_iss=IssEts, ets_mon=MonEts}) ->
+insert_provider(Id,
+                IssuerOrEndpoint,
+                Pid,
+                #state{ets_prov = ProvEts,
+                       ets_iss = IssEts,
+                       ets_mon = MonEts}) ->
     MRef = monitor(process, Pid),
     %% {ok, Issuer} = oidcc_openid_provider:get_issuer(Pid),
     [Issuer1, Issuer2] = to_issuer(IssuerOrEndpoint),
@@ -166,55 +166,58 @@ insert_provider(Id, IssuerOrEndpoint, Pid,
 
 create_provider_list('$end_of_table', List, _) ->
     lists:reverse(List);
-create_provider_list(Current , List, Ets) ->
+create_provider_list(Current, List, Ets) ->
     [{Id, _Iss, Pid, _MRef}] = ets:lookup(Ets, Current),
     Next = ets:next(Ets, Current),
     create_provider_list(Next, [{Id, Pid} | List], Ets).
 
-
-
 get_unique_id(State) ->
     Id = random_id(),
     case is_unique_id(Id, State) of
-        true -> Id;
-        false -> get_unique_id(State)
+        true ->
+            Id;
+        false ->
+            get_unique_id(State)
     end.
 
-is_unique_id(Id, #state{ets_prov=Ets}) ->
+is_unique_id(Id, #state{ets_prov = Ets}) ->
     case ets:lookup(Ets, Id) of
-        [] -> true;
-        _ -> false
+        [] ->
+            true;
+        _ ->
+            false
     end.
-
 
 random_id() ->
     random_id(5).
 
 random_id(Length) ->
-    Random = try crypto:strong_rand_bytes(Length) of
-                 Data -> Data
-             catch
-                 low_entropy ->
-                     timer:sleep(100),
-                     random_id(Length)
-             end,
+    Random =
+        try crypto:strong_rand_bytes(Length) of
+            Data ->
+                Data
+        catch
+            low_entropy ->
+                timer:sleep(100),
+                random_id(Length)
+        end,
     base64url:encode(Random).
 
 to_issuer(IssuerOrEndpoint) ->
     Slash = <<"/">>,
     Config = <<".well-known/openid-configuration">>,
-    ConfigS = << Slash/binary, Config/binary >>,
-    Issuer = case binary:match(IssuerOrEndpoint, ConfigS) of
-        {Pos, 33} ->
-            binary:part(IssuerOrEndpoint, 0, Pos);
-       _  ->
-            case binary:last(IssuerOrEndpoint) of
-                $/ ->
-                    Len = byte_size(IssuerOrEndpoint),
-                    binary:part(IssuerOrEndpoint, 0, Len-1);
-                _ ->
-                    IssuerOrEndpoint
-            end
-    end,
-                    [Issuer, <<Issuer/binary, Slash/binary>>]
-.
+    ConfigS = <<Slash/binary, Config/binary>>,
+    Issuer =
+        case binary:match(IssuerOrEndpoint, ConfigS) of
+            {Pos, 33} ->
+                binary:part(IssuerOrEndpoint, 0, Pos);
+            _ ->
+                case binary:last(IssuerOrEndpoint) of
+                    $/ ->
+                        Len = byte_size(IssuerOrEndpoint),
+                        binary:part(IssuerOrEndpoint, 0, Len - 1);
+                    _ ->
+                        IssuerOrEndpoint
+                end
+        end,
+    [Issuer, <<Issuer/binary, Slash/binary>>].

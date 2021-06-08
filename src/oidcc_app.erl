@@ -1,4 +1,5 @@
 -module(oidcc_app).
+
 -behaviour(application).
 
 -export([start/2]).

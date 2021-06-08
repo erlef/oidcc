@@ -1,4 +1,5 @@
 -module(oidcc_session).
+
 -behaviour(gen_server).
 
 %% API.
@@ -21,8 +22,6 @@
 -export([set_peer_ip/2]).
 -export([set_client_mod/2]).
 -export([close/1]).
-
-
 %% gen_server.
 -export([init/1]).
 -export([handle_call/3]).
@@ -31,11 +30,7 @@
 -export([terminate/2]).
 -export([code_change/3]).
 
--record(state, {
-          id = undefined,
-          timeout = undefined,
-          data = #{}
-         }).
+-record(state, {id = undefined, timeout = undefined, data = #{}}).
 
 %% API.
 
@@ -45,14 +40,17 @@ start_link(Id, Nonce, ProviderId) ->
     start_link(Id, Nonce, ProviderId, Scopes).
 
 start_link(Id, Nonce, ProviderId, Scopes0) ->
-    Scopes = case Scopes0 of
-                 undefined -> application:get_env(oidcc, scopes, [openid]);
-                 _ -> Scopes0
-             end,
+    Scopes =
+        case Scopes0 of
+            undefined ->
+                application:get_env(oidcc, scopes, [openid]);
+            _ ->
+                Scopes0
+        end,
     Pkce = generate_pkce_if_supported(ProviderId),
     gen_server:start_link(?MODULE, {Id, Nonce, Pkce, ProviderId, Scopes}, []).
 
--spec close(Pid ::pid()) -> ok.
+-spec close(Pid :: pid()) -> ok.
 close(Pid) ->
     gen_server:cast(Pid, close).
 
@@ -96,34 +94,40 @@ set_user_agent(UserAgent, Pid) ->
     gen_server:call(Pid, {set, user_agent, UserAgent}).
 
 set_peer_ip(PeerIp, Pid) ->
-    gen_server:call(Pid, {set, peer_ip, PeerIp }).
+    gen_server:call(Pid, {set, peer_ip, PeerIp}).
 
 set_cookie_data(CookieData, Pid) ->
-    gen_server:call(Pid, {set, cookie_data, CookieData }).
+    gen_server:call(Pid, {set, cookie_data, CookieData}).
 
 set_client_mod(ClientMod, Pid) ->
-    gen_server:call(Pid, {set, client_mod, ClientMod }).
+    gen_server:call(Pid, {set, client_mod, ClientMod}).
+
 %% gen_server.
 
 init({Id, Nonce, Pkce, ProviderId, Scopes}) ->
     Timeout = application:get_env(oidcc, session_timeout, 300000),
-    Map = #{nonce => Nonce, scopes => Scopes, pkce => Pkce,
+    Map = #{nonce => Nonce,
+            scopes => Scopes,
+            pkce => Pkce,
             provider => ProviderId},
-    {ok, #state{id = Id, data = Map, timeout=Timeout}, Timeout}.
+    {ok,
+     #state{id = Id,
+            data = Map,
+            timeout = Timeout},
+     Timeout}.
 
-handle_call({get, Field}, _From, #state{data=Map, timeout=To} = State) ->
+handle_call({get, Field}, _From, #state{data = Map, timeout = To} = State) ->
     Value = maps:get(Field, Map, undefined),
     {reply, {ok, Value}, State, To};
-handle_call({set, Field, Value}, _From, #state{data=Map, timeout=To} = State) ->
+handle_call({set, Field, Value}, _From, #state{data = Map, timeout = To} = State) ->
     NewMap = maps:put(Field, Value, Map),
-    {reply, ok, State#state{data=NewMap}, To};
-handle_call({is, Field, InVal}, _From, #state{data=Map, timeout=To} = State) ->
+    {reply, ok, State#state{data = NewMap}, To};
+handle_call({is, Field, InVal}, _From, #state{data = Map, timeout = To} = State) ->
     Value = maps:get(Field, Map, undefined),
     {reply, InVal == Value, State, To};
-
-handle_call(get_id, _From, #state{id=Id, timeout=To} = State) ->
+handle_call(get_id, _From, #state{id = Id, timeout = To} = State) ->
     {reply, {ok, Id}, State, To};
-handle_call(_Request, _From, #state{timeout=To} = State) ->
+handle_call(_Request, _From, #state{timeout = To} = State) ->
     {reply, ignored, State, To}.
 
 handle_cast(close, #state{id = Id} = State) ->
@@ -135,10 +139,8 @@ handle_cast(_Request, #state{timeout = To} = State) ->
 handle_info(timeout, #state{id = Id} = State) ->
     ok = oidcc_session_mgr:session_terminating(Id),
     {stop, normal, State};
-handle_info(_Info, #state{timeout=To} = State) ->
+handle_info(_Info, #state{timeout = To} = State) ->
     {noreply, State, To}.
-
-
 
 terminate(normal, _State) ->
     ok;
@@ -163,17 +165,16 @@ generate_pkce(_, _) ->
     undefined.
 
 apply_s256(true, CodeVerifier) ->
-    #{
-       verifier => CodeVerifier,
-       challenge => base64url:encode(crypto:hash(sha256, CodeVerifier)),
-       method => 'S256'
-     };
+    #{verifier => CodeVerifier,
+      challenge =>
+          base64url:encode(
+              crypto:hash(sha256, CodeVerifier)),
+      method => 'S256'};
 apply_s256(_, CodeVerifier) ->
-    #{
-       verifier => CodeVerifier,
-       challenge => CodeVerifier,
-       method => plain
-     }.
+    #{verifier => CodeVerifier,
+      challenge => CodeVerifier,
+      method => plain}.
 
 gen_code_verifier() ->
-    base64url:encode(crypto:strong_rand_bytes(64)).
+    base64url:encode(
+        crypto:strong_rand_bytes(64)).

@@ -1,4 +1,5 @@
 -module(oidcc_http_cache).
+
 -behaviour(gen_server).
 
 %% API.
@@ -8,8 +9,6 @@
 -export([lookup_http_call/2]).
 -export([enqueue_http_call/2]).
 -export([trigger_cleaning/0]).
-
-
 %% gen_server.
 -export([init/1]).
 -export([handle_call/3]).
@@ -18,10 +17,7 @@
 -export([terminate/2]).
 -export([code_change/3]).
 
--record(state, {
-          ets_cache = undefined,
-          last_clean = undefined
-         }).
+-record(state, {ets_cache = undefined, last_clean = undefined}).
 
 %% API.
 -spec start_link() -> {ok, pid()}.
@@ -48,13 +44,12 @@ trigger_cleaning() ->
     gen_server:cast(?MODULE, clean_cache).
 
 -define(REQUEST_BUFFER, 30).
+
 %% gen_server.
 init(_) ->
     EtsCache = ets:new(oidcc_ets_http_cache, [set, protected, named_table]),
     Now = erlang:system_time(seconds),
-    {ok, #state{ets_cache=EtsCache,
-                last_clean = Now
-               }}.
+    {ok, #state{ets_cache = EtsCache, last_clean = Now}}.
 
 handle_call({enqueue, Key}, _From, State) ->
     CacheDuration = application:get_env(oidcc, http_cache_duration, none),
@@ -68,9 +63,8 @@ handle_call({cache_http, Key, Result}, _From, State) ->
 handle_call(_Request, _From, State) ->
     {reply, ignored, State}.
 
-
 insert_into_cache(Key, Result, Duration, #state{ets_cache = EtsCache})
-  when is_integer(Duration), Duration > 0 ->
+    when is_integer(Duration), Duration > 0 ->
     Now = erlang:system_time(seconds),
     Timeout =
         case Result of
@@ -83,10 +77,8 @@ insert_into_cache(Key, Result, Duration, #state{ets_cache = EtsCache})
     case {Result, Inserted} of
         {pending, true} ->
             true;
-
         {pending, false} ->
             false;
-
         {_, _} ->
             true = ets:insert(EtsCache, {Key, Timeout, Result}),
             ok
@@ -97,7 +89,6 @@ insert_into_cache(_Key, pending, _NoDuration, _State) ->
 insert_into_cache(_Key, _Result, _NoDuration, _State) ->
     ok.
 
-
 handle_cast(clean_cache, State) ->
     NewState = clean_cache(State),
     {noreply, NewState};
@@ -106,17 +97,14 @@ handle_cast(stop, State) ->
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-
 handle_info(_Info, State) ->
     {noreply, State}.
-
 
 terminate(_Reason, _State) ->
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
 
 read_cache(Key) ->
     Now = erlang:system_time(seconds),
@@ -127,10 +115,10 @@ read_cache(Key) ->
             {error, not_found}
     end.
 
-trigger_cleaning_if_needed(#state{last_clean=LastClean}) ->
+trigger_cleaning_if_needed(#state{last_clean = LastClean}) ->
     Now = erlang:system_time(seconds),
     CleanTimeout = application:get_env(oidcc, http_cache_clean, 60),
-    case (Now - LastClean) >= CleanTimeout of
+    case Now - LastClean >= CleanTimeout of
         true ->
             trigger_cleaning(),
             ok;
@@ -140,7 +128,7 @@ trigger_cleaning_if_needed(#state{last_clean=LastClean}) ->
 
 clean_cache(#state{ets_cache = CT} = State) ->
     Now = erlang:system_time(seconds),
-    ets:select_delete(CT, [{{'_', '$1', '_'}, [{'<', '$1', Now}] , [true]}]),
+    ets:select_delete(CT, [{{'_', '$1', '_'}, [{'<', '$1', Now}], [true]}]),
     State#state{last_clean = Now}.
 
 return_if_not_outdated(Result, true) ->

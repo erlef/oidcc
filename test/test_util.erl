@@ -5,7 +5,6 @@
 -export([meck_new/1]).
 -export([meck_done/1]).
 
-
 wait_for_process_to_die(_Pid, 0) ->
     still_alive;
 wait_for_process_to_die(Pid, Iterations) ->
@@ -14,9 +13,8 @@ wait_for_process_to_die(Pid, Iterations) ->
             ok;
         _ ->
             timer:sleep(10),
-            wait_for_process_to_die(Pid, Iterations-1)
+            wait_for_process_to_die(Pid, Iterations - 1)
     end.
-
 
 wait_for_true(_Fun, 0) ->
     failed;
@@ -26,10 +24,8 @@ wait_for_true(Fun, Iterations) ->
             ok;
         _ ->
             timer:sleep(10),
-            wait_for_true(Fun, Iterations-1)
+            wait_for_true(Fun, Iterations - 1)
     end.
-
-
 
 meck_new([]) ->
     ok;

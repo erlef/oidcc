@@ -1,4 +1,5 @@
 -module(oidcc_session_mgr).
+
 %%
 %% Copyright 2016 SCC/KIT
 %%
@@ -21,13 +22,11 @@
 %% API.
 -export([start_link/0]).
 -export([stop/0]).
-
 -export([new_session/1]).
 -export([get_session/1]).
 -export([close_all_sessions/0]).
 -export([get_session_list/0]).
 -export([session_terminating/1]).
-
 %% gen_server.
 -export([init/1]).
 -export([handle_call/3]).
@@ -36,9 +35,7 @@
 -export([terminate/2]).
 -export([code_change/3]).
 
--record(state, {
-          sessions = []
-         }).
+-record(state, {sessions = []}).
 
 %% API.
 
@@ -66,10 +63,9 @@ session_terminating(ID) ->
 close_all_sessions() ->
     gen_server:call(?MODULE, close_all_sessions).
 
--spec get_session_list() -> {ok, Sessions::list()}.
+-spec get_session_list() -> {ok, Sessions :: list()}.
 get_session_list() ->
     gen_server:call(?MODULE, get_session_list).
-
 
 %% gen_server.
 
@@ -109,19 +105,18 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-
 delete_sessions(#state{sessions = Sessions} = State) ->
     {ok, NewState} = delete_sessions(Sessions, State),
     {ok, NewState}.
 
 delete_sessions([], State) ->
     {ok, State#state{sessions = []}};
-delete_sessions([{_Id, Pid}|T], State) ->
+delete_sessions([{_Id, Pid} | T], State) ->
     oidcc_session:close(Pid),
     delete_sessions(T, State).
 
 set_session_for_id(ID, Pid, #state{sessions = Sessions} = State) ->
-    {ok, State#state{sessions = [ {ID, Pid} | Sessions]}}.
+    {ok, State#state{sessions = [{ID, Pid} | Sessions]}}.
 
 delete_session(Id, #state{sessions = Sessions} = State) ->
     NewSessions = lists:keydelete(Id, 1, Sessions),
@@ -138,7 +133,7 @@ repeat_id_gen_if_needed(ID, false, _) ->
 repeat_id_gen_if_needed(_, _, List) ->
     get_unique_id(List).
 
-lookup_session(Id, #state{sessions=Sessions}) ->
+lookup_session(Id, #state{sessions = Sessions}) ->
     case lists:keyfind(Id, 1, Sessions) of
         {Id, Pid} ->
             {ok, Pid};
@@ -146,7 +141,7 @@ lookup_session(Id, #state{sessions=Sessions}) ->
             {error, not_found}
     end.
 
-session_list(#state{sessions=Sessions}) ->
+session_list(#state{sessions = Sessions}) ->
     Sessions.
 
 create_new_session(ProviderId, State) ->
@@ -164,4 +159,5 @@ start_session(Id, ProviderId) ->
     Pid.
 
 random_string(Length) ->
-    base64url:encode(crypto:strong_rand_bytes(Length)).
+    base64url:encode(
+        crypto:strong_rand_bytes(Length)).

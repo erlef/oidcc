@@ -1,13 +1,13 @@
 -module(oidcc_session_test).
+
 -include_lib("eunit/include/eunit.hrl").
-
-
 
 start_stop_test() ->
     MeckModules = [oidcc, oidcc_session_mgr],
     ok = test_util:meck_new(MeckModules),
-    meck:expect(oidcc_session_mgr, session_terminating, fun(_) -> ok end ),
-    meck:expect(oidcc, get_openid_provider_info, 
+    meck:expect(oidcc_session_mgr, session_terminating, fun(_) -> ok end),
+    meck:expect(oidcc,
+                get_openid_provider_info,
                 fun(_) -> {ok, #{request_scopes => undefined}} end),
     Id = 123,
     Nonce = 123,
@@ -21,8 +21,9 @@ start_stop_test() ->
 timeout_test() ->
     MeckModules = [oidcc, oidcc_session_mgr],
     ok = test_util:meck_new(MeckModules),
-    meck:expect(oidcc_session_mgr, session_terminating, fun(_) -> ok end ),
-    meck:expect(oidcc, get_openid_provider_info, 
+    meck:expect(oidcc_session_mgr, session_terminating, fun(_) -> ok end),
+    meck:expect(oidcc,
+                get_openid_provider_info,
                 fun(_) -> {ok, #{request_scopes => undefined}} end),
     application:set_env(oidcc, session_timeout, 50),
     Id = 123,
@@ -36,29 +37,28 @@ timeout_test() ->
 garbage_test() ->
     MeckModules = [oidcc, oidcc_session_mgr],
     ok = test_util:meck_new(MeckModules),
-    meck:expect(oidcc_session_mgr, session_terminating, fun(_) -> ok end ),
-    meck:expect(oidcc, get_openid_provider_info, 
+    meck:expect(oidcc_session_mgr, session_terminating, fun(_) -> ok end),
+    meck:expect(oidcc,
+                get_openid_provider_info,
                 fun(_) -> {ok, #{request_scopes => undefined}} end),
     Id = 123,
     Nonce = 123,
     ProviderId = <<"oidcc_provider">>,
     {ok, Pid} = oidcc_session:start_link(Id, Nonce, ProviderId),
-
     ignored = gen_server:call(Pid, garbage),
     ok = gen_server:cast(Pid, garbage),
     Pid ! garbage,
-
     ok = oidcc_session:close(Pid),
     ok = test_util:wait_for_process_to_die(Pid, 100),
     ok = test_util:meck_done(MeckModules),
     ok.
-    
 
 get_set_test() ->
     MeckModules = [oidcc, oidcc_session_mgr],
     ok = test_util:meck_new(MeckModules),
-    meck:expect(oidcc_session_mgr, session_terminating, fun(_) -> ok end ),
-    meck:expect(oidcc, get_openid_provider_info, 
+    meck:expect(oidcc_session_mgr, session_terminating, fun(_) -> ok end),
+    meck:expect(oidcc,
+                get_openid_provider_info,
                 fun(_) -> {ok, #{request_scopes => undefined}} end),
     Id = id,
     Nonce = nonce,

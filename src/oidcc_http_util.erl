@@ -130,19 +130,18 @@ uncompress_body_if_needed(_Body, {_, Compression}) ->
     erlang:error({unsupported_encoding, Compression}).
 
 options(Url) when is_list(Url) ->
-    #{scheme := Schema, host := HostName} = uri_string:parse(normalize(Url)),
+    #{scheme := Schema} = uri_string:parse(normalize(Url)),
     BaseOptions = [{timeout, request_timeout(ms)}],
     case Schema of
         "http" ->
             {ok, BaseOptions};
         "https" ->
-            ssl_options(HostName, BaseOptions)
+            ssl_options(BaseOptions)
     end;
 options(Url) when is_binary(Url) ->
     options(binary_to_list(Url)).
 
-ssl_options(HostName, BaseOptions) ->
-    VerifyFun = ssl_verify_fun(HostName),
+ssl_options(BaseOptions) ->
     CaCert = application:get_env(oidcc, cacertfile),
     Depth = application:get_env(oidcc, cert_depth, 1),
     case CaCert of
@@ -150,7 +149,7 @@ ssl_options(HostName, BaseOptions) ->
             {ok,
              [{ssl,
                [{verify, verify_peer},
-                {verify_fun, VerifyFun},
+                {verify_fun, {fun ssl_verify_hostname:verify_fun/3, []}},
                 {customize_hostname_check,
                  [{match_fun, public_key:pkix_verify_hostname_match_fun(https)}]},
                 {cacertfile, CaCertFile},
@@ -159,78 +158,6 @@ ssl_options(HostName, BaseOptions) ->
         _ ->
             {error, missing_cacertfile}
     end.
-
-ssl_verify_fun(Hostname) ->
-    HostPartList =
-        fun(Host) ->
-           lists:reverse(
-               binary:split(list_to_binary(Host), <<".">>, [global]))
-        end,
-    ExtractHosts =
-        fun(Entry, List) ->
-           case Entry of
-               {dNSName, Host} ->
-                   [Host | List];
-               _ ->
-                   List
-           end
-        end,
-    Compare =
-        fun (_HostPart, [<<"*">>]) ->
-                true;
-            (HostPart, [HostPart | CertList]) ->
-                CertList;
-            (_, _) ->
-                false
-        end,
-    BinHostList = HostPartList(Hostname),
-    IsValid =
-        fun(HostOfCert, CurValid) ->
-           CrtList = HostPartList(HostOfCert),
-           LongEnough = length(CrtList) >= 2,
-           Valid =
-               case lists:foldl(Compare, CrtList, BinHostList) of
-                   [] ->
-                       true;
-                   Other ->
-                       Other
-               end,
-           case Valid and LongEnough of
-               true ->
-                   true;
-               _ ->
-                   CurValid
-           end
-        end,
-    ContainsValidHost =
-        fun(HostsOfCert, UserState) ->
-           case lists:foldl(IsValid, false, HostsOfCert) of
-               true ->
-                   {valid, UserState};
-               _ ->
-                   {fail, {bad_cert, name_not_permitted}}
-           end
-        end,
-    {fun (_, {bad_cert, _} = Reason, _) ->
-             {fail, Reason};
-         (_, {extension, _}, UserState) ->
-             {unknown, UserState};
-         (_, valid, UserState) ->
-             %% nothing to do with intermediate CA-certificates
-             {valid, UserState};
-         (Cert, valid_peer, UserState) ->
-             %% validate the certificate of the peer host
-             TBSCert = Cert#'OTPCertificate'.tbsCertificate,
-             Extensions = TBSCert#'OTPTBSCertificate'.extensions,
-             case lists:keysearch(?'id-ce-subjectAltName', #'Extension'.extnID, Extensions) of
-                 {value, #'Extension'{extnValue = ExtValue}} ->
-                     HostsOfCert = lists:foldl(ExtractHosts, [], ExtValue),
-                     ContainsValidHost(HostsOfCert, UserState);
-                 false ->
-                     {fail, invalid_certificate_hostname}
-             end
-     end,
-     []}.
 
 normalize(L) when is_list(L) ->
     L;

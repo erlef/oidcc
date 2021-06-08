@@ -174,7 +174,6 @@ retrieve_and_validate_token_test() ->
               header => [],
               body => TokenData}}
         end,
-    PassThrough = fun(Data) -> meck:passthrough([Data]) end,
     ExtractFun =
         fun(Data, _Scopes) ->
            Data = TokenData,
@@ -195,8 +194,6 @@ retrieve_and_validate_token_test() ->
     ok = meck:expect(oidcc_openid_provider, get_config, ConfigFun),
     ok = meck:expect(oidcc_openid_provider_mgr, get_openid_provider, MapFun),
     ok = meck:expect(oidcc_http_util, sync_http, HttpFun),
-    ok = meck:expect(oidcc_http_util, urlencode, PassThrough),
-    ok = meck:expect(oidcc_http_util, qs, PassThrough),
     AuthCode = <<"1234567890">>,
     {ok, #{id := #{}}} = oidcc:retrieve_and_validate_token(AuthCode, ProviderId),
     true = meck:validate(oidcc_token),

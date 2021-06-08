@@ -214,7 +214,7 @@ introspect_token(TokenMapIn,
                    client_secret := ClientSecret}) ->
     AccessToken = extract_access_token(TokenMapIn),
     Header = [{"accept", "application/json"}, basic_auth(ClientId, ClientSecret)],
-    BodyQs = oidcc_http_util:qs([{<<"token">>, AccessToken}]),
+    BodyQs = uri_string:compose_query([{<<"token">>, AccessToken}]),
     HttpResult =
         oidcc_http_util:sync_http(post,
                                   Endpoint,
@@ -252,7 +252,7 @@ retrieve_a_token(QsBodyIn, Pkce, OpenIdProviderInfo) ->
     Header0 = [],
     {QsBody, Header} =
         add_authentication_code_verifier(QsBodyIn, Header0, AuthMethod, ClientId, Secret, Pkce),
-    Body = oidcc_http_util:qs(QsBody),
+    Body = uri_string:compose_query(QsBody),
     return_token(oidcc_http_util:sync_http(post,
                                            Endpoint,
                                            Header,
@@ -300,7 +300,7 @@ create_redirect_url_if_ready(Info, Config) ->
     UrlList2 = append_nonce(OidcNonce, UrlList1),
     UrlList3 = append_code_challenge(Pkce, UrlList2),
     UrlList4 = append_scope(Scopes, UrlList3),
-    Qs = oidcc_http_util:qs(UrlList4),
+    Qs = uri_string:compose_query(UrlList4),
     Url = <<AuthEndpoint/binary, <<"?">>/binary, Qs/binary>>,
     {ok, Url}.
 
@@ -424,8 +424,8 @@ return_json_info({ok, Map}) ->
     {error, {bad_status, Map}}.
 
 basic_auth(User, Secret) ->
-    UserEnc = oidcc_http_util:urlencode(User),
-    SecretEnc = oidcc_http_util:urlencode(Secret),
+    UserEnc = uri_string:compose_query([{User, true}]),
+    SecretEnc = uri_string:compose_query([{Secret, true}]),
     RawAuth = <<UserEnc/binary, <<":">>/binary, SecretEnc/binary>>,
     AuthData = base64:encode(RawAuth),
     BasicAuth = <<<<"Basic ">>/binary, AuthData/binary>>,

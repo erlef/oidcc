@@ -1,4 +1,7 @@
 # oidcc
+
+[![Test](https://github.com/Erlang-Openid/oidcc/actions/workflows/test.yml/badge.svg)](https://github.com/Erlang-Openid/oidcc/actions/workflows/test.yml)
+
 OpenId Connect client library in Erlang.
 OpenID Certified by Bas Wegh at SCC/KIT to the basic and configuration profile of the OpenID Connect protocol.
 

@@ -126,4 +126,4 @@ wait_for_config(Pid) ->
 
 
 ca_file() ->
-    code:where_is_file("cacert.pem").
+    certifi:cacertfile().

@@ -224,7 +224,8 @@ mock_oidcc(OpenIdProviderId, Issuer, ClientId) ->
               keys =>
                   [#{kty => <<"RSA">>,
                      n => Encode(N),
-                     e => Encode(E)}]}}
+                     e => Encode(E)}],
+              id_token_signing_alg_values_supported => [<<"RS256">>]}}
         end,
     SelfFun = fun(_) -> {ok, self()} end,
     KeysFun = fun(_) -> {ok, [#{kty => <<"oct">>, k => <<"some shared secret">>}]} end,

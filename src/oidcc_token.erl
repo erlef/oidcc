@@ -282,14 +282,12 @@ verify_jwt(IdToken, AllowedAlgos, ExpClaims, Pubkeys, ExtraKeys, ProviderId) ->
     end.
 
 supported_algos(ProviderId) ->
-    {ok, Pid} = oidcc_openid_provider_mgr:get_openid_provider(ProviderId),
-    {ok, Config} = oidcc:get_openid_provider_info(Pid),
-    #{<<"id_token_signing_alg_values_supported">> := Algos} = Config,
+    {ok, Config} = oidcc:get_openid_provider_info(ProviderId),
+    #{id_token_signing_alg_values_supported := Algos} = Config,
     lists:map(fun(A) -> erljwt_sig:algo_to_atom(A) end, Algos).
 
 build_mac_key(ProviderId) ->
-    {ok, Pid} = oidcc_openid_provider_mgr:get_openid_provider(ProviderId),
-    {ok, Config} = oidcc:get_openid_provider_info(Pid),
+    {ok, Config} = oidcc:get_openid_provider_info(ProviderId),
     #{client_secret := ClientSecret} = Config,
     #{kty => <<"oct">>,
       k => ClientSecret,

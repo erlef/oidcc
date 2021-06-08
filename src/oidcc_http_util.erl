@@ -130,12 +130,12 @@ uncompress_body_if_needed(_Body, {_, Compression}) ->
     erlang:error({unsupported_encoding, Compression}).
 
 options(Url) when is_list(Url) ->
-    {ok, {Schema, _, HostName, _, _, _}} = http_uri:parse(normalize(Url)),
+    #{scheme := Schema, host := HostName} = uri_string:parse(normalize(Url)),
     BaseOptions = [{timeout, request_timeout(ms)}],
     case Schema of
-        http ->
+        "http" ->
             {ok, BaseOptions};
-        https ->
+        "https" ->
             ssl_options(HostName, BaseOptions)
     end;
 options(Url) when is_binary(Url) ->

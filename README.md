@@ -1,6 +1,10 @@
 # oidcc
 
 [![Test](https://github.com/Erlang-Openid/oidcc/actions/workflows/test.yml/badge.svg)](https://github.com/Erlang-Openid/oidcc/actions/workflows/test.yml)
+[![Module Version](https://img.shields.io/hexpm/v/oidcc.svg)](https://hex.pm/packages/oidcc)
+[![Total Download](https://img.shields.io/hexpm/dt/oidcc.svg)](https://hex.pm/packages/oidcc)
+[![License](https://img.shields.io/hexpm/l/oidcc.svg)](https://github.com/Erlang-Openid/oidcc/blob/master/LICENSE)
+[![Last Updated](https://img.shields.io/github/last-commit/Erlang-Openid/oidcc.svg)](https://github.com/Erlang-Openid/oidcc/commits/master)
 
 OpenId Connect client library in Erlang.
 OpenID Certified by Bas Wegh at SCC/KIT to the basic and configuration profile of the OpenID Connect protocol.

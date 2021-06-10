@@ -1,8 +1,8 @@
 {"1.2.0",
 [{<<"base64url">>,{pkg,<<"base64url">>,<<"1.0.1">>},1},
  {<<"erljwt">>,
-  {git,"https://github.com/jshmrtn/erljwt.git",
-       {ref,"17124ee1df5f23c763f213c28d792e64ed9301e9"}},
+  {git,"https://github.com/Erlang-Openid/erljwt.git",
+       {ref,"d2baeecd49c3dd6e41b8511bbf7a35ec995f06cf"}},
   0},
  {<<"jsone">>,{pkg,<<"jsone">>,<<"1.5.7">>},1},
  {<<"ssl_verify_fun">>,{pkg,<<"ssl_verify_fun">>,<<"1.1.6">>},0}]}.

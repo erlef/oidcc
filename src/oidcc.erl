@@ -12,6 +12,8 @@
 -export([create_redirect_for_session/2]).
 -export([retrieve_and_validate_token/2]).
 -export([retrieve_and_validate_token/3]).
+-export([retrieve_client_credential_token/1]).
+-export([retrieve_client_credential_token/2]).
 -export([retrieve_user_info/2]).
 -export([retrieve_user_info/3]).
 -export([retrieve_fresh_token/2]).
@@ -156,6 +158,29 @@ retrieve_and_validate_token(AuthCode, ProviderId, Config) ->
         {ok, Token} ->
             TokenMap = oidcc_token:extract_token_map(Token, Scopes),
             oidcc_token:validate_token_map(TokenMap, ProviderId, Nonce, true);
+        Error ->
+            Error
+    end.
+
+%% @doc
+%% retrieve the token using the client credentials and directly validate the
+%% result.
+%%
+%% the result is textual representation of the token and should be verified
+%% using parse_and_validate_token/3
+%% @end
+retrieve_client_credential_token(ProviderId) ->
+    retrieve_client_credential_token(ProviderId, #{}).
+
+retrieve_client_credential_token(ProviderId, Config) ->
+    {ok, Info} = get_openid_provider_info(ProviderId),
+    Scopes = scopes_to_bin(maps:get(scope, Config, []), <<>>),
+    QsBody =
+        [{<<"grant_type">>, <<"client_credentials">>}, {<<"scope">>, Scopes}
+         | maps:get(extra_params, Config, [])],
+    case retrieve_a_token(QsBody, undefined, Info) of
+        {ok, Token} ->
+            {ok, oidcc_token:extract_token_map(Token, Scopes)};
         Error ->
             Error
     end.

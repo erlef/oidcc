@@ -206,6 +206,69 @@ retrieve_and_validate_token_test() ->
     meck:unload(oidcc_token),
     ok.
 
+retrieve_client_credential_token_test() ->
+    MyPid = self(),
+    ClientId = <<"123">>,
+    ClientSecret = <<"secret">>,
+    TokenEndpoint = <<"https://my.provider/token">>,
+    TokenData = <<"TokenData">>,
+    AccessTokenMap =
+        #{expires => <<"3599">>,
+          hash => undefined,
+          token => <<"AccessToken">>},
+    ProviderId = <<"ID123">>,
+    AuthMethods = [<<"unsupporeted_auth">>, <<"client_secret_post">>],
+    ConfigFun =
+        fun(Pid) ->
+           Pid = MyPid,
+           {ok,
+            #{client_id => ClientId,
+              client_secret => ClientSecret,
+              token_endpoint => TokenEndpoint,
+              token_endpoint_auth_methods_supported => AuthMethods}}
+        end,
+    MapFun =
+        fun(Id) ->
+           case Id of
+               ProviderId ->
+                   {ok, MyPid};
+               _ ->
+                   {error, not_found}
+           end
+        end,
+    HttpFun =
+        fun(Method, Url, _Header, _ContentType, _Body) ->
+           Method = post,
+           Url = TokenEndpoint,
+           {ok,
+            #{status => 200,
+              header => [],
+              body => TokenData}}
+        end,
+    ExtractFun =
+        fun(Data, _Scopes) ->
+           Data = TokenData,
+           #{access => AccessTokenMap}
+        end,
+    ok = meck:new(oidcc_token),
+    ok = meck:expect(oidcc_token, extract_token_map, ExtractFun),
+    ok = meck:new(oidcc_openid_provider),
+    ok = meck:new(oidcc_openid_provider_mgr),
+    ok = meck:new(oidcc_http_util),
+    ok = meck:expect(oidcc_openid_provider, get_config, ConfigFun),
+    ok = meck:expect(oidcc_openid_provider_mgr, get_openid_provider, MapFun),
+    ok = meck:expect(oidcc_http_util, sync_http, HttpFun),
+    {ok, #{access := #{}}} = oidcc:retrieve_client_credential_token(ProviderId),
+    true = meck:validate(oidcc_token),
+    true = meck:validate(oidcc_openid_provider),
+    true = meck:validate(oidcc_openid_provider_mgr),
+    true = meck:validate(oidcc_http_util),
+    meck:unload(oidcc_openid_provider),
+    meck:unload(oidcc_openid_provider_mgr),
+    meck:unload(oidcc_http_util),
+    meck:unload(oidcc_token),
+    ok.
+
 retrieve_user_info_test() ->
     MyPid = self(),
     ProviderId = <<"6">>,

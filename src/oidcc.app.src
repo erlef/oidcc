@@ -5,7 +5,7 @@
               {registered,[oidcc_sup,oidcc_openid_provider_mgr,
                            oidcc_openid_provider_sup,oidcc_session_mgr,
                            oidcc_session_sup]},
-              {applications,[kernel,stdlib,ssl,public_key,crypto,erljwt,
+              {applications,[kernel,stdlib,ssl,public_key,crypto,erljwt,ssl_verify_hostname,
                              base64url,inets]},
               {maintainers,["Bas Wegh"]},
               {licenses,["Apache 2.0"]},

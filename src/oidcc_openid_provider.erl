@@ -210,20 +210,12 @@ handle_info(timeout, State) ->
     {noreply, State, ?GEN_TIMEOUT}.
 
 http_async_get(Type, Url, Header, State) ->
-    case oidcc_http_util:async_http(get, Url, Header) of
-        {ok, RequestId} ->
-            State#state{request_id = RequestId, retrieving = Type};
-        Error ->
-            State#state{error = Error}
-    end.
+    {ok, RequestId} = oidcc_http_util:async_http(get, Url, Header),
+    State#state{request_id = RequestId, retrieving = Type}.
 
 http_async_post(Type, Url, Header, ContentType, Body, State) ->
-    case oidcc_http_util:async_http(post, Url, Header, ContentType, Body) of
-        {ok, RequestId} ->
-            State#state{request_id = RequestId, retrieving = Type};
-        Error ->
-            State#state{error = Error}
-    end.
+    {ok, RequestId} = oidcc_http_util:async_http(post, Url, Header, ContentType, Body),
+    State#state{request_id = RequestId, retrieving = Type}.
 
 terminate(_Reason, _State) ->
     ok.

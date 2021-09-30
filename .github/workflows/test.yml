@@ -24,16 +24,16 @@ jobs:
       - uses: actions/checkout@v2
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: 24.0
+          otp-version: 24.1
           rebar3-version: 3.15.2
       - uses: actions/cache@v2
         name: Cache
         with:
           path: |
             _build
-          key: build-${{ secrets.CACHE_VERSION }}-${{ runner.os }}-build-24.0-${{ hashFiles(format('rebar.lock')) }}-1
+          key: build-${{ secrets.CACHE_VERSION }}-${{ runner.os }}-build-24.1-${{ hashFiles(format('rebar.lock')) }}-1
           restore-keys: |
-            build-${{ secrets.CACHE_VERSION }}-${{ runner.os }}-build-24.0-1-
+            build-${{ secrets.CACHE_VERSION }}-${{ runner.os }}-build-24.1-1-
       - name: Elvis
         run: rebar3 format --verify
 
@@ -44,16 +44,16 @@ jobs:
       - uses: actions/checkout@v2
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: 24.0
+          otp-version: 24.1
           rebar3-version: 3.15.2
       - uses: actions/cache@v2
         name: Cache
         with:
           path: |
             _build
-          key: build-${{ secrets.CACHE_VERSION }}-${{ runner.os }}-build-24.0-${{ hashFiles(format('rebar.lock')) }}-1
+          key: build-${{ secrets.CACHE_VERSION }}-${{ runner.os }}-build-24.1-${{ hashFiles(format('rebar.lock')) }}-1
           restore-keys: |
-            build-${{ secrets.CACHE_VERSION }}-${{ runner.os }}-build-24.0-1-
+            build-${{ secrets.CACHE_VERSION }}-${{ runner.os }}-build-24.1-1-
       - name: Elvis
         run: rebar3 lint
 
@@ -64,16 +64,16 @@ jobs:
       - uses: actions/checkout@v2
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: 24.0
+          otp-version: 24.1
           rebar3-version: 3.15.2
       - uses: actions/cache@v2
         name: Cache
         with:
           path: |
             _build
-          key: build-${{ secrets.CACHE_VERSION }}-${{ runner.os }}-build-24.0-${{ hashFiles(format('rebar.lock')) }}-1
+          key: build-${{ secrets.CACHE_VERSION }}-${{ runner.os }}-build-24.1-${{ hashFiles(format('rebar.lock')) }}-1
           restore-keys: |
-            build-${{ secrets.CACHE_VERSION }}-${{ runner.os }}-build-24.0-1-
+            build-${{ secrets.CACHE_VERSION }}-${{ runner.os }}-build-24.1-1-
       - name: Dialyzer
         run: rebar3 dialyzer
 
@@ -83,7 +83,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        otp_version: ["24.0", "23.3.1", "22.3.4.9", "21.3.8.17"]
+        otp_version: ["24.1", "23.3.1", "22.3.4.9", "21.3.8.17"]
         os: [ubuntu-latest]
     env:
       OTP_VERSION: ${{ matrix.otp_version }}
@@ -112,7 +112,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        otp_version: ["24.0", "23.3.1", "22.3.4.9", "21.3.8.17"]
+        otp_version: ["24.1", "23.3.1", "22.3.4.9", "21.3.8.17"]
         os: [ubuntu-latest]
     env:
       OTP_VERSION: ${{ matrix.otp_version }}

@@ -15,16 +15,10 @@ sync_http(Method, Url, Header, ContentType, Body) ->
     sync_http(Method, Url, Header, ContentType, Body, false).
 
 sync_http(Method, Url, Header, UseCache) ->
-    perform_request(Method, Url, Header, undefined, <<>>, [{body_format, binary}], UseCache).
+    perform_request(Method, Url, Header, undefined, <<>>, [], UseCache).
 
 sync_http(Method, Url, Header, ContentType, Body, UseCache) ->
-    perform_request(Method,
-                    Url,
-                    Header,
-                    ContentType,
-                    Body,
-                    [{body_format, binary}],
-                    UseCache).
+    perform_request(Method, Url, Header, ContentType, Body, [], UseCache).
 
 async_http(Method, Url, Header) ->
     async_http(Method, Url, Header, undefined, <<>>).
@@ -84,7 +78,7 @@ perform_http_request(Method, Url, Header, ContentType, Body, Options) ->
             undefined ->
                 Header;
             _ ->
-                [{"content-type", ContentType} | Header]
+                [{<<"content-type">>, ContentType} | Header]
         end,
     Res = hackney:request(Method, Url, Headers1, Body, Options ++ [{follow_redirect, true}]),
     normalize_result(Res).

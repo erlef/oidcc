@@ -214,13 +214,13 @@ introspect_token(TokenMapIn,
                    client_secret := ClientSecret}) ->
     AccessToken = extract_access_token(TokenMapIn),
     Header = [{"accept", "application/json"}, basic_auth(ClientId, ClientSecret)],
-    BodyQs = uri_string:compose_query([{<<"token">>, AccessToken}]),
+    Body = [{<<"token">>, AccessToken}],
     HttpResult =
         oidcc_http_util:sync_http(post,
                                   Endpoint,
                                   Header,
                                   "application/x-www-form-urlencoded",
-                                  BodyQs,
+                                  {form, Body},
                                   true),
     case return_token(HttpResult) of
         {ok, Token} ->
@@ -250,14 +250,13 @@ retrieve_a_token(QsBodyIn, Pkce, OpenIdProviderInfo) ->
                  [<<"client_secret_basic">>]),
     AuthMethod = select_preferred_auth(AuthMethods),
     Header0 = [],
-    {QsBody, Header} =
+    {Body, Header} =
         add_authentication_code_verifier(QsBodyIn, Header0, AuthMethod, ClientId, Secret, Pkce),
-    Body = uri_string:compose_query(QsBody),
     return_token(oidcc_http_util:sync_http(post,
                                            Endpoint,
                                            Header,
                                            "application/x-www-form-urlencoded",
-                                           Body)).
+                                           {form, Body})).
 
 extract_subject(#{sub := Subject}) ->
     Subject;

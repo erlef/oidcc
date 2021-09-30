@@ -6,7 +6,7 @@
                            oidcc_openid_provider_sup,oidcc_session_mgr,
                            oidcc_session_sup]},
               {applications,[kernel,stdlib,ssl,public_key,crypto,erljwt,
-                             base64url,inets]},
+                             base64url,inets, hackney]},
               {maintainers,["Bas Wegh"]},
               {licenses,["Apache 2.0"]},
               {links,[{"GitHub","https://github.com/indigo-dc/oidcc"}]},

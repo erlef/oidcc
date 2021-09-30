@@ -116,16 +116,12 @@ fetch_config_test() ->
 real_config_fetch_test_() ->
     Setup =
         fun() ->
-           application:set_env(oidcc, cert_depth, 5),
            application:set_env(oidcc, provider_max_tries, 1),
-           application:set_env(oidcc, cacertfile, ca_file()),
            ok
         end,
     Cleanup =
         fun(_) ->
-           application:unset_env(oidcc, cert_depth),
            application:unset_env(oidcc, provider_max_tries),
-           application:unset_env(oidcc, cacertfile),
            ok
         end,
     WithoutKeys = {"real config fetch", fun() -> real_config_fetch(false) end},
@@ -178,6 +174,3 @@ wait_for_config(Pid, Timeout) ->
             timer:sleep(100),
             wait_for_config(Pid, Timeout - 1)
     end.
-
-ca_file() ->
-    certifi:cacertfile().

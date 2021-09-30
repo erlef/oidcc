@@ -15,13 +15,7 @@ sync_http(Method, Url, Header, ContentType, Body) ->
     sync_http(Method, Url, Header, ContentType, Body, false).
 
 sync_http(Method, Url, Header, UseCache) ->
-    perform_request(Method,
-                    Url,
-                    Header,
-                    undefined,
-                    undefined,
-                    [{body_format, binary}],
-                    UseCache).
+    perform_request(Method, Url, Header, undefined, <<>>, [{body_format, binary}], UseCache).
 
 sync_http(Method, Url, Header, ContentType, Body, UseCache) ->
     perform_request(Method,
@@ -33,10 +27,28 @@ sync_http(Method, Url, Header, ContentType, Body, UseCache) ->
                     UseCache).
 
 async_http(Method, Url, Header) ->
-    perform_request(Method, Url, Header, undefined, undefined, [{sync, false}], false).
+    async_http(Method, Url, Header, undefined, <<>>).
 
 async_http(Method, Url, Header, ContentType, Body) ->
-    perform_request(Method, Url, Header, ContentType, Body, [{sync, false}], false).
+    RequestId = erlang:make_ref(),
+    Caller = self(),
+    spawn_link(fun() ->
+                  async_http_perform(Caller, RequestId, Method, Url, Header, ContentType, Body)
+               end),
+    {ok, RequestId}.
+
+async_http_perform(Caller, RequestId, Method, Url, Header, ContentType, Body) ->
+    Response =
+        case perform_request(Method, Url, Header, ContentType, Body, [], false) of
+            {error, _} = Error ->
+                Error;
+            {ok,
+             #{status := StatusCode,
+               header := RespHeaders,
+               body := InBody}} ->
+                {{<<>>, StatusCode, <<>>}, RespHeaders, InBody}
+        end,
+    Caller ! {http, {RequestId, Response}}.
 
 request_timeout(Unit) ->
     Timeout =
@@ -53,39 +65,42 @@ request_timeout(Unit) ->
             Timeout
     end.
 
-perform_request(Method, Url, Header, ContentType, Body, Options, UseCache) ->
-    case options(Url) of
-        {ok, HttpOptions} ->
-            Request = gen_request(Url, Header, ContentType, Body),
-            perform_request_or_lookup_cache(Method, Request, HttpOptions, Options, UseCache);
-        Error ->
-            Error
-    end.
-
-perform_request_or_lookup_cache(Method, Request, HttpOptions, Options, true) ->
-    case oidcc_http_cache:lookup_http_call(Method, Request) of
+perform_request(Method, Url, Header, ContentType, Body, Options, true) ->
+    case oidcc_http_cache:lookup_http_call(Method, {Method, Url, Header, ContentType, Body})
+    of
         {ok, pending} ->
-            wait_for_cache(Method, Request);
+            wait_for_cache(Method, {Method, Url, Header, ContentType, Body});
         {ok, Res} ->
             Res;
         {error, _} ->
-            request_or_wait(Method, Request, HttpOptions, Options)
+            request_or_wait(Method, Url, Header, ContentType, Body, Options)
     end;
-perform_request_or_lookup_cache(Method, Request, HttpOptions, Options, false) ->
-    perform_http_request(Method, Request, HttpOptions, Options).
+perform_request(Method, Url, Header, ContentType, Body, Options, false) ->
+    perform_http_request(Method, Url, Header, ContentType, Body, Options).
 
-perform_http_request(Method, Request, HttpOptions, Options) ->
-    Res = httpc:request(Method, Request, HttpOptions, Options),
+perform_http_request(Method, Url, Header, ContentType, Body, Options) ->
+    Headers1 =
+        case ContentType of
+            undefined ->
+                Header;
+            _ ->
+                [{"content-type", ContentType} | Header]
+        end,
+    Res = hackney:request(Method, Url, Headers1, Body, Options ++ [{follow_redirect, true}]),
     normalize_result(Res).
 
-request_or_wait(Method, Request, HttpOpts, Opts) ->
-    case oidcc_http_cache:enqueue_http_call(Method, Request) of
+request_or_wait(Method, Url, Header, ContentType, Body, Options) ->
+    case oidcc_http_cache:enqueue_http_call(Method, {Method, Url, Header, ContentType, Body})
+    of
         true ->
-            Result = perform_http_request(Method, Request, HttpOpts, Opts),
-            ok = oidcc_http_cache:cache_http_result(Method, Request, Result),
+            Result = perform_http_request(Method, Url, Header, ContentType, Body, Options),
+            ok =
+                oidcc_http_cache:cache_http_result(Method,
+                                                   {Method, Url, Header, ContentType, Body},
+                                                   Result),
             Result;
         _ ->
-            wait_for_cache(Method, Request)
+            wait_for_cache(Method, {Method, Url, Header, ContentType, Body})
     end.
 
 wait_for_cache(Method, Request) ->
@@ -97,14 +112,10 @@ wait_for_cache(Method, Request) ->
             Result
     end.
 
-gen_request(Url, Header, undefined, undefined) ->
-    {normalize(Url), normalize_headers(Header)};
-gen_request(Url, Header, ContentType, Body) ->
-    {normalize(Url), normalize_headers(Header), normalize(ContentType), Body}.
-
-normalize_result({ok, {{_Proto, Status, _StatusName}, RespHeaders, Body}}) ->
+normalize_result({ok, StatusCode, RespHeaders, ClientRef}) ->
+    {ok, Body} = hackney:body(ClientRef),
     {ok,
-     #{status => Status,
+     #{status => StatusCode,
        header => RespHeaders,
        body => Body}};
 normalize_result({ok, StreamId}) ->
@@ -125,44 +136,3 @@ uncompress_body_if_needed(Body, {_, <<"deflate">>}) ->
     {ok, zlib:inflate(Z, Body)};
 uncompress_body_if_needed(_Body, {_, Compression}) ->
     erlang:error({unsupported_encoding, Compression}).
-
-options(Url) when is_list(Url) ->
-    #{scheme := Schema} = uri_string:parse(normalize(Url)),
-    BaseOptions = [{timeout, request_timeout(ms)}],
-    case Schema of
-        "http" ->
-            {ok, BaseOptions};
-        "https" ->
-            ssl_options(BaseOptions)
-    end;
-options(Url) when is_binary(Url) ->
-    options(binary_to_list(Url)).
-
-ssl_options(BaseOptions) ->
-    CaCert = application:get_env(oidcc, cacertfile),
-    Depth = application:get_env(oidcc, cert_depth, 1),
-    case CaCert of
-        {ok, CaCertFile} ->
-            {ok,
-             [{ssl,
-               [{verify, verify_peer},
-                {verify_fun, {fun ssl_verify_hostname:verify_fun/3, []}},
-                {customize_hostname_check,
-                 [{match_fun, public_key:pkix_verify_hostname_match_fun(https)}]},
-                {cacertfile, CaCertFile},
-                {depth, Depth}]}]
-             ++ BaseOptions};
-        _ ->
-            {error, missing_cacertfile}
-    end.
-
-normalize(L) when is_list(L) ->
-    L;
-normalize(B) when is_binary(B) ->
-    binary_to_list(B).
-
-normalize_headers(L) when is_list(L) ->
-    [normalize_header(K, V) || {K, V} <- L].
-
-normalize_header(K, V) ->
-    {normalize(K), normalize(V)}.

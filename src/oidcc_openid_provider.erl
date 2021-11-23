@@ -319,14 +319,14 @@ header_to_deadline(Header) ->
     Cache = lists:keyfind(<<"cache-control">>, 1, Header),
     Delta =
         try
-            cache_deadline(Cache)
+            cache_deadline(Cache, 3600)
         catch
             _:_ ->
                 3600
         end,
     deadline_in(Delta).
 
-cache_deadline({_, Cache}) ->
+cache_deadline({_, Cache}, Fallback) ->
     Entries = binary:split(Cache, [<<",">>, <<"=">>, <<" ">>], [global, trim_all]),
     MaxAge =
         fun (Entry, true) ->
@@ -336,7 +336,7 @@ cache_deadline({_, Cache}) ->
             (_, Res) ->
                 Res
         end,
-    lists:foldl(MaxAge, false, Entries).
+    lists:foldl(MaxAge, Fallback, Entries).
 
 deadline_in(Seconds) ->
     timestamp() + Seconds.

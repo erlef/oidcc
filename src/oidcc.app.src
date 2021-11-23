@@ -1,6 +1,6 @@
 {application,oidcc,
              [{description,"an easy to use OpenID Connect client library"},
-              {vsn,"2.0.0-alpha.1"},
+              {vsn,"2.0.0-alpha.2"},
               {modules,[]},
               {registered,[oidcc_sup,oidcc_openid_provider_mgr,
                            oidcc_openid_provider_sup,oidcc_session_mgr,

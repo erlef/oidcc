@@ -113,6 +113,68 @@ fetch_config_test() ->
     meck:unload(oidcc_http_util),
     ok.
 
+fetch_config_cache_control_no_deadline_test() ->
+    Id = <<"some id">>,
+    ConfigEndpoint = <<"https://my.provider/.well-known/openid-configuration">>,
+    KeyEndpoint = <<"https://my.provider/keys">>,
+    ConfigBody =
+        <<"{\"issuer\":\"https://my.provider\",\"jwks_uri\": \"https://my.provider/keys\", \"response_types_supported\":[\"code\"] }">>,
+    KeyBody =
+        <<"{ \"keys\": [ { \"kty\": \"RSA\", \"alg\": \"RS256\", \"use\":\n    \"sig\", \"kid\": \"6b8297523597b08d37e9c66e6dbbb32ea70e2770\", \"n\":\n    \"ufxh3jipQ6N9GvVfaHIdFkCBQ7MA8XBkXswHQdwKEyXhYBPp11KKumenQ9hVodEkFEpVnblPxI-Tnmj_0lLX-d4CSEBzZO5hQGTSCKiCUESVOYrirLiN3Mxjt5qi4-7JESeATcptGbEk69T2NLlWYki_LcXTmt_-n4XV_HfgCg9DdrlTjq7xtDlc3KYUf6iizWEBKixd47Y91vzdegl-O5iu1WCHrF6owAu1Ok5q4pVoACPzXONLXnxjUNRpuYksmFZDJOeJEy4Ig59H0S-uy20StRSGCySSEjeACP_Kib7weqyRD-7zHzJpW6jR25XHvoIIbCvnnWkkCKj_noyimw\",\n    \"e\": \"AQAB\" } ] }">>,
+    Config =
+        #{name => <<"some name">>,
+          description => <<"some description">>,
+          client_id => <<"123">>,
+          client_secret => <<"dont tell">>,
+          request_scopes => undefined,
+          issuer_or_endpoint => ConfigEndpoint,
+          local_endpoint => <<"/here">>,
+          test => <<"extra config">>,
+          static_extend_url => #{}},
+    HttpFun =
+        fun(Method, Url, _Header) ->
+           Method = get,
+           case Url of
+               ConfigEndpoint ->
+                   {ok, config_id};
+               KeyEndpoint ->
+                   {ok, key_id}
+           end
+        end,
+    ok = meck:new(oidcc_http_util),
+    ok = meck:expect(oidcc_http_util, async_http, HttpFun),
+    ok = meck:expect(oidcc_http_util, uncompress_body_if_needed, fun(B, _) -> {ok, B} end),
+    {ok, Pid} = oidcc_openid_provider:start_link(Id, Config),
+    Pid
+    ! {http,
+       {config_id,
+        {{tcp, 200, good},
+         [{<<"cache-control">>, <<"no-cache, must-revalidate, no-transform, no-store">>}],
+         ConfigBody}}},
+    {ok, Config1} = oidcc_openid_provider:get_config(Pid),
+    #{config_endpoint := ConfigEndpoint,
+      keys := [],
+      issuer := <<"https://my.provider">>,
+      jwks_uri := <<"https://my.provider/keys">>,
+      extra_config := #{test := <<"extra config">>}} =
+        Config1,
+    gen_server:cast(Pid, retrieve_keys),
+    Pid ! {http, {key_id, {{tcp, 200, good}, [], KeyBody}}},
+    {ok, Config2} = oidcc_openid_provider:get_config(Pid),
+    #{config_endpoint := ConfigEndpoint,
+      keys := [_Keys],
+      issuer := <<"https://my.provider">>,
+      jwks_uri := <<"https://my.provider/keys">>,
+      extra_config := #{test := <<"extra config">>}} =
+        Config2,
+    true = oidcc_openid_provider:is_issuer(<<"https://my.provider">>, Pid),
+    false = oidcc_openid_provider:is_issuer(<<"https://other.provider">>, Pid),
+    ok = oidcc_openid_provider:stop(Pid),
+    ok = test_util:wait_for_process_to_die(Pid, 100),
+    true = meck:validate(oidcc_http_util),
+    meck:unload(oidcc_http_util),
+    ok.
+
 real_config_fetch_test_() ->
     Setup =
         fun() ->

@@ -1,19 +1,40 @@
-*.d
+# The directory Mix & Rebar will write compiled artifacts to.
+/_build/
+*.beam
+
+# If you run "mix test --cover" / "rebar3 eunit" / "rebar3 ct", coverage assets end up here.
+/cover/
+*.coverdata
+
+# The directory Mix downloads your dependencies sources to.
+/deps/
+
+# Where 3rd-party dependencies like ExDoc output generated docs.
+/doc/
+
+# Ignore .fetch files in case you like to edit your project deps locally.
+/.fetch
+
+# If the VM or Rebar3 crashes, it generates a dump, let's ignore it too.
+erl_crash.dump
+rebar3.crashdump
+
+# Also ignore archive artifacts (built via "mix archive.build").
+*.ez
+
+# Ignore package tarball (built via "mix hex.build").
+oidcc-*.tar
+
+# Ignore Package Lock Files (not relevant for library)
+mix.lock
+rebar.lock
+
+# Other Rebar Files
 ebin/
 log/
 relx
-deps/
 _rel/
-_build/
-doc/
-.erlang.mk/
-.tts.plt
 elvis
 xrefr
-cover/
-*.coverdata
-test/ct.cover.spec
-*.beam
 *~
 *#
-conformance/rebar.lock

@@ -1,11 +1,11 @@
 # oidcc
 
-[![Main Branch](https://github.com/Erlang-Openid/oidcc/actions/workflows/branch_main.yml/badge.svg?branch=main)](https://github.com/Erlang-Openid/oidcc/actions/workflows/branch_main.yml)
+[![Main Branch](https://github.com/erlef/oidcc/actions/workflows/branch_main.yml/badge.svg?branch=main)](https://github.com/erlef/oidcc/actions/workflows/branch_main.yml)
 [![Module Version](https://img.shields.io/hexpm/v/oidcc.svg)](https://hex.pm/packages/oidcc)
 [![Total Download](https://img.shields.io/hexpm/dt/oidcc.svg)](https://hex.pm/packages/oidcc)
-[![License](https://img.shields.io/hexpm/l/oidcc.svg)](https://github.com/Erlang-OpenID/oidcc/blob/main/LICENSE)
-[![Last Updated](https://img.shields.io/github/last-commit/Erlang-OpenID/oidcc.svg)](https://github.com/Erlang-OpenID/oidcc/commits/master)
-[![Coverage Status](https://coveralls.io/repos/github/Erlang-Openid/oidcc/badge.svg?branch=main)](https://coveralls.io/github/Erlang-Openid/oidcc?branch=main)
+[![License](https://img.shields.io/hexpm/l/oidcc.svg)](https://github.com/erlef/oidcc/blob/main/LICENSE)
+[![Last Updated](https://img.shields.io/github/last-commit/erlef/oidcc.svg)](https://github.com/erlef/oidcc/commits/master)
+[![Coverage Status](https://coveralls.io/repos/github/erlef/oidcc/badge.svg?branch=main)](https://coveralls.io/github/erlef/oidcc?branch=main)
 
 OpenID Connect client library for Erlang.
 

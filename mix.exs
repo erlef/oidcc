@@ -14,7 +14,7 @@ defmodule Oidcc.Mixfile do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       name: "Oidcc",
-      source_url: "https://github.com/Erlang-Openid/oidcc",
+      source_url: "https://github.com/erlef/oidcc",
       docs: &docs/0,
       description: to_string(@props[:description]),
       package: package(),
@@ -58,7 +58,7 @@ defmodule Oidcc.Mixfile do
         "src"
       ],
       licenses: Enum.map(@props[:licenses], &to_string/1),
-      links: %{"Github" => "https://github.com/Erlang-Openid/oidcc"}
+      links: %{"Github" => "https://github.com/erlef/oidcc"}
     ]
   end
 

@@ -1,0 +1,34 @@
+on:
+  push:
+    branches:
+      - "main"
+
+name: "Main Branch"
+
+jobs:
+  detectToolVersions:
+    name: "Detect Tool Versions"
+
+    uses: ./.github/workflows/part_tool_versioning.yml
+
+  test:
+    name: "Test"
+
+    needs: ["detectToolVersions"]
+
+    uses: ./.github/workflows/part_test.yml
+    with:
+      otpVersion: "${{ needs.detectToolVersions.outputs.otpVersion }}"
+      rebarVersion: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
+      elixirVersion: "${{ needs.detectToolVersions.outputs.elixirVersion }}"
+
+  docs:
+    name: "Docs"
+
+    needs: ["detectToolVersions"]
+
+    uses: ./.github/workflows/part_docs.yml
+    with:
+      otpVersion: "${{ needs.detectToolVersions.outputs.otpVersion }}"
+      rebarVersion: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
+      elixirVersion: "${{ needs.detectToolVersions.outputs.elixirVersion }}"

@@ -1,0 +1,347 @@
+on:
+  workflow_call:
+    inputs:
+      otpVersion:
+        required: true
+        type: string
+      rebarVersion:
+        required: true
+        type: string
+      elixirVersion:
+        required: true
+        type: string
+
+name: "Test"
+
+env:
+  ERL_AFLAGS: "-enable-feature all"
+
+jobs:
+  rebar_format:
+    name: Check Rebar Formatting
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        id: setupBEAM
+        with:
+          otp-version: ${{ inputs.otpVersion }}
+          rebar3-version: ${{ inputs.rebarVersion }}
+      - uses: actions/cache@v3
+        with:
+          path: _build
+          key: rebar_format-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            rebar_format-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - run: rebar3 fmt --check
+
+  mix_format:
+    name: Check Mix Formatting
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        id: setupBEAM
+        with:
+          otp-version: ${{ inputs.otpVersion }}
+          rebar3-version: ${{ inputs.rebarVersion }}
+          elixir-version: ${{ inputs.elixirVersion }}
+      - uses: actions/cache@v3
+        with:
+          path: _build
+          key: mix_format-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            mix_format-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - uses: actions/cache@v3
+        with:
+          path: deps
+          key: mix_format-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            mix_format-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - run: mix deps.get
+      - run: mix format --check-formatted
+
+  eunit:
+    name: Run EUnit
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - otp: "${{ inputs.otpVersion }}"
+          - otp: "master"
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        id: setupBEAM
+        with:
+          otp-version: ${{ matrix.otp }}
+          rebar3-version: ${{ inputs.rebarVersion }}
+      - uses: actions/cache@v3
+        with:
+          path: _build
+          key: eunit-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            eunit-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - run: rebar3 eunit --cover
+      - uses: actions/upload-artifact@v3
+        with:
+          name: eunit-coverage
+          path: _build/test/cover/eunit.coverdata
+
+  conformance:
+    name: Run Conformance Tests
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        id: setupBEAM
+        with:
+          otp-version: ${{ inputs.otpVersion }}
+          rebar3-version: ${{ inputs.rebarVersion }}
+      - uses: actions/cache@v3
+        with:
+          path: _build
+          key: ct-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            ct-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - run: rebar3 ct --cover
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ct-coverage
+          path: _build/test/cover/ct.coverdata
+
+  mix_test:
+    name: Run Mix Tests
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        id: setupBEAM
+        with:
+          otp-version: ${{ inputs.otpVersion }}
+          rebar3-version: ${{ inputs.rebarVersion }}
+          elixir-version: ${{ inputs.elixirVersion }}
+      - uses: actions/cache@v3
+        with:
+          path: _build
+          key: mix_test-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            mix_test-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - uses: actions/cache@v3
+        with:
+          path: deps
+          key: mix_test-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            mix_test-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - run: mix deps.get
+      - run: mix test --cover --export-coverage mix_test
+      - uses: actions/upload-artifact@v3
+        with:
+          name: mix_test-coverage
+          path: cover/mix_test.coverdata
+
+  coverage:
+    name: Process Test Coverage
+
+    runs-on: ubuntu-latest
+
+    needs: ["eunit", "conformance", "mix_test"]
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        id: setupBEAM
+        with:
+          otp-version: ${{ inputs.otpVersion }}
+          rebar3-version: ${{ inputs.rebarVersion }}
+      - uses: actions/cache@v3
+        with:
+          path: _build
+          key: cover-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            cover-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - uses: actions/download-artifact@v3
+        with:
+          name: ct-coverage
+          path: _build/test/cover/
+      - uses: actions/download-artifact@v3
+        with:
+          name: eunit-coverage
+          path: _build/test/cover/
+      - uses: actions/download-artifact@v3
+        with:
+          name: mix_test-coverage
+          path: _build/test/cover/
+      - run: rebar3 cover
+      - uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: _build/test/cover/
+
+  coveralls:
+    name: Send Coverage to coveralls.io
+
+    runs-on: ubuntu-latest
+
+    needs: ["eunit", "conformance", "mix_test"]
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        id: setupBEAM
+        with:
+          otp-version: ${{ inputs.otpVersion }}
+          rebar3-version: ${{ inputs.rebarVersion }}
+      - uses: actions/cache@v3
+        with:
+          path: _build
+          key: cover-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            cover-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - uses: actions/download-artifact@v3
+        with:
+          name: ct-coverage
+          path: _build/test/cover/
+      - uses: actions/download-artifact@v3
+        with:
+          name: eunit-coverage
+          path: _build/test/cover/
+      - uses: actions/download-artifact@v3
+        with:
+          name: mix_test-coverage
+          path: _build/test/cover/
+      - uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: _build/test/cover/
+      - run: rebar3 as test coveralls send
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  lint:
+    name: Lint
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        id: setupBEAM
+        with:
+          otp-version: ${{ inputs.otpVersion }}
+          rebar3-version: ${{ inputs.rebarVersion }}
+      - uses: actions/cache@v3
+        with:
+          path: _build
+          key: lint-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            lint-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - run: rebar3 lint
+
+  credo:
+    name: Run Credo
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        id: setupBEAM
+        with:
+          otp-version: ${{ inputs.otpVersion }}
+          rebar3-version: ${{ inputs.rebarVersion }}
+          elixir-version: ${{ inputs.elixirVersion }}
+      - uses: actions/cache@v3
+        with:
+          path: _build
+          key: credo-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            credo-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - uses: actions/cache@v3
+        with:
+          path: deps
+          key: credo-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            credo-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - run: mix deps.get
+      - run: mix credo
+
+  dialyxir:
+    name: Run Dialyxir
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        id: setupBEAM
+        with:
+          otp-version: ${{ inputs.otpVersion }}
+          rebar3-version: ${{ inputs.rebarVersion }}
+          elixir-version: ${{ inputs.elixirVersion }}
+      - uses: actions/cache@v3
+        with:
+          path: _build
+          key: dialyxir-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            dialyxir-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - uses: actions/cache@v3
+        with:
+          path: deps
+          key: dialyxir-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            dialyxir-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - run: mix deps.get
+      - run: mix dialyzer
+
+  dialyzer:
+    name: Dialyzer
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        id: setupBEAM
+        with:
+          otp-version: ${{ inputs.otpVersion }}
+          rebar3-version: ${{ inputs.rebarVersion }}
+      - uses: actions/cache@v3
+        with:
+          path: _build
+          key: dialyzer-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            dialyzer-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - run: rebar3 dialyzer
+
+  hank:
+    name: Hank
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-beam@v1
+        id: setupBEAM
+        with:
+          otp-version: ${{ inputs.otpVersion }}
+          rebar3-version: ${{ inputs.rebarVersion }}
+      - uses: actions/cache@v3
+        with:
+          path: _build
+          key: hank-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.lock') }}
+          restore-keys: |
+            hank-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+      - run: rebar3 hank

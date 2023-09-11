@@ -1,299 +1,696 @@
+%%%-------------------------------------------------------------------
+%% @doc Facilitate OpenID Code/Token Exchanges
+%% @end
+%%%-------------------------------------------------------------------
 -module(oidcc_token).
 
--export([extract_token_map/2]).
--export([introspect_token_map/2]).
--export([validate_token_map/3]).
--export([validate_token_map/4]).
--export([verify_access_token_map_hash/2]).
--export([validate_id_token/3]).
--export([validate_id_token/4]).
+-feature(maybe_expr, enable).
 
-extract_token_map(Token, OrgScope) ->
-    TokenMap = jsone:decode(Token, [{object_format, map}]),
-    IDToken = maps:get(<<"id_token">>, TokenMap, none),
+-include("oidcc_client_context.hrl").
+-include("oidcc_provider_configuration.hrl").
+-include("oidcc_token.hrl").
+
+-include_lib("jose/include/jose_jwk.hrl").
+-include_lib("jose/include/jose_jws.hrl").
+-include_lib("jose/include/jose_jwt.hrl").
+
+-export([client_credentials/2]).
+-export([jwt_profile/4]).
+-export([refresh/3]).
+-export([retrieve/3]).
+-export([validate_id_token/3]).
+
+-export_type([access/0]).
+-export_type([client_credentials_opts/0]).
+-export_type([error/0]).
+-export_type([id/0]).
+-export_type([jwt_profile_opts/0]).
+-export_type([refresh/0]).
+-export_type([refresh_opts/0]).
+-export_type([refresh_opts_no_sub/0]).
+-export_type([retrieve_opts/0]).
+-export_type([t/0]).
+
+-type id() :: #oidcc_token_id{token :: binary(), claims :: oidcc_jwt_util:claims()}.
+
+%% ID Token Wrapper
+%%
+%% <h2>Fields</h2>
+%%
+%% <ul>
+%%   <li>`token' - The retrieved token</li>
+%%   <li>`claims' - Unpacked claims of the verified token</li>
+%% </ul>
+
+-type access() ::
+    #oidcc_token_access{token :: binary(), expires :: pos_integer() | undefined}.
+%% Access Token Wrapper
+%%
+%% <h2>Fields</h2>
+%%
+%% <ul>
+%%   <li>`token' - The retrieved token</li>
+%%   <li>`expires' - Timestamp when token will expire</li>
+%% </ul>
+
+-type refresh() :: #oidcc_token_refresh{token :: binary()}.
+%% Refresh Token Wrapper
+%%
+%% <h2>Fields</h2>
+%%
+%% <ul>
+%%   <li>`token' - The retrieved token</li>
+%% </ul>
+
+-type t() ::
+    #oidcc_token{
+        id :: oidcc_token:id() | none,
+        access :: oidcc_token:access() | none,
+        refresh :: oidcc_token:refresh() | none,
+        scope :: oidcc_scope:scopes()
+    }.
+%% Token Response Wrapper
+%%
+%% <h2>Fields</h2>
+%%
+%% <ul>
+%%   <li>`id' - {@link id()}</li>
+%%   <li>`access' - {@link access()}</li>
+%%   <li>`refresh' - {@link refresh()}</li>
+%%   <li>`scope' - {@link oidcc_scope:scopes()}</li>
+%% </ul>
+
+-type pkce() :: #{verifier := binary()}.
+
+-type retrieve_opts() ::
+    #{
+        pkce => pkce(),
+        nonce => binary() | any,
+        scope => oidcc_scope:scopes(),
+        refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
+        redirect_uri := uri_string:uri_string(),
+        request_opts => oidcc_http_util:request_opts()
+    }.
+%% Options for retrieving a token
+%%
+%% See [https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3]
+%%
+%% <h2>Fields</h2>
+%%
+%% <ul>
+%%   <li>`pkce' - PKCE verification options</li>
+%%   <li>`nonce' - Nonce to check</li>
+%%   <li>`scope' - Scope to store with the token</li>
+%%   <li>`refresh_jwks' - How to handle tokens with an unknown `kid'.
+%%     See {@link oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun()}</li>
+%%   <li>`redirect_uri' - Redirect uri given to {@link oidcc_authorization:create_redirect_url/2}</li>
+%% </ul>
+
+-type refresh_opts_no_sub() ::
+    #{
+        scope => oidcc_scope:scopes(),
+        refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
+        expected_subject := binary()
+    }.
+%% See {@link refresh_opts_no_sub()}
+
+-type refresh_opts() ::
+    #{
+        scope => oidcc_scope:scopes(),
+        refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
+        expected_subject := binary(),
+        request_opts => oidcc_http_util:request_opts()
+    }.
+%% Options for refreshing a token
+%%
+%% See [https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3]
+%%
+%% <h2>Fields</h2>
+%%
+%% <ul>
+%%   <li>`scope' - Scope to store with the token</li>
+%%   <li>`refresh_jwks' - How to handle tokens with an unknown `kid'.
+%%     See {@link oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun()}</li>
+%%   <li>`expected_subject' - `sub' of the original token</li>
+%% </ul>
+
+-type jwt_profile_opts() :: #{
+    scope => oidcc_scope:scopes(),
+    refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
+    request_opts => oidcc_http_util:request_opts(),
+    kid => binary()
+}.
+
+-type client_credentials_opts() :: #{
+    scope => oidcc_scope:scopes(),
+    refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
+    request_opts => oidcc_http_util:request_opts()
+}.
+
+-type error() ::
+    {missing_claim, MissingClaim :: binary(), Claims :: oidcc_jwt_util:claims()}
+    | bad_access_token_hash
+    | sub_invalid
+    | {none_alg_used, NoneClaims :: oidcc_jwt_util:claims()}
+    | {grant_type_not_supported,
+        authorization_code | refresh_token | jwt_bearer | client_credentials}
+    | oidcc_jwt_util:error()
+    | oidcc_http_util:error().
+
+%% @doc
+%% retrieve the token using the authcode received before and directly validate
+%% the result.
+%%
+%% the authcode was sent to the local endpoint by the OpenId Connect provider,
+%% using redirects
+%%
+%% For a high level interface using {@link oidcc_provider_configuration_worker}
+%% see {@link oidcc:retrieve_token/5}.
+%%
+%% <h2>Examples</h2>
+%%
+%% ```
+%% {ok, ClientContext} =
+%%   oidcc_client_context:from_configuration_worker(provider_name,
+%%                                                  <<"client_id">>,
+%%                                                  <<"client_secret">>),
+%%
+%% %% Get AuthCode from Redirect
+%%
+%% {ok, #oidcc_token{}} =
+%%   oidcc:retrieve(AuthCode, ClientContext, #{
+%%     redirect_uri => <<"https://example.com/callback">>}).
+%% '''
+%% @end
+-spec retrieve(AuthCode, ClientContext, Opts) ->
+    {ok, t()} | {error, error()}
+when
+    AuthCode :: binary(),
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: retrieve_opts().
+retrieve(AuthCode, ClientContext, Opts) ->
+    #oidcc_client_context{provider_configuration = Configuration,
+                          client_id = ClientId} = ClientContext,
+    #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} = Configuration,
+
+    case lists:member(<<"authorization_code">>, GrantTypesSupported) of
+        true ->
+
+            Pkce = maps:get(pkce, Opts, undefined),
+            QsBody =
+                [{<<"grant_type">>, <<"authorization_code">>},
+                {<<"code">>, AuthCode},
+                {<<"redirect_uri">>, maps:get(redirect_uri, Opts)}],
+
+            TelemetryOpts = #{topic => [oidcc, request_token],
+                extra_meta => #{issuer => Issuer, client_id => ClientId}},
+
+            maybe
+                {ok, Token} ?= retrieve_a_token(QsBody, Pkce, ClientContext, Opts, TelemetryOpts, true),
+                extract_response(Token, ClientContext, Opts)
+            end;
+        false ->
+            {error, {grant_type_not_supported, authorization_code}}
+    end.
+
+%% @doc Refresh Token
+%%
+%% For a high level interface using {@link oidcc_provider_configuration_worker}
+%% see {@link oidcc:refresh_token/5}.
+%%
+%% <h2>Examples</h2>
+%%
+%% ```
+%% {ok, ClientContext} =
+%%   oidcc_client_context:from_configuration_worker(provider_name,
+%%                                                  <<"client_id">>,
+%%                                                  <<"client_secret">>),
+%%
+%% %% Get AuthCode from Redirect
+%%
+%% {ok, Token} =
+%%   oidcc_token:retrieve(AuthCode, ClientContext, #{
+%%     redirect_uri => <<"https://example.com/callback">>}).
+%%
+%% %% Later
+%%
+%% {ok, #oidcc_token{}} =
+%%   oidcc_token:refresh(Token,
+%%                       ClientContext,
+%%                       #{expected_subject => <<"sub_from_initial_id_token>>}).
+%% '''
+%% @end
+-spec refresh
+    (RefreshToken, ClientContext, Opts) ->
+        {ok, t()} | {error, error()}
+    when
+        RefreshToken :: binary(),
+        ClientContext :: oidcc_client_context:t(),
+        Opts :: refresh_opts();
+    (Token, ClientContext, Opts) ->
+        {ok, t()} | {error, error()}
+    when
+        Token :: oidcc_token:t(),
+        ClientContext :: oidcc_client_context:t(),
+        Opts :: refresh_opts_no_sub().
+refresh(#oidcc_token{refresh = #oidcc_token_refresh{token = RefreshToken}, id = #oidcc_token_id{claims = #{<<"sub">> := ExpectedSubject}}}, ClientContext, Opts) ->
+    refresh(RefreshToken, ClientContext, maps:put(expected_subject, ExpectedSubject, Opts));
+refresh(RefreshToken, ClientContext, Opts) ->
+    #oidcc_client_context{provider_configuration = Configuration,
+                          client_id = ClientId} = ClientContext,
+    #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} = Configuration,
+
+    case lists:member(<<"refresh_token">>, GrantTypesSupported) of
+        true ->
+            ExpectedSub = maps:get(expected_subject, Opts),
+            Scope = maps:get(scope, Opts, []),
+            QueryString =
+                [{<<"refresh_token">>, RefreshToken}, {<<"grant_type">>, <<"refresh_token">>}],
+            QueryString1 = oidcc_scope:query_append_scope(Scope, QueryString),
+
+            TelemetryOpts = #{topic => [oidcc, refresh_token],
+                extra_meta => #{issuer => Issuer, client_id => ClientId}},
+
+            maybe
+                {ok, Token} ?= retrieve_a_token(QueryString1, undefined, ClientContext, Opts, TelemetryOpts, true),
+                {ok, TokenRecord} ?=
+                    extract_response(Token, ClientContext, maps:put(nonce, any, Opts)),
+                case TokenRecord of
+                    #oidcc_token{id = #oidcc_token_id{claims = #{<<"sub">> := ExpectedSub}}} ->
+                        {ok, TokenRecord};
+                    #oidcc_token{} ->
+                        {error, sub_invalid}
+                end
+            end;
+        false ->
+            {error, {grant_type_not_supported, refresh_token}}
+    end.
+
+%% @doc Retrieve JSON Web Token (JWT) Profile Token
+%%
+%% See [https://datatracker.ietf.org/doc/html/rfc7523#section-4]
+%%
+%% For a high level interface using {@link oidcc_provider_configuration_worker}
+%% see {@link oidcc:jwt_profile_token/6}.
+%%
+%% <h2>Examples</h2>
+%%
+%% ```
+%% {ok, ClientContext} =
+%%   oidcc_client_context:from_configuration_worker(provider_name,
+%%                                                  <<"client_id">>,
+%%                                                  <<"client_secret">>),
+%%
+%% {ok, KeyJson} = file:read_file("jwt-profile.json"),
+%% KeyMap = jose:decode(KeyJson),
+%% Key = jose_jwk:from_pem(maps:get(<<"key">>, KeyMap)),
+%%
+%% {ok, #oidcc_token{}} =
+%%   oidcc_token:jwt_profile(<<"subject">>,
+%%                           ClientContext,
+%%                           Key,
+%%                           #{scope => [<<"scope">>],
+%%                             kid => maps:get(<<"keyId">>, KeyMap)}).
+%% '''
+%% @end
+-spec jwt_profile(Subject, ClientContext, Jwk, Opts) -> {ok, t()} | {error, error()} when
+    Subject :: binary(),
+    ClientContext :: oidcc_client_context:t(),
+    Jwk :: jose_jwk:key(),
+    Opts :: jwt_profile_opts().
+jwt_profile(Subject, ClientContext, Jwk, Opts) ->
+    #oidcc_client_context{provider_configuration = Configuration, client_id = ClientId} = ClientContext,
+    #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} = Configuration,
+
+    case lists:member(<<"urn:ietf:params:oauth:grant-type:jwt-bearer">>, GrantTypesSupported) of
+        true ->
+            Iat = os:system_time(seconds),
+            Exp = Iat + 60,
+
+            AssertionClaims = #{
+                <<"iss">> => Subject,
+                <<"sub">> => Subject,
+                <<"aud">> => [Issuer],
+                <<"exp">> => Exp,
+                <<"iat">> => Iat,
+                <<"nbf">> => Iat
+            },
+            AssertionJwt = jose_jwt:from(AssertionClaims),
+
+            AssertionJws0 = #{
+                <<"alg">> => <<"RS256">>,
+                <<"typ">> => <<"JWT">>
+            },
+            AssertionJws = case maps:get(kid, Opts, none) of
+                none -> AssertionJws0;
+                Kid -> maps:put(<<"kid">>, Kid, AssertionJws0)
+            end,
+
+            {_Jws, Assertion} = jose_jws:compact(jose_jwt:sign(Jwk, AssertionJws, AssertionJwt)),
+
+            Scope = maps:get(scope, Opts, []),
+            QueryString =
+                [{<<"assertion">>, Assertion}, {<<"grant_type">>, <<"urn:ietf:params:oauth:grant-type:jwt-bearer">>}],
+            QueryString1 = oidcc_scope:query_append_scope(Scope, QueryString),
+
+            TelemetryOpts = #{topic => [oidcc, refresh_token],
+                extra_meta => #{issuer => Issuer, client_id => ClientId}},
+
+            maybe
+                {ok, Token} ?= retrieve_a_token(QueryString1, undefined, ClientContext, Opts, TelemetryOpts, false),
+                {ok, TokenRecord} ?= extract_response(Token, ClientContext, maps:put(nonce, any, Opts)),
+                case TokenRecord of
+                    #oidcc_token{id = none} ->
+                        {ok, TokenRecord};
+                    #oidcc_token{id = #oidcc_token_id{claims = #{<<"sub">> := Subject}}} ->
+                        {ok, TokenRecord};
+                    #oidcc_token{} ->
+                        {error, sub_invalid}
+                end
+            end;
+
+        false ->
+            {error, {grant_type_not_supported, jwt_bearer}}
+    end.
+
+%% @doc Retrieve Client Credential Token
+%%
+%% See [https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.4]
+%%
+%% For a high level interface using {@link oidcc_provider_configuration_worker}
+%% see {@link oidcc:client_credentials_token/4}.
+%%
+%% <h2>Examples</h2>
+%%
+%% ```
+%% {ok, ClientContext} =
+%%   oidcc_client_context:from_configuration_worker(provider_name,
+%%                                                  <<"client_id">>,
+%%                                                  <<"client_secret">>),
+%%
+%% {ok, #oidcc_token{}} =
+%%   oidcc_token:client_credentials(ClientContext,
+%%                                  #{scope => [<<"scope">>]}).
+%% '''
+%% @end
+-spec client_credentials(ClientContext, Opts) -> {ok, t()} | {error, error()} when
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: client_credentials_opts().
+client_credentials(ClientContext, Opts) ->
+    #oidcc_client_context{provider_configuration = Configuration,
+                          client_id = ClientId} = ClientContext,
+    #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} = Configuration,
+
+    case lists:member(<<"client_credentials">>, GrantTypesSupported) of
+        true ->
+            Scope = maps:get(scope, Opts, []),
+            QueryString = [{<<"grant_type">>, <<"client_credentials">>}],
+            QueryString1 = oidcc_scope:query_append_scope(Scope, QueryString),
+
+            TelemetryOpts = #{topic => [oidcc, client_credentials],
+                extra_meta => #{issuer => Issuer, client_id => ClientId}},
+
+            maybe
+                {ok, Token} ?= retrieve_a_token(QueryString1, undefined, ClientContext, Opts, TelemetryOpts, true),
+                extract_response(Token, ClientContext, maps:put(nonce, any, Opts))
+            end;
+        false ->
+            {error, {grant_type_not_supported, client_credentials}}
+    end.
+
+-spec extract_response(TokenResponseBody, ClientContext, Opts) ->
+    {ok, t()} | {error, error()}
+when
+    TokenResponseBody :: map(),
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: retrieve_opts().
+extract_response(TokenResponseBody, ClientContext, Opts) ->
+    RefreshJwksFun = maps:get(refresh_jwks, Opts, undefined),
+    maybe
+        {ok, Token} ?= int_extract_response(TokenResponseBody, ClientContext, Opts),
+        {ok, Token}
+    else
+        {error, {no_matching_key_with_kid, Kid}} when RefreshJwksFun =/= undefined ->
+            #oidcc_client_context{jwks = OldJwks} = ClientContext,
+            maybe
+                {ok, RefreshedJwks} ?= RefreshJwksFun(OldJwks, Kid),
+                RefreshedClientContext = ClientContext#oidcc_client_context{jwks = RefreshedJwks},
+                int_extract_response(TokenResponseBody, RefreshedClientContext, Opts)
+            end;
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+-spec int_extract_response(TokenMap, ClientContext, Opts) ->
+    {ok, t()} | {error, error()}
+when
+    TokenMap :: map(),
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: retrieve_opts().
+int_extract_response(TokenMap, ClientContext, Opts) ->
+    Nonce = maps:get(nonce, Opts, any),
+    Scopes = maps:get(scope, Opts, []),
+    IdToken = maps:get(<<"id_token">>, TokenMap, none),
     AccessToken = maps:get(<<"access_token">>, TokenMap, none),
     AccessExpire = maps:get(<<"expires_in">>, TokenMap, undefined),
     RefreshToken = maps:get(<<"refresh_token">>, TokenMap, none),
-    Scope = maps:get(<<"scope">>, TokenMap, OrgScope),
-    #{id => #{token => IDToken, claims => undefined},
-      access =>
-          #{token => AccessToken,
-            expires => AccessExpire,
-            hash => undefined},
-      refresh => #{token => RefreshToken},
-      scope => scope_map(Scope)}.
-
-introspect_token_map(Token, ThisClientId) ->
-    TokenMap = jsone:decode(Token, [{object_format, map}]),
-    Active =
-        case maps:get(<<"active">>, TokenMap, undefined) of
-            true ->
-                true;
+    Scope = maps:get(<<"scope">>, TokenMap, oidcc_scope:scopes_to_bin(Scopes)),
+    AccessTokenRecord = case AccessToken of
+        none -> none;
+        _ -> #oidcc_token_access{token = AccessToken, expires = AccessExpire}
+    end,
+    RefreshTokenRecord =
+        case RefreshToken of
+            none ->
+                none;
             _ ->
-                false
+                #oidcc_token_refresh{token = RefreshToken}
         end,
-    Scope = maps:get(<<"scope">>, TokenMap, <<"">>),
-    ClientId = maps:get(<<"client_id">>, TokenMap, undefined),
-    SameClientId = ClientId == ThisClientId,
-    Username = maps:get(<<"username">>, TokenMap, undefined),
-    Exp = maps:get(<<"exp">>, TokenMap, undefined),
-    #{active => Active,
-      scope => scope_map(Scope),
-      client_id => #{id => ClientId, same => SameClientId},
-      username => Username,
-      exp => Exp}.
+    case IdToken of
+        none ->
+            {ok, #oidcc_token{id = none,
+                access = AccessTokenRecord,
+                refresh = RefreshTokenRecord,
+                scope = oidcc_scope:parse(Scope)}};
+        _ ->
+            RescueNone = case validate_id_token(IdToken, ClientContext, Nonce) of
+                {ok, OkClaims} ->
+                    {ok, {OkClaims, false}};
+                {error, {none_alg_used, NoneClaims}} ->
+                    {ok, {NoneClaims, true}};
+                {error, Reason} ->
+                    {error, Reason}
+            end,
 
-scope_map(Scope) ->
-    #{scope => Scope, list => binary:split(Scope, [<<" ">>], [trim_all, global])}.
-
-validate_token_map(TokenMap, OpenIdProvider, Nonce) ->
-    validate_token_map(TokenMap, OpenIdProvider, Nonce, false).
-
-validate_token_map(TokenMap, OpenIdProvider, Nonce, AllowNone) ->
-    #{id := IdTokenMap, access := AccessTokenMap} = TokenMap,
-
-    case validate_id_token_map(IdTokenMap, OpenIdProvider, Nonce, AllowNone) of
-        {ok, NewIdTokenMap} ->
-            NewAccessTokenMap = verify_access_token_map_hash(AccessTokenMap, NewIdTokenMap),
-            TokenMap1 = maps:put(id, NewIdTokenMap, TokenMap),
-            Result = maps:put(access, NewAccessTokenMap, TokenMap1),
-            {ok, Result};
-        Other ->
-            Other
+            maybe
+                {ok, {Claims, NoneUsed}} ?= RescueNone,
+                IdTokenRecord = #oidcc_token_id{token = IdToken, claims = Claims},
+                TokenRecord = #oidcc_token{id = IdTokenRecord,
+                    access = AccessTokenRecord,
+                    refresh = RefreshTokenRecord,
+                    scope = oidcc_scope:parse(Scope)},
+                ok ?= verify_access_token_map_hash(TokenRecord),
+                %% If none alg was used, continue with checks to allow the user to decide
+                %% if he wants to use the result
+                case NoneUsed of
+                    true ->
+                        {error, {none_alg_used, TokenRecord}};
+                    false ->
+                        {ok, TokenRecord}
+                end
+            end
     end.
 
-verify_access_token_map_hash(AccessTokenMap, IdTokenMap) ->
-    try int_verify_access_token_hash(AccessTokenMap, IdTokenMap) of
-        Result ->
-            Result
-    catch
-        _:_ ->
-            maps:put(hash, internal_error, AccessTokenMap)
-    end.
-
-int_verify_access_token_hash(#{token := AccessToken} = Map, #{claims := Claims}) ->
+-spec verify_access_token_map_hash(TokenRecord :: t()) ->
+    ok | {error, error()}.
+verify_access_token_map_hash(#oidcc_token{
+    id =
+        #oidcc_token_id{
+            claims =
+                #{<<"at_hash">> := ExpectedHash}
+        },
+    access = #oidcc_token_access{token = AccessToken}
+}) ->
     <<BinHash:16/binary, _Rest/binary>> = crypto:hash(sha256, AccessToken),
-    Hash = base64url:encode(BinHash),
-    Result =
-        case maps:get(at_hash, Claims, undefined) of
-            undefined ->
-                no_hash;
-            Hash ->
-                verified;
-            _OtherHash ->
-                bad_hash
-        end,
-    maps:put(hash, Result, Map).
+    case base64:encode(BinHash, #{mode => urlsafe, padding => false}) of
+        ExpectedHash ->
+            ok;
+        _Other ->
+            {error, bad_access_token_hash}
+    end;
+verify_access_token_map_hash(#oidcc_token{}) ->
+    ok.
 
-validate_id_token_map(#{token := IdToken} = IdTokenMap,
-                      OpenIdProviderId,
-                      Nonce,
-                      AllowNone) ->
-    case validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone) of
-        {ok, Claims} ->
-            {ok, maps:put(claims, Claims, IdTokenMap)};
-        Other ->
-            Other
+%% @doc Validate ID Token
+%%
+%% Usually the id token is validated using {@link retrieve/3}.
+%% If you gget the token passed from somewhere else, this function can validate it.
+%%
+%% <h2>Examples</h2>
+%%
+%% ```
+%% {ok, ClientContext} =
+%%   oidcc_client_context:from_configuration_worker(provider_name,
+%%                                                  <<"client_id">>,
+%%                                                  <<"client_secret">>),
+%%
+%% %% Get IdToken from somewhere
+%%
+%% {ok, Claims} =
+%%   oidcc:validate_id_token(IdToken, ClientContext, ExpectedNonce).
+%% '''
+%% @end
+-spec validate_id_token(IdToken, ClientContext, Nonce) ->
+    {ok, Claims} | {error, error()}
+when
+    IdToken :: binary(),
+    ClientContext :: oidcc_client_context:t(),
+    Nonce :: binary() | any,
+    Claims :: oidcc_jwt_util:claims().
+validate_id_token(IdToken, ClientContext, Nonce) ->
+    #oidcc_client_context{provider_configuration = Configuration,
+                          jwks = #jose_jwk{} = Jwks,
+                          client_id = ClientId,
+                          client_secret = ClientSecret} =
+        ClientContext,
+    #oidcc_provider_configuration{id_token_signing_alg_values_supported = AllowAlgorithms,
+                                  issuer = Issuer} =
+        Configuration,
+    maybe
+        ExpClaims0 = [{<<"aud">>, ClientId}, {<<"iss">>, Issuer}],
+        ExpClaims =
+            case Nonce of
+                any ->
+                    ExpClaims0;
+                Bin when is_binary(Bin) ->
+                    [{<<"nonce">>, Nonce} | ExpClaims0]
+            end,
+        JwksInclOct =
+            case oidcc_jwt_util:client_secret_oct_keys(AllowAlgorithms, ClientSecret) of
+                none ->
+                    Jwks;
+                OctJwk ->
+                    jose_jwk:merge(OctJwk, Jwks)
+            end,
+        {ok, {#jose_jwt{fields = Claims}, Jws}} ?=
+            oidcc_jwt_util:verify_signature(IdToken, AllowAlgorithms, JwksInclOct),
+        ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),
+        ok ?= verify_missing_required_claims(Claims),
+        case Jws of
+            #jose_jws{alg = {jose_jws_alg_none, none}} ->
+                {error, {none_alg_used, Claims}};
+            #jose_jws{} ->
+                {ok, Claims}
+        end
     end.
 
-validate_id_token(IdToken, OpenIdProviderId, Nonce) ->
-    validate_id_token(IdToken, OpenIdProviderId, Nonce, false).
-
-validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone) ->
-    try int_validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone) of
-        Claims ->
-            {ok, Claims}
-    catch
-        Exception ->
-            {error, Exception}
-    end.
-
-int_validate_id_token(IdToken, OpenIdProviderId, Nonce, AllowNone)
-    when is_binary(IdToken), byte_size(IdToken) > 5 ->
-    {ok, OpInfo} = oidcc:get_openid_provider_info(OpenIdProviderId),
-    #{issuer := Issuer,
-      client_id := ClientId,
-      keys := PubKeys} =
-        OpInfo,
-
-    % 1. If the ID Token is encrypted, decrypt it using the keys and algorithms
-    % that the Client specified during Registration that the OP was to use to
-    % encrypt the ID Token. If encryption was negotiated with the OP at
-    % Registration time and the ID Token is not encrypted, the RP SHOULD reject
-    % it.
-    % TODO: implement later if needed, not for now
-    % 2.  The Issuer Identifier for the OpenID Provider (which is typically
-    % obtained during Discovery) MUST exactly match the value of the iss
-    % (issuer) Claim.
-    % 3. The Client MUST validate that the aud (audience) Claim contains its
-    % client_id value registered at the Issuer identified by the iss (issuer)
-    % Claim as an audience. The aud (audience) Claim MAY contain an array with
-    % more than one element. The ID Token MUST be rejected if the ID Token does
-    % not list the Client as a valid audience, or if it contains additional
-    % audiences not trusted by the Client.
-    % 11. If a nonce value was sent in the Authentication Request, a nonce Claim
-    % MUST be present and its value checked to verify that it is the same value
-    % as the one that was % sent in the Authentication Request. The Client
-    % SHOULD check the nonce value for replay attacks. The precise method for
-    % detecting replay attacks is Client specific.
-    %% NonceInToken = maps:get(nonce, Claims, undefined),
-    %% case Nonce of
-    %%     NonceInToken -> ok;
-    %%     any -> ok;
-    %%     _ -> throw(wrong_nonce)
-    %% end,
-    ExpClaims0 = #{aud => ClientId, iss => Issuer},
-
-    ExpClaims =
-        case Nonce of
-            any ->
-                ExpClaims0;
-            Bin when is_binary(Bin) ->
-                maps:put(nonce, Nonce, ExpClaims0)
-        end,
-
-    % 6. If the ID Token is received via direct communication between the Client
-    % and the Token Endpoint (which it is in this flow), the TLS server
-    % validation MAY be used to validate the issuer in place of checking the
-    % token signature. The Client MUST validate the signature of all other ID
-    % Tokens according to JWS [JWS] using the algorithm specified in the JWT alg
-    % Header Parameter. The Client MUST use the keys provided by the Issuer.
-    %
-    % 7. The alg value SHOULD be the default of RS256 or the algorithm sent by
-    % the Client in the id_token_signed_response_alg parameter during
-    % Registration.
-    SupportedAlgorithms = supported_algos(OpenIdProviderId),
-    AcceptedAlgorithms =
-        case AllowNone and application:get_env(oidcc, support_none_algorithm, true) of
-            true ->
-                [none | SupportedAlgorithms];
-            _ ->
-                SupportedAlgorithms
-        end,
-
-    % 8. If the JWT alg Header Parameter uses a MAC based algorithm such as
-    % HS256, HS384, or HS512, the octets of the UTF-8 representation of the
-    % client_secret corresponding to the client_id contained in the aud
-    % (audience) Claim are used as the key to validate the signature. For MAC
-    % based algorithms, the behavior is unspecified if the aud is multi-valued
-    % or if an azp value is present that is different than the aud value.
-    ExtraKeys =
-        case lists:member(hs256, AcceptedAlgorithms)
-             or lists:member(hs384, AcceptedAlgorithms)
-             or lists:member(hs512, AcceptedAlgorithms)
-        of
-            true ->
-                [build_mac_key(OpenIdProviderId)];
-            false ->
-                []
-        end,
-
-    % 10. The iat Claim can be used to reject tokens that were issued too far
-    % away from the current time, limiting the amount of time that nonces need
-    % to be stored to prevent attacks. The acceptable range is Client specific.
-    % TODO: maybe in the future, not for now
-    % 9. The current time MUST be before the time represented by the exp Claim.
-    Claims =
-        case verify_jwt(IdToken,
-                        AcceptedAlgorithms,
-                        ExpClaims,
-                        PubKeys ++ ExtraKeys,
-                        ExtraKeys,
-                        OpenIdProviderId)
-        of
-            #{claims := C} ->
-                C;
-            invalid ->
-                throw(invalid_signature);
-            Error ->
-                throw(Error)
-        end,
-
-    case list_missing_required_claims(Claims) of
+-spec verify_missing_required_claims(Claims) -> ok | {error, error()} when
+    Claims :: oidcc_jwt_util:claims().
+verify_missing_required_claims(Claims) ->
+    Required = [<<"iss">>, <<"sub">>, <<"aud">>, <<"exp">>, <<"iat">>],
+    CheckKeys = fun(Key, _Val, Acc) -> lists:delete(Key, Acc) end,
+    case maps:fold(CheckKeys, Required, Claims) of
         [] ->
             ok;
-        Missing ->
-            throw({required_fields_missing, Missing})
-    end,
-
-    % 4. If the ID Token contains multiple audiences, the Client SHOULD verify
-    % that an azp Claim is present.
-    % 5.  If an azp (authorized party) Claim is present, the Client SHOULD
-    % verify that its client_id is the Claim Value.
-    #{aud := Audience} = Claims,
-    case {has_other_audience(ClientId, Audience), maps:get(azp, Claims, undefined)} of
-        {false, _} ->
-            ok;
-        {true, ClientId} ->
-            ok;
-        {true, Azp} when is_binary(Azp) ->
-            throw(azp_bad);
-        {true, undefined} ->
-            throw(azp_missing)
-    end,
-
-    % 12. If the acr Claim was requested, the Client SHOULD check that the
-    % asserted Claim Value is appropriate. The meaning and processing of acr
-    % Claim Values is out of scope for this specification. If the acr Claim was
-    % requested, the Client SHOULD check that the asserted Claim Value is
-    % appropriate. The meaning and processing of acr Claim Values is out of
-    % scope for this specification.
-    % TODO: check what for
-    % 13. If the auth_time Claim was requested, either through a specific
-    % request for this Claim or by using the max_age parameter, the Client
-    % SHOULD check the auth_time Claim value and request re-authentication if it
-    % determines too much time has elapsed since the last End-User
-    % authentication.
-    % TODO: maybe later, not for now
-    % delete the nonce before handing it out, only needs space as it has been
-    % checked by now
-    maps:remove(nonce, Claims);
-int_validate_id_token(_IdToken, _OpenIdProviderId, _Nonce, _AllowNone) ->
-    throw(no_id_token).
-
-list_missing_required_claims(Jwt) ->
-    Required = [iss, sub, aud, exp, iat, nonce],
-    CheckKeys = fun(Key, _Val, List) -> lists:delete(Key, List) end,
-    maps:fold(CheckKeys, Required, Jwt).
-
-has_other_audience(ClientId, Audience) when is_binary(Audience) ->
-    Audience /= ClientId;
-has_other_audience(ClientId, Audience) when is_list(Audience) ->
-    length(lists:delete(ClientId, Audience)) >= 1.
-
-verify_jwt(IdToken, AllowedAlgos, ExpClaims, Pubkeys, ExtraKeys, ProviderId) ->
-    case {erljwt:validate(IdToken, AllowedAlgos, ExpClaims, Pubkeys), ProviderId} of
-        {{error, _}, undefined} ->
-            invalid;
-        {{error, Reason}, ProviderId} when Reason == invalid; Reason == no_key_found ->
-            %% it might be the case that our keys expired ...
-            %% so refetch them
-            NewPubKeys = refetch_keys(ProviderId),
-            verify_jwt(IdToken,
-                       AllowedAlgos,
-                       ExpClaims,
-                       NewPubKeys ++ ExtraKeys,
-                       ExtraKeys,
-                       undefined);
-        {{ok, Jwt}, _Provider} when is_map(Jwt) ->
-            Jwt;
-        {{error, Error}, _} ->
-            Error
+        [MissingClaim | _Rest] ->
+            {error, {missing_claim, MissingClaim, Claims}}
     end.
 
-supported_algos(ProviderId) ->
-    {ok, Config} = oidcc:get_openid_provider_info(ProviderId),
-    #{<<"id_token_signing_alg_values_supported">> := Algos} = Config,
-    lists:map(fun(A) -> erljwt_sig:algo_to_atom(A) end, Algos).
+-spec retrieve_a_token(QsBodyIn, Pkce, ClientContext, Opts, TelemetryOpts, AuthenticateClient) ->
+    {ok, map()} | {error, error()}
+when
+    QsBodyIn :: oidcc_http_util:query_params(),
+    Pkce :: pkce() | undefined,
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: retrieve_opts() | refresh_opts(),
+    TelemetryOpts :: oidcc_http_util:telemetry_opts(),
+    AuthenticateClient :: boolean().
+retrieve_a_token(QsBodyIn, Pkce, ClientContext, Opts, TelemetryOpts, AuthenticateClient) ->
+    #oidcc_client_context{provider_configuration = Configuration,
+                          client_id = ClientId,
+                          client_secret = Secret} =
+        ClientContext,
+    #oidcc_provider_configuration{token_endpoint = TokenEndpoint,
+                                  token_endpoint_auth_methods_supported = SupportedAuthMethods} =
+        Configuration,
 
-build_mac_key(ProviderId) ->
-    {ok, Config} = oidcc:get_openid_provider_info(ProviderId),
-    #{client_secret := ClientSecret} = Config,
-    #{kty => <<"oct">>,
-      k => ClientSecret,
-      use => <<"sig">>}.
+    AuthMethod = select_preferred_auth(SupportedAuthMethods),
+    Header0 = [{"accept", "application/jwt, application/json"}],
+    {Body, Header} = case AuthenticateClient of
+        true -> add_authentication_code_verifier(QsBodyIn, Header0, AuthMethod, ClientId, Secret, Pkce);
+        false -> {QsBodyIn, Header0}
+    end,
 
-refetch_keys(ProviderId) ->
-    {ok, Pid} = oidcc_openid_provider_mgr:get_openid_provider(ProviderId),
-    {ok, Keys} = oidcc_openid_provider:update_and_get_keys(Pid),
-    Keys.
+    Request =
+        {TokenEndpoint,
+         Header,
+         "application/x-www-form-urlencoded",
+         uri_string:compose_query(Body)},
+
+         RequestOpts = maps:get(request_opts, Opts, #{}),
+
+    maybe
+        {ok, {{json, TokenResponse}, _Headers}} ?= oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
+        {ok, TokenResponse}
+    end.
+
+-spec select_preferred_auth(AuthMethodsSupported :: [binary(), ...]) ->
+    post | basic | undefined.
+select_preferred_auth(AuthMethodsSupported) ->
+    Selector =
+        fun(Method, Current) ->
+            case {Method, Current} of
+                {_, post} ->
+                    post;
+                {<<"client_secret_basic">>, _} ->
+                    basic;
+                {<<"client_secret_post">>, _} ->
+                    post;
+                {_, Current} ->
+                    Current
+            end
+        end,
+    lists:foldl(Selector, undefined, AuthMethodsSupported).
+
+-spec add_authentication_code_verifier(
+    QueryList,
+    Header,
+    AuthMethod,
+    ClientId,
+    ClientSecret,
+    Pkce
+) ->
+    {oidcc_http_util:query_params(), [oidcc_http_util:http_header()]}
+when
+    QueryList :: oidcc_http_util:query_params(),
+    Header :: [oidcc_http_util:http_header()],
+    AuthMethod :: basic | post | undefined,
+    ClientId :: binary(),
+    ClientSecret :: binary(),
+    Pkce :: pkce() | undefined.
+add_authentication_code_verifier(
+    QsBodyList,
+    Header,
+    basic,
+    ClientId,
+    Secret,
+    undefined
+) ->
+    NewHeader = [oidcc_http_util:basic_auth_header(ClientId, Secret) | Header],
+    {QsBodyList, NewHeader};
+add_authentication_code_verifier(
+    QsBodyList,
+    Header,
+    post,
+    ClientId,
+    ClientSecret,
+    undefined
+) ->
+    NewBodyList =
+        [{<<"client_id">>, ClientId}, {<<"client_secret">>, ClientSecret} | QsBodyList],
+    {NewBodyList, Header};
+add_authentication_code_verifier(B, H, undefined, CI, CS, undefined) ->
+    add_authentication_code_verifier(B, H, basic, CI, CS, undefined);
+add_authentication_code_verifier(BodyQs, Header, AuthMethod, CI, CS, #{verifier := CV}) ->
+    BodyQs1 = [{<<"code_verifier">>, CV} | BodyQs],
+    add_authentication_code_verifier(BodyQs1, Header, AuthMethod, CI, CS, undefined).

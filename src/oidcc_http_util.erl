@@ -1,132 +1,156 @@
+%%%-------------------------------------------------------------------
+%% @doc HTTP Client Utilities
+%% @end
+%%%-------------------------------------------------------------------
 -module(oidcc_http_util).
 
--export([async_http/3, async_http/5]).
--export([sync_http/3, sync_http/5]).
--export([sync_http/4, sync_http/6]).
--export([uncompress_body_if_needed/2]).
--export([request_timeout/1]).
+-feature(maybe_expr, enable).
 
--include_lib("public_key/include/public_key.hrl").
+-export([basic_auth_header/2]).
+-export([bearer_auth_header/1]).
+-export([request/4]).
 
-sync_http(Method, Url, Header) ->
-    sync_http(Method, Url, Header, false).
+-export_type([
+    http_header/0, error/0, httpc_error/0, query_params/0, telemetry_opts/0, request_opts/0
+]).
 
-sync_http(Method, Url, Header, ContentType, Body) ->
-    sync_http(Method, Url, Header, ContentType, Body, false).
+-type query_params() :: [{unicode:chardata(), unicode:chardata() | true}].
+%% See {@link uri_string:compose_query/1}
+-type http_header() :: {Field :: [byte()], Value :: iodata()}.
+%% See {@link httpc:request/5}
+-type error() ::
+    {http_error, StatusCode :: pos_integer(), HttpBodyResult :: binary()}
+    | invalid_content_type
+    | httpc_error().
+-type httpc_error() :: term().
+%% See {@link httpc:request/5} for additional errors
 
-sync_http(Method, Url, Header, UseCache) ->
-    perform_request(Method, Url, Header, undefined, <<>>, [], UseCache).
+-type request_opts() :: #{
+    timeout => timeout(),
+    ssl => [ssl:tls_option()]
+}.
+%% See {@link httpc:request/5}
+%%
+%% <h2>Parameters</h2>
+%%
+%% <ul>
+%%   <li>`timeout' - timeout for request</li>
+%%   <li>`ssl' - TLS config</li>
+%% </ul>
 
-sync_http(Method, Url, Header, ContentType, Body, UseCache) ->
-    perform_request(Method, Url, Header, ContentType, Body, [], UseCache).
+-type telemetry_opts() :: #{
+    topic := [atom()],
+    extra_meta => map()
+}.
 
-async_http(Method, Url, Header) ->
-    async_http(Method, Url, Header, undefined, <<>>).
+%% @private
+-spec basic_auth_header(User, Secret) -> http_header() when
+    User :: binary(),
+    Secret :: binary().
+basic_auth_header(User, Secret) ->
+    UserEnc = uri_string:compose_query([{User, true}]),
+    SecretEnc = uri_string:compose_query([{Secret, true}]),
+    RawAuth = <<UserEnc/binary, <<":">>/binary, SecretEnc/binary>>,
+    AuthData = base64:encode(RawAuth),
+    {"authorization", [<<"Basic ">>, AuthData]}.
 
-async_http(Method, Url, Header, ContentType, Body) ->
-    RequestId = erlang:make_ref(),
-    Caller = self(),
-    spawn_link(fun() ->
-                  async_http_perform(Caller, RequestId, Method, Url, Header, ContentType, Body)
-               end),
-    {ok, RequestId}.
+%% @private
+-spec bearer_auth_header(Token) -> http_header() when Token :: binary().
+bearer_auth_header(Token) ->
+    {"authorization", [<<"Bearer ">>, Token]}.
 
-async_http_perform(Caller, RequestId, Method, Url, Header, ContentType, Body) ->
-    Response =
-        case perform_request(Method, Url, Header, ContentType, Body, [], false) of
-            {error, _} = Error ->
-                Error;
-            {ok,
-             #{status := StatusCode,
-               header := RespHeaders,
-               body := InBody}} ->
-                {{<<>>, StatusCode, <<>>}, RespHeaders, InBody}
-        end,
-    Caller ! {http, {RequestId, Response}}.
+%% @private
+-spec request(Method, Request, TelemetryOpts, RequestOpts) ->
+    {ok, {{json, term()} | {jwt, binary()}, [http_header()]}}
+    | {error, error()}
+when
+    Method :: head | get | put | patch | post | trace | options | delete,
+    Request ::
+        {uri_string:uri_string(), [http_header()]}
+        | {
+            uri_string:uri_string(),
+            [http_header()],
+            ContentType :: uri_string:uri_string(),
+            HttpBody
+        },
+    HttpBody ::
+        iolist()
+        | binary()
+        | {
+            fun((Accumulator :: term()) -> eof | {ok, iolist(), Accumulator :: term()}),
+            Accumulator :: term()
+        }
+        | {chunkify, fun((Accumulator :: term()) -> eof | {ok, iolist(), Accumulator :: term()}),
+            Accumulator :: term()},
+    TelemetryOpts :: telemetry_opts(),
+    RequestOpts :: request_opts().
+request(Method, Request, TelemetryOpts, RequestOpts) ->
+    TelemetryTopic = maps:get(topic, TelemetryOpts),
+    TelemetryExtraMeta = maps:get(extra_meta, TelemetryOpts, #{}),
+    Timeout = maps:get(timeout, RequestOpts, timer:minutes(1)),
+    SslOpts = maps:get(ssl, RequestOpts, undefined),
 
-request_timeout(Unit) ->
-    Timeout =
-        case application:get_env(oidcc, http_request_timeout, undefined) of
-            T when is_integer(T), T > 0 ->
-                T;
-            _ ->
-                300
-        end,
-    case Unit of
-        ms ->
-            Timeout * 1000;
-        s ->
-            Timeout
-    end.
+    HttpOpts0 = [{timeout, Timeout}],
+    HttpOpts = case SslOpts of
+        undefined -> HttpOpts0;
+        _Opts -> [{ssl, SslOpts} | HttpOpts0]
+    end,
 
-perform_request(Method, Url, Header, ContentType, Body, Options, true) ->
-    case oidcc_http_cache:lookup_http_call(Method, {Method, Url, Header, ContentType, Body})
-    of
-        {ok, pending} ->
-            wait_for_cache(Method, {Method, Url, Header, ContentType, Body});
-        {ok, Res} ->
-            Res;
-        {error, _} ->
-            request_or_wait(Method, Url, Header, ContentType, Body, Options)
+    telemetry:span(
+        TelemetryTopic,
+        TelemetryExtraMeta,
+        fun() ->
+            maybe
+                {ok, {_StatusLine, Headers, _Result} = Response} ?=
+                    httpc:request(Method,
+                                  Request,
+                                  HttpOpts,
+                                  [{body_format, binary}]),
+                {ok, BodyAndFormat} ?= extract_successful_response(Response),
+                {{ok, {BodyAndFormat, Headers}}, TelemetryExtraMeta}
+            else
+                {error, Reason} ->
+                    {{error, Reason}, maps:put(error, Reason, TelemetryExtraMeta)}
+            end
+        end
+    ).
+
+-spec extract_successful_response({StatusLine, [HttpHeader], HttpBodyResult}) ->
+    {ok, {json, term()} | {jwt, binary()}} | {error, error()}
+when
+    StatusLine :: {HttpVersion, StatusCode, string()},
+    HttpVersion :: uri_string:uri_string(),
+    StatusCode :: pos_integer(),
+    HttpHeader :: http_header(),
+    HttpBodyResult :: binary().
+extract_successful_response({{_HttpVersion, 200, _HttpStatusName}, Headers, HttpBodyResult}) ->
+    case fetch_content_type(Headers) of
+        json ->
+            {ok, {json, jose:decode(HttpBodyResult)}};
+        jwt ->
+            {ok, {jwt, HttpBodyResult}};
+        unknown ->
+            {error, invalid_content_type}
     end;
-perform_request(Method, Url, Header, ContentType, Body, Options, false) ->
-    perform_http_request(Method, Url, Header, ContentType, Body, Options).
-
-perform_http_request(Method, Url, Header, ContentType, Body, Options) ->
-    Headers1 =
-        case ContentType of
-            undefined ->
-                Header;
-            _ ->
-                [{<<"content-type">>, ContentType} | Header]
+extract_successful_response({{_HttpVersion, StatusCode, _HttpStatusName}, Headers, HttpBodyResult}) ->
+    Body =
+        case fetch_content_type(Headers) of
+            json ->
+                jose:decode(HttpBodyResult);
+            jwt ->
+                HttpBodyResult;
+            unknown ->
+                HttpBodyResult
         end,
-    Res = hackney:request(Method, Url, Headers1, Body, Options ++ [{follow_redirect, true}]),
-    normalize_result(Res).
+    {error, {http_error, StatusCode, Body}}.
 
-request_or_wait(Method, Url, Header, ContentType, Body, Options) ->
-    case oidcc_http_cache:enqueue_http_call(Method, {Method, Url, Header, ContentType, Body})
-    of
-        true ->
-            Result = perform_http_request(Method, Url, Header, ContentType, Body, Options),
-            ok =
-                oidcc_http_cache:cache_http_result(Method,
-                                                   {Method, Url, Header, ContentType, Body},
-                                                   Result),
-            Result;
-        _ ->
-            wait_for_cache(Method, {Method, Url, Header, ContentType, Body})
+-spec fetch_content_type(Headers) -> json | jwt | unknown when Headers :: [http_header()].
+fetch_content_type(Headers) ->
+    case proplists:lookup("content-type", Headers) of
+        {"content-type", "application/json" ++ _Rest} ->
+            json;
+        {"content-type", "application/jwt" ++ _Rest} ->
+            jwt;
+        _Other ->
+            unknown
     end.
-
-wait_for_cache(Method, Request) ->
-    case oidcc_http_cache:lookup_http_call(Method, Request) of
-        {ok, pending} ->
-            timer:sleep(500),
-            wait_for_cache(Method, Request);
-        {ok, Result} ->
-            Result
-    end.
-
-normalize_result({ok, StatusCode, RespHeaders, ClientRef}) ->
-    {ok, Body} = hackney:body(ClientRef),
-    {ok,
-     #{status => StatusCode,
-       header => RespHeaders,
-       body => Body}};
-normalize_result({ok, StreamId}) ->
-    {ok, StreamId};
-normalize_result({error, _} = Error) ->
-    Error.
-
-uncompress_body_if_needed(Body, Header) when is_list(Header) ->
-    Encoding = lists:keyfind(<<"content-encoding">>, 1, Header),
-    uncompress_body_if_needed(Body, Encoding);
-uncompress_body_if_needed(Body, false) ->
-    {ok, Body};
-uncompress_body_if_needed(Body, {_, <<"gzip">>}) ->
-    {ok, zlib:gunzip(Body)};
-uncompress_body_if_needed(Body, {_, <<"deflate">>}) ->
-    Z = zlib:open(),
-    ok = zlib:inflateInit(Z),
-    {ok, zlib:inflate(Z, Body)};
-uncompress_body_if_needed(_Body, {_, Compression}) ->
-    erlang:error({unsupported_encoding, Compression}).

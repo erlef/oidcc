@@ -86,11 +86,11 @@ Supervisor.init([
 <!-- TODO: Uncomment when available -->
 
 <!-- - [`oidcc_cowboy`](https://hex.pm/packages/oidcc_cowboy) - Integrations for
-  [`cowboy`](https://hex.pm/packages/cowboy)
+  [`cowboy`](https://hex.pm/packages/cowboy) -->
 - [`oidcc_plug`](https://hex.pm/packages/oidcc_plug) - Integrations for
   [`plug`](https://hex.pm/packages/plug) and
   [`phoenix`](https://hex.pm/packages/phoenix)
-- [`phx_gen_oidcc`](https://hex.pm/packages/phx_gen_oidcc) - Setup Generator for
+<!-- - [`phx_gen_oidcc`](https://hex.pm/packages/phx_gen_oidcc) - Setup Generator for
   [`phoenix`](https://hex.pm/packages/phoenix) -->
 
 ### Erlang
@@ -140,7 +140,7 @@ Supervisor.init([
                       #{}).
 ```
 
-for more details, see https://hexdocs.pm/expo/oidcc.html
+for more details, see https://hexdocs.pm/oidcc/oidcc.html
 
 ### Elixir
 
@@ -192,3 +192,5 @@ for more details, see https://hexdocs.pm/expo/oidcc.html
   "client_secret"
 )
 ```
+
+for more details, see https://hexdocs.pm/oidcc/Oidcc.html

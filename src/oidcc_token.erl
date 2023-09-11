@@ -151,7 +151,10 @@
     {missing_claim, MissingClaim :: binary(), Claims :: oidcc_jwt_util:claims()}
     | bad_access_token_hash
     | sub_invalid
+    | token_expired
+    | token_not_yet_valid
     | {none_alg_used, NoneClaims :: oidcc_jwt_util:claims()}
+    | {missing_claim, ExpClaim :: {binary(), term()}, Claims :: oidcc_jwt_util:claims()}
     | {grant_type_not_supported,
         authorization_code | refresh_token | jwt_bearer | client_credentials}
     | oidcc_jwt_util:error()
@@ -557,7 +560,7 @@ validate_id_token(IdToken, ClientContext, Nonce) ->
                                   issuer = Issuer} =
         Configuration,
     maybe
-        ExpClaims0 = [{<<"aud">>, ClientId}, {<<"iss">>, Issuer}],
+        ExpClaims0 = [{<<"iss">>, Issuer}],
         ExpClaims =
             case Nonce of
                 any ->
@@ -576,6 +579,10 @@ validate_id_token(IdToken, ClientContext, Nonce) ->
             oidcc_jwt_util:verify_signature(IdToken, AllowAlgorithms, JwksInclOct),
         ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),
         ok ?= verify_missing_required_claims(Claims),
+        ok ?= verify_aud_claim(Claims, ClientId),
+        ok ?= verify_azp_claim(Claims, ClientId),
+        ok ?= verify_exp_claim(Claims),
+        ok ?= verify_nbf_claim(Claims),
         case Jws of
             #jose_jws{alg = {jose_jws_alg_none, none}} ->
                 {error, {none_alg_used, Claims}};
@@ -583,6 +590,53 @@ validate_id_token(IdToken, ClientContext, Nonce) ->
                 {ok, Claims}
         end
     end.
+
+-spec verify_aud_claim(Claims, ClientId) -> ok | {error, error()} when
+    Claims :: oidcc_jwt_util:claims(), ClientId :: binary().
+verify_aud_claim(#{<<"aud">> := Audience} = Claims, ClientId) when is_list(Audience) ->
+    case lists:member(ClientId, Audience) of
+        true -> ok;
+        false -> {missing_claim, {<<"aud">>, ClientId}, Claims}
+    end;
+verify_aud_claim(#{<<"aud">> := ClientId}, ClientId) ->
+    ok;
+verify_aud_claim(Claims, ClientId) ->
+    {missing_claim, {<<"aud">>, ClientId}, Claims}.
+
+-spec verify_azp_claim(Claims, ClientId) -> ok | {error, error()} when
+    Claims :: oidcc_jwt_util:claims(), ClientId :: binary().
+verify_azp_claim(#{<<"azp">> := ClientId}, ClientId) ->
+    ok;
+verify_azp_claim(#{<<"azp">> := _Azp} = Claims, ClientId) ->
+    {missing_claim, {<<"azp">>, ClientId}, Claims};
+verify_azp_claim(_Claims, _ClientId) ->
+    ok.
+
+-spec verify_exp_claim(Claims) -> ok | {error, error()} when Claims :: oidcc_jwt_util:claims().
+verify_exp_claim(#{<<"exp">> := Expiry}) ->
+    MaxClockSkew =
+        case application:get_env(oidcc, max_clock_skew) of
+            undefined -> 0;
+            ClockSkew -> ClockSkew
+        end,
+    case erlang:system_time(second) > Expiry + MaxClockSkew of
+        true -> {error, token_expired};
+        false -> ok
+    end.
+
+-spec verify_nbf_claim(Claims) -> ok | {error, error()} when Claims :: oidcc_jwt_util:claims().
+verify_nbf_claim(#{<<"nbf">> := Expiry}) ->
+    MaxClockSkew =
+        case application:get_env(oidcc, max_clock_skew) of
+            undefined -> 0;
+            ClockSkew -> ClockSkew
+        end,
+    case erlang:system_time(second) < Expiry - MaxClockSkew of
+        true -> {error, token_not_yet_valid};
+        false -> ok
+    end;
+verify_nbf_claim(_Claims) ->
+    ok.
 
 -spec verify_missing_required_claims(Claims) -> ok | {error, error()} when
     Claims :: oidcc_jwt_util:claims().

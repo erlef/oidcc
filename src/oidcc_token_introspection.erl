@@ -116,7 +116,9 @@ extract_response(TokenMap, #oidcc_client_context{client_id = ClientId}) ->
     Username = maps:get(<<"username">>, TokenMap, undefined),
     Exp = maps:get(<<"exp">>, TokenMap, undefined),
     case maps:get(<<"client_id">>, TokenMap, undefined) of
-        ClientId ->
+        IntrospectionClientId when
+            IntrospectionClientId == ClientId; IntrospectionClientId == undefined
+        ->
             {ok, #oidcc_token_introspection{
                 active = Active,
                 scope = oidcc_scope:parse(Scope),

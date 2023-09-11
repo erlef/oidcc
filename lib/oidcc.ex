@@ -15,6 +15,11 @@ defmodule Oidcc do
       Supervisor.init([
         {Oidcc.ProviderConfiguration.Worker, %{issuer: "https://accounts.google.com/"}}
       ], strategy: :one_for_one)
+
+  ## Global Configuration
+
+  * `max_clock_skew` (default `0`) - Maximum allowed clock skew for JWT
+    `exp` / `nbf` validation
   """
 
   @doc """

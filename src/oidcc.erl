@@ -14,6 +14,13 @@
 %% (or via a `supervisor')
 %%
 %% See {@link oidcc_provider_configuration_worker} for details
+%%
+%% <h2>Global Configuration</h2>
+%%
+%% <ul>
+%%   <li>`max_clock_skew' (default `0') - Maximum allowed clock skew for JWT
+%%     `exp' / `nbf' validation</li>
+%% </ul>
 %% @end
 %%%-------------------------------------------------------------------
 -module(oidcc).

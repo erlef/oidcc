@@ -41,8 +41,8 @@ retrieve_none_test() ->
             <<"iss">> => Issuer,
             <<"sub">> => <<"sub">>,
             <<"aud">> => ClientId,
-            <<"iat">> => 1694089540,
-            <<"exp">> => 1694089840
+            <<"iat">> => erlang:system_time(second),
+            <<"exp">> => erlang:system_time(second) + 10
         },
 
     Jwk = jose_jwk:generate_key(16),
@@ -138,8 +138,8 @@ retrieve_rs256_with_rotation_test() ->
             <<"iss">> => Issuer,
             <<"sub">> => <<"sub">>,
             <<"aud">> => ClientId,
-            <<"iat">> => 1694089540,
-            <<"exp">> => 1694089840,
+            <<"iat">> => erlang:system_time(second),
+            <<"exp">> => erlang:system_time(second) + 10,
             <<"at_hash">> => <<"hrOQHuo3oE6FR82RIiX1SA">>
         },
 

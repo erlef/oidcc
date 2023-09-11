@@ -119,11 +119,10 @@ when
 validate_userinfo_body({json, Userinfo}, _ClientContext, Opts) ->
     ExpectedSubject = maps:get(expected_subject, Opts),
 
-    case Userinfo of
-        #{<<"sub">> := ExpectedSubject} = Map ->
-            {ok, Map};
-        #{} ->
-            {error, bad_subject}
+    case {ExpectedSubject, Userinfo} of
+        {any, Map} -> {ok, Map};
+        {ExpectedSubject, #{<<"sub">> := ExpectedSubject} = Map} -> {ok, Map};
+        {_, #{}} -> {error, bad_subject}
     end;
 validate_userinfo_body({jwt, UserinfoBody}, ClientContext, Opts) ->
     #oidcc_client_context{provider_configuration = Configuration, client_id = ClientId} =

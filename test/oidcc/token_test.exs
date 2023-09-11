@@ -61,8 +61,8 @@ defmodule Oidcc.TokenTest do
               "iss" => "https://my.provider",
               "sub" => "sub",
               "aud" => "client_id",
-              "iat" => 1_694_089_540,
-              "exp" => 1_694_089_840
+              "iat" => :erlang.system_time(:second),
+              "exp" => :erlang.system_time(:second) + 10
             })
           )
           |> JOSE.JWS.compact()
@@ -91,8 +91,8 @@ defmodule Oidcc.TokenTest do
                   token: _token,
                   claims: %{
                     "aud" => "client_id",
-                    "exp" => 1_694_089_840,
-                    "iat" => 1_694_089_540,
+                    "exp" => _exp,
+                    "iat" => _iat,
                     "iss" => "https://my.provider",
                     "sub" => "sub"
                   }
@@ -124,8 +124,8 @@ defmodule Oidcc.TokenTest do
               "iss" => "https://my.provider",
               "sub" => "sub",
               "aud" => "client_id",
-              "iat" => 1_694_089_540,
-              "exp" => 1_694_089_840
+              "iat" => :erlang.system_time(:second),
+              "exp" => :erlang.system_time(:second) + 10
             })
           )
           |> JOSE.JWS.compact()

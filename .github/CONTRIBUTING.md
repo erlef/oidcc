@@ -130,7 +130,7 @@ Install `oidcc`'s dependencies using [rebar3](https://rebar3.org/) and
 
 ```bash
 $ rebar3 get-deps # Erlang Code
-$ mix deps # Elixir Bindings
+$ mix deps.get # Elixir Bindings
 ```
 
 ## Running `oidcc`'s test suite

@@ -1,8 +1,35 @@
 defmodule Oidcc.TokenIntrospection do
+  use TelemetryRegistry
+
+  telemetry_event(%{
+    event: [:oidcc, :introspect_token, :start],
+    description: "Emitted at the start of introspecting the token",
+    measurements: "%{system_time: non_neg_integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :introspect_token, :stop],
+    description: "Emitted at the end of introspecting the token",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :introspect_token, :exception],
+    description: "Emitted at the end of introspecting the token",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
   @moduledoc """
   OAuth Token Introspection
 
   See https://datatracker.ietf.org/doc/html/rfc7662
+
+  ## Telemetry
+
+  #{telemetry_docs()}
   """
 
   use Oidcc.RecordStruct,

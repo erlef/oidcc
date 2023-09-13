@@ -30,6 +30,7 @@ defmodule Oidcc.Mixfile do
   defp deps() do
     [
       {:telemetry, "~> 1.2"},
+      {:telemetry_registry, "~> 0.3.1"},
       {:jose, "~> 1.11"},
       {:jsx, "~> 3.1"},
       {:mock, "~> 0.3.8", only: :test},

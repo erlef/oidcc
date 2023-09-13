@@ -1,6 +1,96 @@
 defmodule Oidcc.Token do
+  use TelemetryRegistry
+
+  telemetry_event(%{
+    event: [:oidcc, :request_token, :start],
+    description: "Emitted at the start of requesting a code token",
+    measurements: "%{system_time: non_neg_integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :request_token, :stop],
+    description: "Emitted at the end of requesting a code token",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :request_token, :exception],
+    description: "Emitted at the end of requesting a code token",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :refresh_token, :start],
+    description: "Emitted at the start of refreshing a token",
+    measurements: "%{system_time: non_neg_integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :refresh_token, :stop],
+    description: "Emitted at the end of refreshing a token",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :refresh_token, :exception],
+    description: "Emitted at the end of refreshing a token",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :jwt_profile_token, :start],
+    description: "Emitted at the start of exchaning a JWT profile token",
+    measurements: "%{system_time: non_neg_integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :jwt_profile_token, :stop],
+    description: "Emitted at the end of exchaning a JWT profile token",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :jwt_profile_token, :exception],
+    description: "Emitted at the end of exchaning a JWT profile token",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :client_credentials, :start],
+    description: "Emitted at the start of requesting a client credentials token",
+    measurements: "%{system_time: non_neg_integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :client_credentials, :stop],
+    description: "Emitted at the end of requesting a client credentials token",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :client_credentials, :exception],
+    description: "Emitted at the end of requesting a client credentials token",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
   @moduledoc """
   Facilitate OpenID Code/Token Exchanges
+
+  ## Telemetry
+
+  #{telemetry_docs()}
   """
 
   use Oidcc.RecordStruct,

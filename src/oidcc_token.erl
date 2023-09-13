@@ -1,5 +1,17 @@
 %%%-------------------------------------------------------------------
 %% @doc Facilitate OpenID Code/Token Exchanges
+%%
+%% <h2>Records</h2>
+%%
+%% To use the records, import the definition:
+%%
+%% ```
+%% -include_lib(["oidcc/include/oidcc_token.hrl"]).
+%% '''
+%%
+%% <h2>Telemetry</h2>
+%%
+%% See {@link 'Elixir.Oidcc.Token'}
 %% @end
 %%%-------------------------------------------------------------------
 -module(oidcc_token).
@@ -159,6 +171,90 @@
         authorization_code | refresh_token | jwt_bearer | client_credentials}
     | oidcc_jwt_util:error()
     | oidcc_http_util:error().
+
+-telemetry_event(#{
+    event => [oidcc, request_token, start],
+    description => <<"Emitted at the start of requesting a code token">>,
+    measurements => <<"#{system_time => non_neg_integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, request_token, stop],
+    description => <<"Emitted at the end of requesting a code token">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, request_token, exception],
+    description => <<"Emitted at the end of requesting a code token">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, refresh_token, start],
+    description => <<"Emitted at the start of refreshing a token">>,
+    measurements => <<"#{system_time => non_neg_integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, refresh_token, stop],
+    description => <<"Emitted at the end of refreshing a token">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, refresh_token, exception],
+    description => <<"Emitted at the end of refreshing a token">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, jwt_profile_token, start],
+    description => <<"Emitted at the start of exchanging a JWT profile token">>,
+    measurements => <<"#{system_time => non_neg_integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, jwt_profile_token, stop],
+    description => <<"Emitted at the end of exchanging a JWT profile token">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, jwt_profile_token, exception],
+    description => <<"Emitted at the end of exchanging a JWT profile token">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, client_credentials, start],
+    description => <<"Emitted at the start of exchanging a client credentials token">>,
+    measurements => <<"#{system_time => non_neg_integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, client_credentials, stop],
+    description => <<"Emitted at the end of exchanging a client credentials token">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, client_credentials, exception],
+    description => <<"Emitted at the end of exchanging a client credentials token">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
 
 %% @doc
 %% retrieve the token using the authcode received before and directly validate
@@ -356,7 +452,7 @@ jwt_profile(Subject, ClientContext, Jwk, Opts) ->
                 [{<<"assertion">>, Assertion}, {<<"grant_type">>, <<"urn:ietf:params:oauth:grant-type:jwt-bearer">>}],
             QueryString1 = oidcc_scope:query_append_scope(Scope, QueryString),
 
-            TelemetryOpts = #{topic => [oidcc, refresh_token],
+            TelemetryOpts = #{topic => [oidcc, jwt_profile_token],
                 extra_meta => #{issuer => Issuer, client_id => ClientId}},
 
             maybe

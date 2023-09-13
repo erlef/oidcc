@@ -3,11 +3,17 @@
 %%
 %% See [https://datatracker.ietf.org/doc/html/rfc7662]
 %%
+%% <h2>Records</h2>
+%%
 %% To use the records, import the definition:
 %%
 %% ```
 %% -include_lib(["oidcc/include/oidcc_token_introspection.hrl"]).
 %% '''
+%%
+%% <h2>Telemetry</h2>
+%%
+%% See {@link 'Elixir.Oidcc.TokenIntrospection'}
 %% @end
 %%%-------------------------------------------------------------------
 -module(oidcc_token_introspection).
@@ -39,6 +45,27 @@
 -type opts() :: #{request_opts => oidcc_http_util:request_opts()}.
 
 -type error() :: client_id_mismatch | introspection_not_supported | oidcc_http_util:error().
+
+-telemetry_event(#{
+    event => [oidcc, load_configuration, start],
+    description => <<"Emitted at the start of introspecting the token">>,
+    measurements => <<"#{system_time => non_neg_integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, load_configuration, stop],
+    description => <<"Emitted at the end of introspecting the token">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, load_configuration, exception],
+    description => <<"Emitted at the end of introspecting the token">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
 
 %% @doc
 %% Introspect the given access token

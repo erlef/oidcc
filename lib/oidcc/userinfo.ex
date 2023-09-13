@@ -1,8 +1,35 @@
 defmodule Oidcc.Userinfo do
+  use TelemetryRegistry
+
+  telemetry_event(%{
+    event: [:oidcc, :userinfo, :start],
+    description: "Emitted at the start of loading userinfo",
+    measurements: "%{system_time: non_neg_integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :userinfo, :stop],
+    description: "Emitted at the end of loading userinfo",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :userinfo, :exception],
+    description: "Emitted at the end of loading userinfo",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
   @moduledoc """
   OpenID Connect Userinfo
 
   See https://openid.net/specs/openid-connect-core-1_0.html#UserInfo
+
+  ## Telemetry
+
+  #{telemetry_docs()}
   """
 
   alias Oidcc.ClientContext

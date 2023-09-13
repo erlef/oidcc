@@ -32,7 +32,7 @@ defmodule Oidcc.Mixfile do
       {:telemetry, "~> 1.2"},
       {:telemetry_registry, "~> 0.3.1"},
       {:jose, "~> 1.11"},
-      {:jsx, "~> 3.1"},
+      {:jsx, "~> 3.1", only: :test},
       {:mock, "~> 0.3.8", only: :test},
       {:ex_doc, "~> 0.29.4", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: :dev, runtime: false},

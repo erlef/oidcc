@@ -45,21 +45,21 @@ defmodule Oidcc.Token do
 
   telemetry_event(%{
     event: [:oidcc, :jwt_profile_token, :start],
-    description: "Emitted at the start of exchaning a JWT profile token",
+    description: "Emitted at the start of exchanging a JWT profile token",
     measurements: "%{system_time: non_neg_integer(), monotonic_time: integer()}",
     metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
   })
 
   telemetry_event(%{
     event: [:oidcc, :jwt_profile_token, :stop],
-    description: "Emitted at the end of exchaning a JWT profile token",
+    description: "Emitted at the end of exchanging a JWT profile token",
     measurements: "%{duration: integer(), monotonic_time: integer()}",
     metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
   })
 
   telemetry_event(%{
     event: [:oidcc, :jwt_profile_token, :exception],
-    description: "Emitted at the end of exchaning a JWT profile token",
+    description: "Emitted at the end of exchanging a JWT profile token",
     measurements: "%{duration: integer(), monotonic_time: integer()}",
     metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
   })

@@ -1,5 +1,6 @@
 # oidcc
 
+[![EEF Security WG project](https://img.shields.io/badge/EEF-Security-black)](https://github.com/erlef/security-wg)
 [![Main Branch](https://github.com/erlef/oidcc/actions/workflows/branch_main.yml/badge.svg?branch=main)](https://github.com/erlef/oidcc/actions/workflows/branch_main.yml)
 [![Module Version](https://img.shields.io/hexpm/v/oidcc.svg)](https://hex.pm/packages/oidcc)
 [![Total Download](https://img.shields.io/hexpm/dt/oidcc.svg)](https://hex.pm/packages/oidcc)

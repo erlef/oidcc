@@ -77,7 +77,7 @@
 %%     start => {oidcc_provider_configuration_worker,
 %%               start_link,
 %%               [
-%%                 {issuer, <<"https://accounts.google.com">>}
+%%                 #{issuer => <<"https://accounts.google.com">>}
 %%               ]},
 %%     restart => permanent,
 %%     type => worker,

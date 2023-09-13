@@ -1,11 +1,17 @@
 %%%-------------------------------------------------------------------
 %% @doc Tooling to load and parse Openid Configuration
 %%
+%% <h2>Records</h2>
+%%
 %% To use the record, import the definition:
 %%
 %% ```
 %% -include_lib(["oidcc/include/oidcc_provider_configuration.hrl"]).
 %% '''
+%%
+%% <h2>Telemetry</h2>
+%%
+%% See {@link 'Elixir.Oidcc.ProviderConfiguration'}
 %% @end
 %%%-------------------------------------------------------------------
 -module(oidcc_provider_configuration).
@@ -115,6 +121,48 @@
     | oidcc_http_util:error().
 
 -define(DEFAULT_CONFIG_EXPIRY, timer:minutes(15)).
+
+-telemetry_event(#{
+    event => [oidcc, load_configuration, start],
+    description => <<"Emitted at the start of loading the provider configuration">>,
+    measurements => <<"#{system_time => non_neg_integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, load_configuration, stop],
+    description => <<"Emitted at the end of loading the provider configuration">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, load_configuration, exception],
+    description => <<"Emitted at the end of loading the provider configuration">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, load_jwks, start],
+    description => <<"Emitted at the start of loading the provider jwks">>,
+    measurements => <<"#{system_time => non_neg_integer()}">>,
+    metadata => <<"#{jwks_uri => uri_string:uri_string()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, load_jwks, stop],
+    description => <<"Emitted at the end of loading the provider jwks">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{jwks_uri => uri_string:uri_string()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, load_jwks, exception],
+    description => <<"Emitted at the end of loading the provider jwks">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{jwks_uri => uri_string:uri_string()}">>
+}).
 
 %% @doc Load OpenID Configuration into a {@link oidcc_provider_configuration:t()} record
 %%

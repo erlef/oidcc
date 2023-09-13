@@ -2,6 +2,10 @@
 %% @doc OpenID Connect Userinfo
 %%
 %% See [https://openid.net/specs/openid-connect-core-1_0.html#UserInfo]
+%%
+%% <h2>Telemetry</h2>
+%%
+%% See {@link 'Elixir.Oidcc.Userinfo'}
 %% @end
 %%%-------------------------------------------------------------------
 -module(oidcc_userinfo).
@@ -49,6 +53,27 @@
     | bad_subject
     | oidcc_jwt_util:error()
     | oidcc_http_util:error().
+
+-telemetry_event(#{
+    event => [oidcc, userinfo, start],
+    description => <<"Emitted at the start of loading userinfo">>,
+    measurements => <<"#{system_time => non_neg_integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, userinfo, stop],
+    description => <<"Emitted at the end of loading userinfo">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, userinfo, exception],
+    description => <<"Emitted at the end of loading userinfo">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
 
 %% @doc
 %% Load userinfo for the given token

@@ -1,6 +1,54 @@
 defmodule Oidcc.ProviderConfiguration do
+  use TelemetryRegistry
+
+  telemetry_event(%{
+    event: [:oidcc, :load_configuration, :start],
+    description: "Emitted at the start of loading the provider configuration",
+    measurements: "%{system_time: non_neg_integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :load_configuration, :stop],
+    description: "Emitted at the end of loading the provider configuration",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :load_configuration, :exception],
+    description: "Emitted at the end of loading the provider configuration",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :load_jwks, :start],
+    description: "Emitted at the start of loading the provider jwks",
+    measurements: "%{system_time: non_neg_integer(), monotonic_time: integer()}",
+    metadata: "%{jwks_uri: :uri_string.uri_string()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :load_jwks, :stop],
+    description: "Emitted at the end of loading the provider jwks",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{jwks_uri: :uri_string.uri_string()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :load_jwks, :exception],
+    description: "Emitted at the end of loading the provider jwks",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{jwks_uri: :uri_string.uri_string()}"
+  })
+
   @moduledoc """
   Tooling to load and parse Openid Configuration
+
+  ## Telemetry
+
+  #{telemetry_docs()}
   """
 
   use Oidcc.RecordStruct,

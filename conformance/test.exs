@@ -1,7 +1,8 @@
 #!/usr/bin/env elixir
 Mix.install(
   [
-    {:oidcc, path: ".."},
+    {:oidcc, path: "..", override: true},
+    {:oidcc_plug, "~> 0.1.0-alpha"},
     {:plug_cowboy, "~> 2.5"},
     {:phoenix, "~> 1.7"},
     {:jason, "~> 1.4"}
@@ -27,23 +28,16 @@ defmodule Conformance.AuthController do
 
   alias Oidcc.Token
 
-  def authorize(conn, _params) do
-    nonce = 32 |> :crypto.strong_rand_bytes() |> Base.encode64()
-
-    with {:ok, url} <-
-           Oidcc.create_redirect_url(:config_worker, "client_id", "client_secret", %{
-             redirect_uri: "http://localhost:4000/callback",
-             nonce: nonce,
-             scopes: ["profile", "openid"],
-             response_type: "code"
-           }) do
-      conn
-      |> put_session(:nonce, nonce)
-      |> redirect(external: IO.iodata_to_binary(url))
-    else
-      {:error, reason} -> error_response(conn, reason)
-    end
-  end
+  plug(
+    Oidcc.Plug.AuthorizationCallback,
+    [
+      provider: :config_worker,
+      client_id: "client_id",
+      client_secret: "client_secret",
+      redirect_uri: "http://localhost:4000/callback"
+    ]
+    when action in [:callback]
+  )
 
   def callback_form(conn, %{"code" => code}) do
     # Redirect neccesary since session does not include nonce
@@ -51,70 +45,61 @@ defmodule Conformance.AuthController do
     redirect(conn, to: "/callback?code=" <> code)
   end
 
-  def callback(conn, %{"code" => code}) do
-    nonce = get_session(conn, :nonce) || :any
-    conn = put_session(conn, :nonce, nil)
+  def callback(
+        %Plug.Conn{
+          private: %{
+            Oidcc.Plug.AuthorizationCallback => {:ok, {token, userinfo}}
+          }
+        } = conn,
+        _params
+      ) do
+    spawn(fn ->
+      Process.sleep(5_000)
+      System.halt()
+    end)
 
-    with {:ok, token} <-
-           Oidcc.retrieve_token(
-             code,
-             :config_worker,
-             "client_id",
-             "client_secret",
-             %{
-               redirect_uri: "http://localhost:4000/callback",
-               nonce: nonce
-             }
-           ),
-         {:ok, userinfo} <-
-           Oidcc.retrieve_userinfo(
-             token,
-             :config_worker,
-             "client_id",
-             "client_secret",
-             %{}
-           ) do
-      maybe_refresh =
-        case token do
-          %Token{refresh: %Token.Refresh{token: token}, id: %Token.Id{claims: %{"sub" => sub}}} ->
-            refresh_url =
-              URI.to_string(%URI{
-                scheme: nil,
-                userinfo: nil,
-                host: nil,
-                port: nil,
-                path: "/refresh",
-                query: URI.encode_query(%{token: token, expected_subject: sub}),
-                fragment: nil
-              })
-
-            """
-             <a href="#{refresh_url}">Refresh</a>
-            """
-
-          %Token{} ->
-            nil
-        end
-
-      conn
-      |> put_resp_header("content-type", "text/html")
-      |> send_resp(200, """
-        <pre>#{inspect(%{token: token, userinfo: userinfo}, pretty: true)}</pre>
-        #{maybe_refresh}
-      """)
+    with {:ok, {refreshed_token, refreshed_userinfo}} <- maybe_refresh(token) do
+      send_resp(
+        conn,
+        200,
+        inspect(
+          %{
+            token: token,
+            userinfo: userinfo,
+            refreshed_token: refreshed_token,
+            refreshed_userinfo: refreshed_userinfo
+          },
+          pretty: true
+        )
+      )
     else
       {:error, reason} -> error_response(conn, reason)
     end
   end
 
-  def refresh(conn, %{"token" => refresh_token, "expected_subject" => sub}) do
+  def callback(
+        %Plug.Conn{
+          private: %{
+            Oidcc.Plug.AuthorizationCallback => {:error, reason}
+          }
+        } = conn,
+        _params
+      ) do
+    spawn(fn ->
+      Process.sleep(5_000)
+      System.halt()
+    end)
+
+    error_response(conn, reason)
+  end
+
+  defp maybe_refresh(%Token{refresh: %Token.Refresh{token: _refresh_token}} = token) do
     with {:ok, token} <-
            Oidcc.refresh_token(
-             refresh_token,
+             token,
              :config_worker,
              "client_id",
-             "client_secret",
-             sub
+             "client_secret"
            ),
          {:ok, userinfo} <-
            Oidcc.retrieve_userinfo(
@@ -124,11 +109,11 @@ defmodule Conformance.AuthController do
              "client_secret",
              %{}
            ) do
-      send_resp(conn, 200, inspect(%{token: token, userinfo: userinfo}, pretty: true))
-    else
-      {:error, reason} -> error_response(conn, reason)
+      {:ok, {token, userinfo}}
     end
   end
+
+  defp maybe_refresh(%Token{}), do: {:ok, {nil, nil}}
 
   defp error_response(conn, reason) do
     send_resp(conn, 400, inspect(reason, pretty: true))
@@ -144,13 +129,18 @@ defmodule Conformance.Router do
     plug(:fetch_session)
   end
 
-  scope "/", Conformance do
+  scope "/" do
     pipe_through(:browser)
 
-    get("/authorize", AuthController, :authorize)
-    get("/callback", AuthController, :callback)
-    post("/callback", AuthController, :callback_form)
-    get("/refresh", AuthController, :refresh)
+    forward("/authorize", Oidcc.Plug.Authorize,
+      provider: :config_worker,
+      client_id: "client_id",
+      client_secret: "client_secret",
+      redirect_uri: "http://localhost:4000/callback"
+    )
+
+    get("/callback", Conformance.AuthController, :callback)
+    post("/callback", Conformance.AuthController, :callback_form)
   end
 end
 

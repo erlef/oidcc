@@ -87,18 +87,16 @@ defmodule Oidcc do
           opts :: :oidcc_token.retrieve_opts()
         ) ::
           {:ok, Oidcc.Token.t()} | {:error, :oidcc_client_context.error() | :oidcc_token.error()}
-  def retrieve_token(auth_code, provider_configuration_name, client_id, client_secret, opts) do
-    with {:ok, token} <-
-           :oidcc.retrieve_token(
-             auth_code,
-             provider_configuration_name,
-             client_id,
-             client_secret,
-             opts
-           ) do
-      {:ok, Oidcc.Token.record_to_struct(token)}
-    end
-  end
+  def retrieve_token(auth_code, provider_configuration_name, client_id, client_secret, opts),
+    do:
+      auth_code
+      |> :oidcc.retrieve_token(
+        provider_configuration_name,
+        client_id,
+        client_secret,
+        opts
+      )
+      |> Oidcc.Token.normalize_token_response()
 
   @doc """
   Refresh Token
@@ -145,16 +143,14 @@ defmodule Oidcc do
         token when is_binary(token) -> token
       end
 
-    with {:ok, token} <-
-           :oidcc.refresh_token(
-             token,
-             provider_configuration_name,
-             client_id,
-             client_secret,
-             opts
-           ) do
-      {:ok, Oidcc.Token.record_to_struct(token)}
-    end
+    token
+    |> :oidcc.refresh_token(
+      provider_configuration_name,
+      client_id,
+      client_secret,
+      opts
+    )
+    |> Oidcc.Token.normalize_token_response()
   end
 
   @doc """
@@ -300,17 +296,15 @@ defmodule Oidcc do
   def jwt_profile_token(subject, provider_configuration_name, client_id, client_secret, jwk, opts) do
     jwk = JOSE.JWK.to_record(jwk)
 
-    with {:ok, token} <-
-           :oidcc.jwt_profile_token(
-             subject,
-             provider_configuration_name,
-             client_id,
-             client_secret,
-             jwk,
-             opts
-           ) do
-      {:ok, Oidcc.Token.record_to_struct(token)}
-    end
+    subject
+    |> :oidcc.jwt_profile_token(
+      provider_configuration_name,
+      client_id,
+      client_secret,
+      jwk,
+      opts
+    )
+    |> Oidcc.Token.normalize_token_response()
   end
 
   @doc """
@@ -341,15 +335,13 @@ defmodule Oidcc do
           opts :: :oidcc_token.client_credentials_opts()
         ) ::
           {:ok, Oidcc.Token.t()} | {:error, :oidcc_client_context.error() | :oidcc_token.error()}
-  def client_credentials_token(provider_configuration_name, client_id, client_secret, opts) do
-    with {:ok, token} <-
-           :oidcc.client_credentials_token(
-             provider_configuration_name,
-             client_id,
-             client_secret,
-             opts
-           ) do
-      {:ok, Oidcc.Token.record_to_struct(token)}
-    end
-  end
+  def client_credentials_token(provider_configuration_name, client_id, client_secret, opts),
+    do:
+      provider_configuration_name
+      |> :oidcc.client_credentials_token(
+        client_id,
+        client_secret,
+        opts
+      )
+      |> Oidcc.Token.normalize_token_response()
 end

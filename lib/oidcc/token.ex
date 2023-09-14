@@ -154,9 +154,9 @@ defmodule Oidcc.Token do
   def retrieve(auth_code, client_context, opts) do
     client_context = ClientContext.struct_to_record(client_context)
 
-    with {:ok, token} <- :oidcc_token.retrieve(auth_code, client_context, opts) do
-      {:ok, record_to_struct(token)}
-    end
+    auth_code
+    |> :oidcc_token.retrieve(client_context, opts)
+    |> normalize_token_response()
   end
 
   @doc """
@@ -209,9 +209,9 @@ defmodule Oidcc.Token do
 
     client_context = ClientContext.struct_to_record(client_context)
 
-    with {:ok, token} <- :oidcc_token.refresh(token, client_context, opts) do
-      {:ok, record_to_struct(token)}
-    end
+    token
+    |> :oidcc_token.refresh(client_context, opts)
+    |> normalize_token_response()
   end
 
   @doc """
@@ -301,9 +301,9 @@ defmodule Oidcc.Token do
     jwk = JOSE.JWK.to_record(jwk)
     client_context = ClientContext.struct_to_record(client_context)
 
-    with {:ok, token} <- :oidcc_token.jwt_profile(subject, client_context, jwk, opts) do
-      {:ok, record_to_struct(token)}
-    end
+    subject
+    |> :oidcc_token.jwt_profile(client_context, jwk, opts)
+    |> normalize_token_response()
   end
 
   @doc """
@@ -339,13 +339,25 @@ defmodule Oidcc.Token do
           client_context :: ClientContext.t(),
           opts :: :oidcc_token.client_credentials_opts()
         ) :: {:ok, t()} | {:error, :oidcc_token.error()}
-  def client_credentials(client_context, opts) do
-    client_context = ClientContext.struct_to_record(client_context)
+  def client_credentials(client_context, opts),
+    do:
+      client_context
+      |> ClientContext.struct_to_record()
+      |> :oidcc_token.client_credentials(opts)
+      |> normalize_token_response()
 
-    with {:ok, token} <- :oidcc_token.client_credentials(client_context, opts) do
-      {:ok, record_to_struct(token)}
-    end
-  end
+  @doc false
+  @spec normalize_token_response(
+          response :: {:ok, :oidcc_token.t()} | {:error, :oidcc_token.error()}
+        ) ::
+          {:ok, t()} | {:error, :oidcc_token.error()}
+  def normalize_token_response(response)
+  def normalize_token_response({:ok, token}), do: {:ok, record_to_struct(token)}
+
+  def normalize_token_response({:error, {:none_alg_used, token}}),
+    do: {:error, {:none_alg_used, record_to_struct(token)}}
+
+  def normalize_token_response({:error, reason}), do: {:error, reason}
 
   @impl Oidcc.RecordStruct
   def record_to_struct(record) do

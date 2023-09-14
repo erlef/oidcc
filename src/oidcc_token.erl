@@ -122,7 +122,7 @@
     #{
         scope => oidcc_scope:scopes(),
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
-        expected_subject := binary()
+        request_opts => oidcc_http_util:request_opts()
     }.
 %% See {@link refresh_opts_no_sub()}
 
@@ -165,7 +165,7 @@
     | sub_invalid
     | token_expired
     | token_not_yet_valid
-    | {none_alg_used, NoneClaims :: oidcc_jwt_util:claims()}
+    | {none_alg_used, Token :: t()}
     | {missing_claim, ExpClaim :: {binary(), term()}, Claims :: oidcc_jwt_util:claims()}
     | {grant_type_not_supported,
         authorization_code | refresh_token | jwt_bearer | client_credentials}

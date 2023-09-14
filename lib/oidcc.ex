@@ -138,7 +138,7 @@ defmodule Oidcc do
           opts :: :oidcc_token.refresh_opts_no_sub()
         ) ::
           {:ok, Oidcc.Token.t()} | {:error, :oidcc_client_context.error() | :oidcc_token.error()}
-  def refresh_token(token, provider_configuration_name, client_id, client_secret, opts) do
+  def refresh_token(token, provider_configuration_name, client_id, client_secret, opts \\ %{}) do
     token =
       case token do
         %Oidcc.Token{} = token -> Oidcc.Token.struct_to_record(token)

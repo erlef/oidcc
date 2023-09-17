@@ -31,6 +31,7 @@ defmodule Oidcc.Userinfo do
 
   #{telemetry_docs()}
   """
+  @moduledoc since: "3.0.0"
 
   alias Oidcc.ClientContext
   alias Oidcc.Token
@@ -66,6 +67,7 @@ defmodule Oidcc.Userinfo do
       ...> # => {:ok, %{"sub" => "sub"}}
 
   """
+  @doc since: "3.0.0"
   @spec retrieve(
           access_token :: String.t(),
           client_context :: ClientContext.t(),

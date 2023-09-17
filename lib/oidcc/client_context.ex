@@ -7,6 +7,7 @@ defmodule Oidcc.ClientContext do
   interface of `Oidcc`. In that case direct usage of this
   module is not needed.
   """
+  @moduledoc since: "3.0.0"
 
   use Oidcc.RecordStruct,
     internal_name: :context,
@@ -15,6 +16,7 @@ defmodule Oidcc.ClientContext do
 
   alias Oidcc.ProviderConfiguration
 
+  @typedoc since: "3.0.0"
   @type t() :: %__MODULE__{
           provider_configuration: ProviderConfiguration.t(),
           jwks: JOSE.JWK.t(),
@@ -47,6 +49,7 @@ defmodule Oidcc.ClientContext do
       ...>     "client_Secret"
       ...>   )
   """
+  @doc since: "3.0.0"
   @spec from_configuration_worker(
           provider_name :: GenServer.name(),
           client_id :: String.t(),
@@ -86,6 +89,7 @@ defmodule Oidcc.ClientContext do
       ...>     "client_Secret"
       ...>   )
   """
+  @doc since: "3.0.0"
   @spec from_manual(
           configuration :: ProviderConfiguration.t(),
           jwks :: JOSE.JWK.t(),

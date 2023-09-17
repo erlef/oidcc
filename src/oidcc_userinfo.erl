@@ -7,6 +7,7 @@
 %%
 %% See {@link 'Elixir.Oidcc.Userinfo'}
 %% @end
+%% @since 3.0.0
 %%%-------------------------------------------------------------------
 -module(oidcc_userinfo).
 
@@ -95,6 +96,7 @@
 %%   oidcc_userinfo:retrieve(Token, ClientContext, #{}).
 %% '''
 %% @end
+%% @since 3.0.0
 -spec retrieve
     (Token, ClientContext, Opts) -> {ok, oidcc_jwt_util:claims()} | {error, error()} when
         Token :: oidcc_token:t(),

@@ -12,12 +12,14 @@ defmodule Oidcc.ProviderConfiguration.Worker do
   ], strategy: :one_for_one)
   ```
   """
+  @moduledoc since: "3.0.0"
 
   alias Oidcc.ProviderConfiguration
 
   @typedoc """
   See `t:oidcc_provider_configuration_worker.opts/0`
   """
+  @typedoc since: "3.0.0"
   @type opts() :: %{
           optional(:name) => GenServer.name(),
           required(:issuer) => :uri_string.uri_string(),
@@ -35,6 +37,7 @@ defmodule Oidcc.ProviderConfiguration.Worker do
       ...>   name: __MODULE__.GoogleConfigProvider
       ...> })
   """
+  @doc since: "3.0.0"
   @spec start_link(opts :: :oidcc_provider_configuration_worker.opts()) :: GenServer.on_start()
   def start_link(opts)
 
@@ -66,6 +69,7 @@ defmodule Oidcc.ProviderConfiguration.Worker do
       ...> %Oidcc.ProviderConfiguration{issuer: "https://accounts.google.com"} =
       ...>   Oidcc.ProviderConfiguration.Worker.get_provider_configuration(pid)
   """
+  @doc since: "3.0.0"
   @spec get_provider_configuration(name :: GenServer.name()) :: ProviderConfiguration.t()
   def get_provider_configuration(name),
     do:
@@ -85,6 +89,7 @@ defmodule Oidcc.ProviderConfiguration.Worker do
       ...> %JOSE.JWK{} =
       ...>   Oidcc.ProviderConfiguration.Worker.get_jwks(pid)
   """
+  @doc since: "3.0.0"
   @spec get_jwks(name :: GenServer.name()) :: JOSE.JWK.t()
   def get_jwks(name),
     do:
@@ -103,6 +108,7 @@ defmodule Oidcc.ProviderConfiguration.Worker do
       ...> })
       ...> :ok = Oidcc.ProviderConfiguration.Worker.refresh_configuration(pid)
   """
+  @doc since: "3.0.0"
   @spec refresh_configuration(name :: GenServer.name()) :: :ok
   def refresh_configuration(name),
     do: :oidcc_provider_configuration_worker.refresh_configuration(name)
@@ -118,6 +124,7 @@ defmodule Oidcc.ProviderConfiguration.Worker do
       ...> })
       ...> :ok = Oidcc.ProviderConfiguration.Worker.refresh_jwks(pid)
   """
+  @doc since: "3.0.0"
   @spec refresh_jwks(name :: GenServer.name()) :: :ok
   def refresh_jwks(name),
     do: :oidcc_provider_configuration_worker.refresh_jwks(name)
@@ -133,6 +140,7 @@ defmodule Oidcc.ProviderConfiguration.Worker do
       ...> })
       ...> :ok = Oidcc.ProviderConfiguration.Worker.refresh_jwks_for_unknown_kid(pid, "kid")
   """
+  @doc since: "3.0.0"
   @spec refresh_jwks_for_unknown_kid(name :: GenServer.name(), kid :: String.t()) :: :ok
   def refresh_jwks_for_unknown_kid(name, kid),
     do: :oidcc_provider_configuration_worker.refresh_jwks_for_unknown_kid(name, kid)

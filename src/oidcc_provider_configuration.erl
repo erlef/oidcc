@@ -13,6 +13,7 @@
 %%
 %% See {@link 'Elixir.Oidcc.ProviderConfiguration'}
 %% @end
+%% @since 3.0.0
 %%%-------------------------------------------------------------------
 -module(oidcc_provider_configuration).
 
@@ -172,6 +173,8 @@
 %% {ok, #oidcc_provider_configuration{}} =
 %%   oidcc_provider_configuration:load_configuration("https://accounts.google.com").
 %% '''
+%% @end
+%% @since 3.0.0
 -spec load_configuration(Issuer, Opts) ->
     {ok, {Configuration :: t(), Expiry :: pos_integer()}} | {error, error()}
 when
@@ -200,6 +203,8 @@ load_configuration(Issuer, Opts) ->
 %% {ok, #jose_jwk{}} =
 %%   oidcc_provider_configuration:load_jwks("https://www.googleapis.com/oauth2/v3/certs").
 %% '''
+%% @end
+%% @since 3.0.0
 -spec load_jwks(JwksUri, Opts) ->
     {ok, {Jwks :: jose_jwk:key(), Expiry :: pos_integer()}} | {error, term()}
 when
@@ -232,6 +237,8 @@ load_jwks(JwksUri, Opts) ->
 %% {ok, #oidcc_provider_configuration{}} =
 %%   oidcc_provider_configuration:decode_configuration(DecodedJson).
 %% '''
+%% @end
+%% @since 3.0.0
 -spec decode_configuration(Configuration :: map()) -> {ok, t()} | {error, error()}.
 decode_configuration(Configuration) ->
     maybe

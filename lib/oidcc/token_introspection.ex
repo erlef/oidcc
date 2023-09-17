@@ -31,6 +31,7 @@ defmodule Oidcc.TokenIntrospection do
 
   #{telemetry_docs()}
   """
+  @moduledoc since: "3.0.0"
 
   use Oidcc.RecordStruct,
     internal_name: :introspection,
@@ -40,6 +41,7 @@ defmodule Oidcc.TokenIntrospection do
   alias Oidcc.ClientContext
   alias Oidcc.Token
 
+  @typedoc since: "3.0.0"
   @type t() :: %__MODULE__{
           active: boolean(),
           client_id: binary(),
@@ -74,6 +76,7 @@ defmodule Oidcc.TokenIntrospection do
       ...> )
       ...> # => {:ok, %Oidcc.TokenIntrospection{}}
   """
+  @doc since: "3.0.0"
   @spec introspect(
           token :: String.t() | Token.t(),
           client_context :: ClientContext.t(),

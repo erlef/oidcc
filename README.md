@@ -1,3 +1,5 @@
+<img align="left" src="https://raw.githubusercontent.com/erlef/oidcc/main/assets/logo.svg" width="150px" style="margin-right: 15px">
+
 # oidcc
 
 [![EEF Security WG project](https://img.shields.io/badge/EEF-Security-black)](https://github.com/erlef/security-wg)
@@ -14,10 +16,16 @@ OpenID Connect client library for Erlang.
 <!--
 OpenID Certified by Jonatan Männchen at the Erlang Ecosystem Foundation for the
 basic and configuration profile of the OpenID Connect protocol. For details,
-check the [Conformance Documentation] (./conformance/HOWTO.md).
+check the [Conformance Documentation](https://github.com/erlef/oidcc/blob/main/conformance/HOWTO.md).
 
-![OpenID Connect Certified Logo](https://openid.net/wp-content/uploads/2023/01/image.png))
+![OpenID Connect Certified Logo](https://raw.githubusercontent.com/erlef/oidcc/main/assets/certified.svg)
 -->
+
+<picture style="margin-right: 15px; float: left">
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/erlef/oidcc/main/assets/erlef-logo-dark.svg" width="115px" align="left">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/erlef/oidcc/main/assets/erlef-logo-light.svg" width="115px" align="left">
+  <img alt="Erlang Ecosystem Foundation Logo" src="https://raw.githubusercontent.com/erlef/oidcc/main/assets/erlef-logo-light.svg" width="115px" align="left">
+</picture>
 
 The refactoring for `v3` and the certification is funded as an
 [Erlang Ecosystem Foundation](https://erlef.org/) stipend entered by the

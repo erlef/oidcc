@@ -13,6 +13,7 @@
 %%
 %% See {@link 'Elixir.Oidcc.Token'}
 %% @end
+%% @since 3.0.0
 %%%-------------------------------------------------------------------
 -module(oidcc_token).
 
@@ -281,6 +282,7 @@
 %%     redirect_uri => <<"https://example.com/callback">>}).
 %% '''
 %% @end
+%% @since 3.0.0
 -spec retrieve(AuthCode, ClientContext, Opts) ->
     {ok, t()} | {error, error()}
 when
@@ -339,6 +341,7 @@ retrieve(AuthCode, ClientContext, Opts) ->
 %%                       #{expected_subject => <<"sub_from_initial_id_token>>}).
 %% '''
 %% @end
+%% @since 3.0.0
 -spec refresh
     (RefreshToken, ClientContext, Opts) ->
         {ok, t()} | {error, error()}
@@ -412,6 +415,7 @@ refresh(RefreshToken, ClientContext, Opts) ->
 %%                             kid => maps:get(<<"keyId">>, KeyMap)}).
 %% '''
 %% @end
+%% @since 3.0.0
 -spec jwt_profile(Subject, ClientContext, Jwk, Opts) -> {ok, t()} | {error, error()} when
     Subject :: binary(),
     ClientContext :: oidcc_client_context:t(),
@@ -492,6 +496,7 @@ jwt_profile(Subject, ClientContext, Jwk, Opts) ->
 %%                                  #{scope => [<<"scope">>]}).
 %% '''
 %% @end
+%% @since 3.0.0
 -spec client_credentials(ClientContext, Opts) -> {ok, t()} | {error, error()} when
     ClientContext :: oidcc_client_context:t(),
     Opts :: client_credentials_opts().
@@ -639,6 +644,7 @@ verify_access_token_map_hash(#oidcc_token{}) ->
 %%   oidcc:validate_id_token(IdToken, ClientContext, ExpectedNonce).
 %% '''
 %% @end
+%% @since 3.0.0
 -spec validate_id_token(IdToken, ClientContext, Nonce) ->
     {ok, Claims} | {error, error()}
 when

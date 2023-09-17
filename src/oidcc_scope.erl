@@ -1,6 +1,7 @@
 %%%-------------------------------------------------------------------
 %% @doc OpenID Scope Utilities
 %% @end
+%% @since 3.0.0
 %%%-------------------------------------------------------------------
 -module(oidcc_scope).
 
@@ -25,6 +26,8 @@
 %% <<"openid profile email">> = oidcc_scope:scopes_to_bin(
 %%   [<<"openid">>, profile, "email"]).
 %% '''
+%% @end
+%% @since 3.0.0
 -spec scopes_to_bin(Scopes :: scopes()) -> t().
 scopes_to_bin(Scopes) ->
     NormalizedScopes =
@@ -60,6 +63,8 @@ query_append_scope(Scopes, QueryList) when is_list(Scopes) ->
 %% ```
 %% [<<"openid">>, <<"profile">>] = oidcc_scope:parse(<<"openid profile">>).
 %% '''
+%% @end
+%% @since 3.0.0
 -spec parse(Scope :: t()) -> scopes().
 parse(Scope) ->
     binary:split(Scope, [<<" ">>], [trim_all, global]).

@@ -50,6 +50,7 @@ defmodule Oidcc.ProviderConfiguration do
 
   #{telemetry_docs()}
   """
+  @moduledoc since: "3.0.0"
 
   use Oidcc.RecordStruct,
     internal_name: :configuration,
@@ -63,6 +64,7 @@ defmodule Oidcc.ProviderConfiguration do
   * https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
   * https://datatracker.ietf.org/doc/html/draft-jones-oauth-discovery-01#section-4.1
   """
+  @typedoc since: "3.0.0"
   @type t() :: %__MODULE__{
           issuer: :uri_string.uri_string(),
           authorization_endpoint: :uri_string.uri_string(),
@@ -119,6 +121,7 @@ defmodule Oidcc.ProviderConfiguration do
       ...>   _expiry
       ...> }} = Oidcc.ProviderConfiguration.load_configuration("https://accounts.google.com")
   """
+  @doc since: "3.0.0"
   @spec load_configuration(
           issuer :: :uri_string.uri_string(),
           opts :: :oidcc_provider_configuration.opts()
@@ -140,6 +143,7 @@ defmodule Oidcc.ProviderConfiguration do
       iex> {:ok, {%JOSE.JWK{}, _expiry}} =
       ...>   Oidcc.ProviderConfiguration.load_jwks("https://www.googleapis.com/oauth2/v3/certs")
   """
+  @doc since: "3.0.0"
   @spec load_jwks(
           jwks_uri :: :uri_string.uri_string(),
           opts :: :oidcc_provider_configuration.opts()
@@ -166,6 +170,7 @@ defmodule Oidcc.ProviderConfiguration do
       ...> {:ok, %ProviderConfiguration{issuer: "https://accounts.google.com"}} =
       ...>   Oidcc.ProviderConfiguration.decode_configuration(decoded_json)
   """
+  @doc since: "3.0.0"
   @spec decode_configuration(configuration :: map()) ::
           {:ok, t()} | {:error, :oidcc_provider_configuration.error()}
   def decode_configuration(configuration) do

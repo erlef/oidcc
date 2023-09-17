@@ -13,6 +13,7 @@
 %% -include_lib(["oidcc/include/oidcc_client_context.hrl"]).
 %% '''
 %% @end
+%% @since 3.0.0
 %%%-------------------------------------------------------------------
 -module(oidcc_client_context).
 
@@ -65,6 +66,8 @@
 %%                                                  <<"client_id">>,
 %%                                                  <<"client_secret">>).
 %% '''
+%% @end
+%% @since 3.0.0
 -spec from_configuration_worker(ProviderName, ClientId, ClientSecret) ->
     {ok, t()} | {error, error()}
 when
@@ -106,6 +109,8 @@ from_configuration_worker(ProviderName, ClientId, ClientSecret) ->
 %%                                    <<"client_id">>,
 %%                                    <<"client_secret">>).
 %% '''
+%% @end
+%% @since 3.0.0
 -spec from_manual(Configuration, Jwks, ClientId, ClientSecret) -> t() when
     Configuration :: oidcc_provider_configuration:t(),
     Jwks :: jose_jwk:key(),

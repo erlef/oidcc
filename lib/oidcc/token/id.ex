@@ -2,6 +2,7 @@ defmodule Oidcc.Token.Id do
   @moduledoc """
   ID Token struct
   """
+  @moduledoc since: "3.0.0"
 
   use Oidcc.RecordStruct,
     internal_name: :token,
@@ -10,6 +11,7 @@ defmodule Oidcc.Token.Id do
     record_type_name: :id,
     hrl: "include/oidcc_token.hrl"
 
+  @typedoc since: "3.0.0"
   @type t() :: %__MODULE__{
           token: String.t(),
           claims: :oidcc_jwt_util.claims()

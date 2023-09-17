@@ -2,6 +2,7 @@ defmodule Oidcc.Token.Refresh do
   @moduledoc """
   Refresh Token struct
   """
+  @moduledoc since: "3.0.0"
 
   use Oidcc.RecordStruct,
     internal_name: :token,
@@ -10,6 +11,7 @@ defmodule Oidcc.Token.Refresh do
     record_type_name: :refresh,
     hrl: "include/oidcc_token.hrl"
 
+  @typedoc since: "3.0.0"
   @type t() :: %__MODULE__{
           token: String.t()
         }

@@ -92,6 +92,7 @@ defmodule Oidcc.Token do
 
   #{telemetry_docs()}
   """
+  @moduledoc since: "3.0.0"
 
   use Oidcc.RecordStruct,
     internal_name: :token,
@@ -103,6 +104,7 @@ defmodule Oidcc.Token do
   alias Oidcc.Token.Id
   alias Oidcc.Token.Refresh
 
+  @typedoc since: "3.0.0"
   @type t() :: %__MODULE__{
           id: Id.t() | none,
           access: Access.t() | none,
@@ -145,6 +147,7 @@ defmodule Oidcc.Token do
       ...> # => {:ok, %Oidcc.Token{}}
 
   """
+  @doc since: "3.0.0"
   @spec retrieve(
           auth_code :: String.t(),
           client_context :: ClientContext.t(),
@@ -190,6 +193,7 @@ defmodule Oidcc.Token do
       ...> # => {:ok, %Oidcc.Token{}}
 
   """
+  @doc since: "3.0.0"
   @spec refresh(
           refresh_token :: String.t(),
           client_context :: ClientContext.t(),
@@ -241,6 +245,7 @@ defmodule Oidcc.Token do
       ...> # => {:ok, %{"sub" => "sub", ... }}
 
   """
+  @doc since: "3.0.0"
   @spec validate_id_token(
           id_token :: String.t(),
           client_context :: ClientContext.t(),
@@ -291,6 +296,7 @@ defmodule Oidcc.Token do
       ...>   )
 
   """
+  @doc since: "3.0.0"
   @spec jwt_profile(
           subject :: String.t(),
           client_context :: ClientContext.t(),
@@ -335,6 +341,7 @@ defmodule Oidcc.Token do
       ...>   )
 
   """
+  @doc since: "3.0.0"
   @spec client_credentials(
           client_context :: ClientContext.t(),
           opts :: :oidcc_token.client_credentials_opts()

@@ -15,6 +15,7 @@
 %%
 %% See {@link 'Elixir.Oidcc.TokenIntrospection'}
 %% @end
+%% @since 3.0.0
 %%%-------------------------------------------------------------------
 -module(oidcc_token_introspection).
 
@@ -87,6 +88,7 @@
 %%   oidcc_token_introspection:introspect(AccessToken, ClientContext, #{}).
 %% '''
 %% @end
+%% @since 3.0.0
 -spec introspect(Token, ClientContext, Opts) ->
     {ok, t()}
     | {error, error()}

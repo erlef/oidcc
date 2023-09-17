@@ -5,6 +5,7 @@
 %% @end
 %% @todo Store configuration in ETS instead of GenServer state to allow
 %% concurrent reads
+%% @since 3.0.0
 %%%-------------------------------------------------------------------
 -module(oidcc_provider_configuration_worker).
 
@@ -84,6 +85,8 @@
 %%     modules => [oidcc_provider_configuration_worker]}],
 %%   {ok, {SupFlags, ChildSpecs}}.
 %% '''
+%% @end
+%% @since 3.0.0
 -spec start_link(Opts :: opts()) -> gen_server:start_ret().
 start_link(Opts) ->
     case maps:get(name, Opts, undefined) of
@@ -204,6 +207,8 @@ get_jwks(Name) ->
 %%
 %% oidcc_provider_configuration_worker:refresh_configuration(Pid).
 %% '''
+%% @end
+%% @since 3.0.0
 -spec refresh_configuration(Name :: gen_server:server_ref()) -> ok.
 refresh_configuration(Name) ->
     gen_server:cast(Name, refresh_configuration).
@@ -222,6 +227,8 @@ refresh_configuration(Name) ->
 %%
 %% oidcc_provider_configuration_worker:refresh_jwks(Pid).
 %% '''
+%% @end
+%% @since 3.0.0
 -spec refresh_jwks(Name :: gen_server:server_ref()) -> ok.
 refresh_jwks(Name) ->
     gen_server:cast(Name, refresh_jwks).
@@ -238,6 +245,8 @@ refresh_jwks(Name) ->
 %%
 %% oidcc_provider_configuration_worker:refresh_jwks_for_unknown_kid(Pid, <<"kid">>).
 %% '''
+%% @end
+%% @since 3.0.0
 -spec refresh_jwks_for_unknown_kid(Name :: gen_server:server_ref(), Kid :: binary()) ->
     ok.
 refresh_jwks_for_unknown_kid(Name, Kid) ->

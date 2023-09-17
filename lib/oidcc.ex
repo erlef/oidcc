@@ -21,6 +21,7 @@ defmodule Oidcc do
   * `max_clock_skew` (default `0`) - Maximum allowed clock skew for JWT
     `exp` / `nbf` validation
   """
+  @moduledoc since: "3.0.0"
 
   @doc """
   Create Auth Redirect URL
@@ -41,6 +42,7 @@ defmodule Oidcc do
       ...>   )
 
   """
+  @doc since: "3.0.0"
   @spec create_redirect_url(
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
@@ -79,6 +81,7 @@ defmodule Oidcc do
       ...> # => {:ok, %Oidcc.Token{}}
 
   """
+  @doc since: "3.0.0"
   @spec retrieve_token(
           auth_code :: String.t(),
           provider_configuration_name :: GenServer.name(),
@@ -121,6 +124,7 @@ defmodule Oidcc do
       ...> # => {:ok, %Oidcc.Token{}}
 
   """
+  @doc since: "3.0.0"
   @spec refresh_token(
           refresh_token :: String.t(),
           provider_configuration_name :: GenServer.name(),
@@ -172,6 +176,7 @@ defmodule Oidcc do
       ...> # => {:ok, %Oidcc.TokenIntrospection{}}
 
   """
+  @doc since: "3.0.0"
   @spec introspect_token(
           access_token :: String.t() | Oidcc.Token.t(),
           provider_configuration_name :: GenServer.name(),
@@ -229,6 +234,7 @@ defmodule Oidcc do
       ...> # => {:ok, %{"sub" => "sub"}}
 
   """
+  @doc since: "3.0.0"
   @spec retrieve_userinfo(
           token :: Oidcc.Token.t(),
           provider_configuration_name :: GenServer.name(),
@@ -284,6 +290,7 @@ defmodule Oidcc do
       ...>   )
 
   """
+  @doc since: "3.0.0"
   @spec jwt_profile_token(
           subject :: String.t(),
           provider_configuration_name :: GenServer.name(),
@@ -328,6 +335,7 @@ defmodule Oidcc do
       ...>   )
 
   """
+  @doc since: "3.0.0"
   @spec client_credentials_token(
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),

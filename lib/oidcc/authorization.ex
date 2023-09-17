@@ -2,6 +2,7 @@ defmodule Oidcc.Authorization do
   @moduledoc """
   Functions to start an OpenID Connect Authorization
   """
+  @moduledoc since: "3.0.0"
 
   alias Oidcc.ClientContext
 
@@ -31,6 +32,7 @@ defmodule Oidcc.Authorization do
       ...>     %{redirect_uri: "https://my.server/return"}
       ...>   )
   """
+  @doc since: "3.0.0"
   @spec create_redirect_url(
           client_context :: ClientContext.t(),
           opts :: :oidcc_authorization.opts()

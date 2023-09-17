@@ -1,6 +1,7 @@
 %%%-------------------------------------------------------------------
 %% @doc Functions to start an OpenID Connect Authorization
 %% @end
+%% @since 3.0.0
 %%%-------------------------------------------------------------------
 -module(oidcc_authorization).
 
@@ -67,6 +68,7 @@
 %% %% RedirectUri = https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn
 %% '''
 %% @end
+%% @since 3.0.0
 -spec create_redirect_url(ClientContext, Opts) -> {ok, Uri} | {error, error()} when
     ClientContext :: oidcc_client_context:t(),
     Opts :: opts(),

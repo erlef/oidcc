@@ -22,6 +22,7 @@
 %%     `exp' / `nbf' validation</li>
 %% </ul>
 %% @end
+%% @since 3.0.0
 %%%-------------------------------------------------------------------
 -module(oidcc).
 
@@ -50,6 +51,7 @@
 %% %% RedirectUri = https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn
 %% '''
 %% @end
+%% @since 3.0.0
 -spec create_redirect_url(
     ProviderConfigurationWorkerName,
     ClientId,
@@ -92,6 +94,7 @@ create_redirect_url(ProviderConfigurationWorkerName, ClientId, ClientSecret, Opt
 %%                        #{redirect_uri => <<"https://example.com/callback">>}).
 %% '''
 %% @end
+%% @since 3.0.0
 -spec retrieve_token(
     AuthCode,
     ProviderConfigurationWorkerName,
@@ -138,6 +141,7 @@ retrieve_token(AuthCode,
 %%                           #{}).
 %% '''
 %% @end
+%% @since 3.0.0
 -spec retrieve_userinfo
     (
         Token,
@@ -188,6 +192,8 @@ retrieve_userinfo(Token,
 %%                       <<"client_secret">>,
 %%                       #{expected_subject => <<"sub_from_initial_id_token>>}).
 %% '''
+%% @end
+%% @since 3.0.0
 -spec refresh_token
     (
         RefreshToken,
@@ -249,6 +255,7 @@ refresh_token(RefreshToken,
 %%                          #{}).
 %% '''
 %% @end
+%% @since 3.0.0
 -spec introspect_token(
     Token,
     ProviderConfigurationWorkerName,
@@ -298,6 +305,7 @@ introspect_token(Token,
 %%                             kid => maps:get(<<"keyId">>, KeyMap)}).
 %% '''
 %% @end
+%% @since 3.0.0
 -spec jwt_profile_token(
     Subject,
     ProviderConfigurationWorkerName,
@@ -338,6 +346,7 @@ jwt_profile_token(Subject, ProviderConfigurationWorkerName, ClientId, ClientSecr
 %%                                  #{scope => [<<"scope">>]}).
 %% '''
 %% @end
+%% @since 3.0.0
 -spec client_credentials_token(
     ProviderConfigurationWorkerName,
     ClientId,

@@ -99,8 +99,8 @@ Supervisor.init([
 - [`oidcc_plug`](https://hex.pm/packages/oidcc_plug) - Integrations for
   [`plug`](https://hex.pm/packages/plug) and
   [`phoenix`](https://hex.pm/packages/phoenix)
-<!-- - [`phx_gen_oidcc`](https://hex.pm/packages/phx_gen_oidcc) - Setup Generator for
-  [`phoenix`](https://hex.pm/packages/phoenix) -->
+- [`phx_gen_oidcc`](https://hex.pm/packages/phx_gen_oidcc) - Setup Generator for
+  [`phoenix`](https://hex.pm/packages/phoenix)
 
 ### Erlang
 

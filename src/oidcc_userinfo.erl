@@ -33,7 +33,7 @@
 -type retrieve_opts() ::
     #{
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
-        expected_subject := binary()
+        expected_subject := binary() | any
     }.
 %% Configure userinfo request
 %%

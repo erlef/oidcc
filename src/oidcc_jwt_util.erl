@@ -9,6 +9,7 @@
 -include_lib("jose/include/jose_jwt.hrl").
 
 -export([client_secret_oct_keys/2]).
+-export([merge_jwks/2]).
 -export([refresh_jwks_fun/1]).
 -export([verify_claims/2]).
 -export([verify_signature/3]).
@@ -84,6 +85,9 @@ verify_signature(Token, AllowAlgorithms, #jose_jwk{} = Jwks) ->
         end
     catch
         error:{badarg, [_Token]} ->
+            {error, invalid_jwt_token};
+        %% Some Keys crash if a non matching alg is provided
+        error:function_clause ->
             {error, invalid_jwt_token}
     end.
 
@@ -138,3 +142,16 @@ refresh_jwks_fun(ProviderConfigurationWorkerName) ->
         ),
         {ok, oidcc_provider_configuration_worker:get_jwks(ProviderConfigurationWorkerName)}
     end.
+
+%% @private
+-spec merge_jwks(Left :: jose_jwk:key(), Right :: jose_jwk:key()) -> jose_jwk:key().
+merge_jwks(#jose_jwk{keys = {jose_jwk_set, LeftKeys}, fields = LeftFields}, #jose_jwk{
+    keys = {jose_jwk_set, RightKeys}, fields = RightFields
+}) ->
+    #jose_jwk{
+        keys = {jose_jwk_set, LeftKeys ++ RightKeys}, fields = maps:merge(LeftFields, RightFields)
+    };
+merge_jwks(#jose_jwk{} = Left, #jose_jwk{keys = {jose_jwk_set, _RightKeys}} = Right) ->
+    merge_jwks(#jose_jwk{keys = {jose_jwk_set, [Left]}}, Right);
+merge_jwks(Left, Right) ->
+    merge_jwks(Left, #jose_jwk{keys = {jose_jwk_set, [Right]}}).

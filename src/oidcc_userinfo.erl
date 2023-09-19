@@ -199,7 +199,7 @@ validate_userinfo_token(UserinfoToken, ClientContext, Opts) ->
                 none ->
                     Jwks;
                 OctJwk ->
-                    jose_jwk:merge(OctJwk, Jwks)
+                    oidcc_jwt_util:merge_jwks(Jwks, OctJwk)
             end,
         {ok, {#jose_jwt{fields = Claims}, _Jws}} ?=
             oidcc_jwt_util:verify_signature(UserinfoToken, AllowAlgorithms, JwksInclOct),

@@ -675,7 +675,7 @@ validate_id_token(IdToken, ClientContext, Nonce) ->
                 none ->
                     Jwks;
                 OctJwk ->
-                    jose_jwk:merge(OctJwk, Jwks)
+                    oidcc_jwt_util:merge_jwks(Jwks, OctJwk)
             end,
         {ok, {#jose_jwt{fields = Claims}, Jws}} ?=
             oidcc_jwt_util:verify_signature(IdToken, AllowAlgorithms, JwksInclOct),

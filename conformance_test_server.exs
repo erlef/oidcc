@@ -1,8 +1,8 @@
 #!/usr/bin/env elixir
 Mix.install(
   [
-    {:oidcc, "~> 3.0-alpha"},
-    {:oidcc_plug, "~> 0.1-alpha"},
+    {:oidcc, "~> 3.0-rc"},
+    {:oidcc_plug, "~> 0.1-rc"},
     {:plug_cowboy, "~> 2.5"},
     {:phoenix, "~> 1.7"},
     {:jason, "~> 1.4"}

@@ -119,6 +119,7 @@
             | alg_no_none,
         Field :: atom()
     }}
+    | {issuer_mismatch, Issuer :: binary()}
     | oidcc_http_util:error().
 
 -define(DEFAULT_CONFIG_EXPIRY, timer:minutes(15)).
@@ -180,7 +181,8 @@
 when
     Issuer :: uri_string:uri_string(),
     Opts :: opts().
-load_configuration(Issuer, Opts) ->
+load_configuration(Issuer0, Opts) ->
+    Issuer = binary:list_to_bin([Issuer0]),
     TelemetryOpts = #{topic => [oidcc, load_configuration], extra_meta => #{issuer => Issuer}},
     RequestOpts = maps:get(request_opts, Opts, #{}),
     Request = {[Issuer, <<"/.well-known/openid-configuration">>], []},
@@ -188,9 +190,11 @@ load_configuration(Issuer, Opts) ->
     maybe
         {ok, {{json, ConfigurationMap}, Headers}} ?= oidcc_http_util:request(get, Request, TelemetryOpts, RequestOpts),
         Expiry = headers_to_deadline(Headers, Opts),
-        {ok, Configuration} ?= decode_configuration(ConfigurationMap),
+        {ok, #oidcc_provider_configuration{issuer = Issuer} = Configuration}
+            ?= decode_configuration(ConfigurationMap),
         {ok, {Configuration, Expiry}}
     else
+        {ok, #oidcc_provider_configuration{issuer = DifferentIssuer}} -> {error, {issuer_mismatch, DifferentIssuer}};
         {error, Reason} -> {error, Reason};
         {ok, {{_Format, _Body}, _Headers}} -> {error, invalid_content_type}
     end.

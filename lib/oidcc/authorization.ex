@@ -16,7 +16,7 @@ defmodule Oidcc.Authorization do
 
       iex> {:ok, pid} =
       ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
-      ...>     issuer: "https://accounts.google.com/"
+      ...>     issuer: "https://accounts.google.com"
       ...>   })
       ...>
       ...> {:ok, client_context} =

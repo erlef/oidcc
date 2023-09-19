@@ -60,7 +60,7 @@ defmodule Oidcc.TokenIntrospection do
 
       iex> {:ok, pid} =
       ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
-      ...>     issuer: "https://login.yahoo.com"
+      ...>     issuer: "https://api.login.yahoo.com"
       ...>   })
       ...>
       ...> {:ok, client_context} =

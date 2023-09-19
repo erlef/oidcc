@@ -35,7 +35,7 @@ retrieves_configuration(_Config) ->
 
     {ok, GoogleConfigurationPid} =
         oidcc_provider_configuration_worker:start_link(#{
-            issuer => <<"https://accounts.google.com/">>,
+            issuer => <<"https://accounts.google.com">>,
             name => {local, WorkerName}
         }),
 
@@ -62,7 +62,7 @@ retrieves_configuration(_Config) ->
 
     receive
         {[oidcc, load_configuration, start], TelemetryRef, #{}, #{
-            issuer := <<"https://accounts.google.com/">>
+            issuer := <<"https://accounts.google.com">>
         }} ->
             ok
     after 10_000 ->
@@ -71,7 +71,7 @@ retrieves_configuration(_Config) ->
 
     receive
         {[oidcc, load_configuration, stop], TelemetryRef, #{duration := _Duration}, #{
-            issuer := <<"https://accounts.google.com/">>
+            issuer := <<"https://accounts.google.com">>
         }} ->
             ok
     after 10_000 ->
@@ -88,7 +88,7 @@ retrieves_configuration(_Config) ->
 retrieves_jwks(_Config) ->
     {ok, GoogleConfigurationPid} =
         oidcc_provider_configuration_worker:start_link(#{
-            issuer => <<"https://accounts.google.com/">>
+            issuer => <<"https://accounts.google.com">>
         }),
 
     ?assertMatch(
@@ -130,7 +130,7 @@ retrieves_jwks(_Config) ->
 refreshes_jwks_on_missing_kid(_Config) ->
     {ok, GoogleConfigurationPid} =
         oidcc_provider_configuration_worker:start_link(#{
-            issuer => <<"https://accounts.google.com/">>
+            issuer => <<"https://accounts.google.com">>
         }),
 
     #jose_jwk{
@@ -172,7 +172,7 @@ refreshes_jwks_on_missing_kid(_Config) ->
 refreshes_after_timeout(_Config) ->
     {ok, YahooConfigurationPid} =
         oidcc_provider_configuration_worker:start_link(#{
-            issuer => <<"https://login.yahoo.com">>,
+            issuer => <<"https://api.login.yahoo.com">>,
             provider_configuration_opts => #{fallback_expiry => 100}
         }),
 

@@ -9,7 +9,7 @@ defmodule Oidcc.ProviderConfiguration.WorkerTest do
   describe inspect(&Worker.start_link/1) do
     test "works" do
       start_supervised!(
-        {Worker, %{issuer: "https://accounts.google.com/", name: __MODULE__.GoogleProvider}}
+        {Worker, %{issuer: "https://accounts.google.com", name: __MODULE__.GoogleProvider}}
       )
     end
   end
@@ -18,7 +18,7 @@ defmodule Oidcc.ProviderConfiguration.WorkerTest do
     test "works" do
       pid =
         start_supervised!(
-          {Worker, %{issuer: "https://accounts.google.com/", name: __MODULE__.GoogleProvider}}
+          {Worker, %{issuer: "https://accounts.google.com", name: __MODULE__.GoogleProvider}}
         )
 
       assert %ProviderConfiguration{issuer: "https://accounts.google.com"} =
@@ -29,7 +29,7 @@ defmodule Oidcc.ProviderConfiguration.WorkerTest do
   describe inspect(&Worker.get_jwks/1) do
     test "works" do
       start_supervised!(
-        {Worker, %{issuer: "https://accounts.google.com/", name: __MODULE__.GoogleProvider}}
+        {Worker, %{issuer: "https://accounts.google.com", name: __MODULE__.GoogleProvider}}
       )
 
       assert %JOSE.JWK{} =
@@ -41,7 +41,7 @@ defmodule Oidcc.ProviderConfiguration.WorkerTest do
     test "works" do
       pid =
         start_supervised!(
-          {Worker, %{issuer: "https://accounts.google.com/", name: __MODULE__.GoogleProvider}}
+          {Worker, %{issuer: "https://accounts.google.com", name: __MODULE__.GoogleProvider}}
         )
 
       assert :ok = Worker.refresh_configuration(pid)
@@ -52,7 +52,7 @@ defmodule Oidcc.ProviderConfiguration.WorkerTest do
     test "works" do
       pid =
         start_supervised!(
-          {Worker, %{issuer: "https://accounts.google.com/", name: __MODULE__.GoogleProvider}}
+          {Worker, %{issuer: "https://accounts.google.com", name: __MODULE__.GoogleProvider}}
         )
 
       assert :ok = Worker.refresh_jwks(pid)
@@ -63,7 +63,7 @@ defmodule Oidcc.ProviderConfiguration.WorkerTest do
     test "works" do
       pid =
         start_supervised!(
-          {Worker, %{issuer: "https://accounts.google.com/", name: __MODULE__.GoogleProvider}}
+          {Worker, %{issuer: "https://accounts.google.com", name: __MODULE__.GoogleProvider}}
         )
 
       assert :ok = Worker.refresh_jwks_for_unknown_kid(pid, "kid")

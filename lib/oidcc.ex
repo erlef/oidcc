@@ -6,14 +6,14 @@ defmodule Oidcc do
 
       {:ok, _pid} =
         Oidcc.ProviderConfiguration.Worker.start_link(%{
-        issuer: "https://accounts.google.com/",
+        issuer: "https://accounts.google.com",
         name: MyApp.GoogleConfigProvider
       })
 
   or via a supervisor
 
       Supervisor.init([
-        {Oidcc.ProviderConfiguration.Worker, %{issuer: "https://accounts.google.com/"}}
+        {Oidcc.ProviderConfiguration.Worker, %{issuer: "https://accounts.google.com"}}
       ], strategy: :one_for_one)
 
   ## Global Configuration
@@ -30,7 +30,7 @@ defmodule Oidcc do
 
       iex> {:ok, pid} =
       ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
-      ...>   issuer: "https://accounts.google.com/"
+      ...>   issuer: "https://accounts.google.com"
       ...> })
       ...>
       ...> {:ok, _redirect_uri} =
@@ -65,7 +65,7 @@ defmodule Oidcc do
 
       iex> {:ok, pid} =
       ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
-      ...>     issuer: "https://login.yahoo.com"
+      ...>     issuer: "https://api.login.yahoo.com"
       ...>   })
       ...>
       ...> # Get auth_code fromm redirect
@@ -108,7 +108,7 @@ defmodule Oidcc do
 
       iex> {:ok, pid} =
       ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
-      ...>     issuer: "https://login.yahoo.com"
+      ...>     issuer: "https://api.login.yahoo.com"
       ...>   })
       ...>
       ...> # Get refresh_token fromm redirect
@@ -164,7 +164,7 @@ defmodule Oidcc do
 
       iex> {:ok, pid} =
       ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
-      ...>     issuer: "https://login.yahoo.com"
+      ...>     issuer: "https://api.login.yahoo.com"
       ...>   })
       ...>
       ...> Oidcc.introspect_token(
@@ -218,7 +218,7 @@ defmodule Oidcc do
 
       iex> {:ok, pid} =
       ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
-      ...>     issuer: "https://login.yahoo.com"
+      ...>     issuer: "https://api.login.yahoo.com"
       ...>   })
       ...>
       ...> # Get access_token from Oidcc.Token.retrieve/3

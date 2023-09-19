@@ -13,7 +13,7 @@ all() ->
 from_configuration_worker(_Config) ->
     {ok, GoogleConfigurationPid} =
         oidcc_provider_configuration_worker:start_link(#{
-            issuer => <<"https://accounts.google.com/">>,
+            issuer => <<"https://accounts.google.com">>,
             name => {local, from_configuration_worker_oidcc_client_context_SUITE}
         }),
 

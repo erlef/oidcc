@@ -220,7 +220,15 @@ get_jwks(Name) ->
 %% @since 3.0.0
 -spec refresh_configuration(Name :: gen_server:server_ref()) -> ok.
 refresh_configuration(Name) ->
-    gen_server:cast(Name, refresh_configuration).
+    refresh_configuration(Name, true).
+
+-spec refresh_configuration(Name :: gen_server:server_ref(), Synchronous :: boolean()) -> ok.
+refresh_configuration(Name, false) ->
+    gen_server:cast(Name, refresh_configuration);
+refresh_configuration(Name, true) ->
+    refresh_configuration(Name, false),
+    gen_server:call(Name, get_provider_configuration),
+    ok.
 
 %% @doc Refresh JWKs
 %%
@@ -239,8 +247,15 @@ refresh_configuration(Name) ->
 %% @end
 %% @since 3.0.0
 -spec refresh_jwks(Name :: gen_server:server_ref()) -> ok.
-refresh_jwks(Name) ->
-    gen_server:cast(Name, refresh_jwks).
+refresh_jwks(Name) -> refresh_jwks(Name, true).
+
+-spec refresh_jwks(Name :: gen_server:server_ref(), Synchronous :: boolean()) -> ok.
+refresh_jwks(Name, false) ->
+    gen_server:cast(Name, refresh_jwks);
+refresh_jwks(Name, true) ->
+    refresh_jwks(Name, false),
+    gen_server:call(Name, get_jwks),
+    ok.
 
 %% @doc Refresh JWKs if the provided `Kid' is not matching any currently loaded keys
 %%
@@ -259,7 +274,18 @@ refresh_jwks(Name) ->
 -spec refresh_jwks_for_unknown_kid(Name :: gen_server:server_ref(), Kid :: binary()) ->
     ok.
 refresh_jwks_for_unknown_kid(Name, Kid) ->
-    gen_server:cast(Name, {refresh_jwks_for_unknown_kid, Kid}).
+    refresh_jwks_for_unknown_kid(Name, Kid, true).
+
+-spec refresh_jwks_for_unknown_kid(
+    Name :: gen_server:server_ref(), Kid :: binary(), Synchronous :: boolean()
+) ->
+    ok.
+refresh_jwks_for_unknown_kid(Name, Kid, false) ->
+    gen_server:cast(Name, {refresh_jwks_for_unknown_kid, Kid});
+refresh_jwks_for_unknown_kid(Name, Kid, true) ->
+    refresh_jwks_for_unknown_kid(Name, Kid, false),
+    gen_server:call(Name, get_jwks),
+    ok.
 
 -spec get_issuer(Opts :: opts()) -> {ok, binary()} | {error, issuer_required}.
 get_issuer(Opts) ->

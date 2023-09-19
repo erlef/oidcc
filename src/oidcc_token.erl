@@ -698,12 +698,12 @@ validate_id_token(IdToken, ClientContext, Nonce) ->
 verify_aud_claim(#{<<"aud">> := Audience} = Claims, ClientId) when is_list(Audience) ->
     case lists:member(ClientId, Audience) of
         true -> ok;
-        false -> {missing_claim, {<<"aud">>, ClientId}, Claims}
+        false -> {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}
     end;
 verify_aud_claim(#{<<"aud">> := ClientId}, ClientId) ->
     ok;
 verify_aud_claim(Claims, ClientId) ->
-    {missing_claim, {<<"aud">>, ClientId}, Claims}.
+    {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}.
 
 -spec verify_azp_claim(Claims, ClientId) -> ok | {error, error()} when
     Claims :: oidcc_jwt_util:claims(), ClientId :: binary().

@@ -71,7 +71,8 @@ defmodule Oidcc.Mixfile do
       main: "readme",
       extras: ["README.md"],
       groups_for_modules: [Erlang: [~r/oidcc/], "Elixir": [~r/Oidcc/]],
-      logo: "assets/logo.svg"
+      logo: "assets/logo.svg",
+      assets: "assets"
     ]
   end
 

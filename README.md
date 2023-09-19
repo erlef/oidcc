@@ -1,7 +1,7 @@
 <div style="margin-right: 15px; float: left;">
   <img
     align="left"
-    src="https://raw.githubusercontent.com/erlef/oidcc/main/assets/logo.svg"
+    src="assets/logo.svg"
     alt="OpenID Connect Logo"
     width="170px"
   />
@@ -26,18 +26,18 @@ OpenID Connect client library for Erlang.
 <picture style="margin-right: 15px; float: left;">
   <source
     media="(prefers-color-scheme: dark)"
-    srcset="https://raw.githubusercontent.com/erlef/oidcc/main/assets/certified-dark.svg"
+    srcset="assets/certified-dark.svg"
     width="170px"
     align="left"
   />
   <source
     media="(prefers-color-scheme: light)"
-    srcset="https://raw.githubusercontent.com/erlef/oidcc/main/assets/certified-light.svg"
+    srcset="assets/certified-light.svg"
     width="170px"
     align="left"
   />
   <img
-    src="https://raw.githubusercontent.com/erlef/oidcc/main/assets/certified-light.svg"
+    src="assets/certified-light.svg"
     alt="OpenID Connect Certified Logo"
     width="170px"
     align="left"
@@ -54,18 +54,18 @@ check the [Conformance Documentation](https://github.com/erlef/oidcc/tree/openid
 <picture style="margin-right: 15px; float: left;">
   <source
     media="(prefers-color-scheme: dark)"
-    srcset="https://raw.githubusercontent.com/erlef/oidcc/main/assets/erlef-logo-dark.svg"
+    srcset="assets/erlef-logo-dark.svg"
     width="170px"
     align="left"
   />
   <source
     media="(prefers-color-scheme: light)"
-    srcset="https://raw.githubusercontent.com/erlef/oidcc/main/assets/erlef-logo-light.svg"
+    srcset="assets/erlef-logo-light.svg"
     width="170px"
     align="left"
   />
   <img
-    src="https://raw.githubusercontent.com/erlef/oidcc/main/assets/erlef-logo-light.svg"
+    src="assets/erlef-logo-light.svg"
     alt="Erlang Ecosystem Foundation Logo"
     width="170px"
     align="left"

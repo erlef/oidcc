@@ -2,9 +2,12 @@
 %% @doc OIDC Config Provider Worker
 %%
 %% Loads and continuously refreshes the OIDC configuration and JWKs
+%%
+%% The worker supports reading values concurrently via an ets table. To use
+%% this performance improvement, the worker has to be registered with a
+%% `{local, Name}'. No name / `{global, Name}' and `{via, RegModule, ViaName}'
+%% are not supported.
 %% @end
-%% @todo Store configuration in ETS instead of GenServer state to allow
-%% concurrent reads
 %% @since 3.0.0
 %%%-------------------------------------------------------------------
 -module(oidcc_provider_configuration_worker).
@@ -49,8 +52,9 @@
     jwks = undefined :: jose_jwk:key() | undefined,
     issuer :: uri_string:uri_string(),
     provider_configuration_opts :: oidcc_provider_configuration:opts(),
-    configuration_refresh_timer :: timer:tref() | undefined,
-    jwks_refresh_timer :: timer:tref() | undefined
+    configuration_refresh_timer = undefined :: timer:tref() | undefined,
+    jwks_refresh_timer = undefined :: timer:tref() | undefined,
+    ets_table = undefined :: ets:table() | undefined
 }).
 
 %% @doc Start Configuration Provider
@@ -98,11 +102,12 @@ start_link(Opts) ->
 
 %% @private
 init(Opts) ->
+    EtsTable = register_ets_table(Opts),
     maybe
         {ok, Issuer} ?= get_issuer(Opts),
         ProviderConfigurationOpts = maps:get(provider_configuration_opts, Opts, #{}),
         {ok,
-         #state{issuer = Issuer, provider_configuration_opts = ProviderConfigurationOpts},
+         #state{issuer = Issuer, provider_configuration_opts = ProviderConfigurationOpts, ets_table = EtsTable},
          {continue, load_configuration}}
     end.
 
@@ -135,7 +140,8 @@ handle_continue(
     #state{
         issuer = Issuer,
         provider_configuration_opts = ProviderConfigurationOpts,
-        configuration_refresh_timer = OldTimer
+        configuration_refresh_timer = OldTimer,
+        ets_table = EtsTable
     } =
         State
 ) ->
@@ -147,6 +153,7 @@ handle_continue(
             ProviderConfigurationOpts
         ),
         {ok, NewTimer} = timer:send_after(Expiry, configuration_expired),
+        ok = store_in_ets(EtsTable, provider_configuration, Configuration),
         {noreply, State#state{provider_configuration = Configuration, configuration_refresh_timer = NewTimer},
             {continue, load_jwks}}
     else
@@ -158,7 +165,8 @@ handle_continue(
     #state{
         provider_configuration = Configuration,
         provider_configuration_opts = ProviderConfigurationOpts,
-        jwks_refresh_timer = OldTimer
+        jwks_refresh_timer = OldTimer,
+        ets_table = EtsTable
     } =
         State
 ) ->
@@ -169,6 +177,7 @@ handle_continue(
     maybe
         {ok, {Jwks, Expiry}} ?= oidcc_provider_configuration:load_jwks(JwksUri, ProviderConfigurationOpts),
         {ok, NewTimer} = timer:send_after(Expiry, jwks_expired),
+        ok = store_in_ets(EtsTable, jwks, Jwks),
         {noreply, State#state{jwks = Jwks, jwks_refresh_timer = NewTimer}}
     else
         {error, Reason} ->
@@ -186,12 +195,12 @@ handle_info(jwks_expired, State) ->
 -spec get_provider_configuration(Name :: gen_server:server_ref()) ->
     oidcc_provider_configuration:t().
 get_provider_configuration(Name) ->
-    gen_server:call(Name, get_provider_configuration).
+    lookup_in_ets_or_call(Name, provider_configuration, get_provider_configuration).
 
 %% @doc Get Parsed Jwks
 -spec get_jwks(Name :: gen_server:server_ref()) -> jose_jwk:key().
 get_jwks(Name) ->
-    gen_server:call(Name, get_jwks).
+    lookup_in_ets_or_call(Name, jwks, get_jwks).
 
 %% @doc Refresh Configuration
 %%
@@ -285,3 +294,40 @@ maybe_cancel_timer(undefined) ->
     ok;
 maybe_cancel_timer(TRef) ->
     {ok, cancel} = timer:cancel(TRef).
+
+-spec store_in_ets(Table :: ets:table() | undefined, Key :: atom(), Value :: term()) -> ok.
+store_in_ets(undefined, _Key, _Value) ->
+    ok;
+store_in_ets(Table, Key, Value) ->
+    true = ets:insert(Table, [{Key, Value}]),
+    ok.
+
+-spec lookup_in_ets_or_call(Name :: gen_server:server_ref(), Key :: atom(), Call :: term()) ->
+    term().
+lookup_in_ets_or_call(Name, Key, Call) ->
+    maybe
+        {ok, TableName} ?= get_ets_table_name(Name),
+        [{Key, Value}] ?= ets:lookup(TableName, Key),
+        Value
+    else
+        %% Fall Back to synchronous gen_server lookup if ets table can't be
+        %% located or the value is not present yet
+        _ -> gen_server:call(Name, Call)
+    end.
+
+-spec get_ets_table_name(WorkerRef :: gen_server:server_ref()) ->
+    {ok, gen_server:server_ref()} | error.
+get_ets_table_name(WorkerName) when is_atom(WorkerName) ->
+    {ok, erlang:list_to_atom(erlang:atom_to_list(WorkerName) ++ "_table")};
+get_ets_table_name(_Ref) ->
+    error.
+
+-spec register_ets_table(Opts :: opts()) -> ets:table() | undefined.
+register_ets_table(Opts) ->
+    case maps:get(name, Opts, undefined) of
+        {local, WorkerName} ->
+            Name = erlang:list_to_atom(erlang:atom_to_list(WorkerName) ++ "_table"),
+            ets:new(Name, [named_table, bag, protected, {read_concurrency, true}]);
+        _OtherName ->
+            undefined
+    end.

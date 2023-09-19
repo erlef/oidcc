@@ -31,10 +31,12 @@ end_per_suite(_Config) ->
     ok.
 
 retrieves_configuration(_Config) ->
+    WorkerName = retrieves_configuration_oidcc_provider_configuration_worker_SUITE,
+
     {ok, GoogleConfigurationPid} =
         oidcc_provider_configuration_worker:start_link(#{
             issuer => <<"https://accounts.google.com/">>,
-            name => {local, retrieves_configuration_oidcc_provider_configuration_worker_SUITE}
+            name => {local, WorkerName}
         }),
 
     ?assertMatch(
@@ -43,7 +45,7 @@ retrieves_configuration(_Config) ->
                 <<"https://oauth2.googleapis.com/token">>
         },
         oidcc_provider_configuration_worker:get_provider_configuration(
-            retrieves_configuration_oidcc_provider_configuration_worker_SUITE
+            WorkerName
         )
     ),
 
@@ -78,8 +80,10 @@ retrieves_configuration(_Config) ->
 
     ?assertMatch(
         #oidcc_provider_configuration{},
-        oidcc_provider_configuration_worker:get_provider_configuration(GoogleConfigurationPid)
-    ).
+        oidcc_provider_configuration_worker:get_provider_configuration(WorkerName)
+    ),
+
+    ok.
 
 retrieves_jwks(_Config) ->
     {ok, GoogleConfigurationPid} =

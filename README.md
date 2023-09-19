@@ -16,7 +16,7 @@ OpenID Connect client library for Erlang.
 <!--
 OpenID Certified by Jonatan Männchen at the Erlang Ecosystem Foundation for the
 basic and configuration profile of the OpenID Connect protocol. For details,
-check the [Conformance Documentation](https://github.com/erlef/oidcc/blob/main/conformance/HOWTO.md).
+check the [Conformance Documentation](https://github.com/erlef/oidcc/blob/openid-foundation-certification/conformance/HOWTO.md).
 
 ![OpenID Connect Certified Logo](https://raw.githubusercontent.com/erlef/oidcc/main/assets/certified.svg)
 -->

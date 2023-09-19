@@ -29,6 +29,9 @@ oidcc-*.tar
 mix.lock
 rebar.lock
 
+# Certification Subtree
+/certification
+
 # Other Rebar Files
 ebin/
 log/

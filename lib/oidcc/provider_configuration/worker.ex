@@ -8,7 +8,7 @@ defmodule Oidcc.ProviderConfiguration.Worker do
 
   ```elixir
   Supervisor.init([
-    {Oidcc.ProviderConfiguration.Worker, %{issuer: "https://accounts.google.com/"}}
+    {Oidcc.ProviderConfiguration.Worker, %{issuer: "https://accounts.google.com"}}
   ], strategy: :one_for_one)
   ```
   """
@@ -33,7 +33,7 @@ defmodule Oidcc.ProviderConfiguration.Worker do
 
       iex> {:ok, _pid} =
       ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
-      ...>   issuer: "https://accounts.google.com/",
+      ...>   issuer: "https://accounts.google.com",
       ...>   name: __MODULE__.GoogleConfigProvider
       ...> })
   """
@@ -64,7 +64,7 @@ defmodule Oidcc.ProviderConfiguration.Worker do
 
       iex> {:ok, pid} =
       ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
-      ...>   issuer: "https://accounts.google.com/"
+      ...>   issuer: "https://accounts.google.com"
       ...> })
       ...> %Oidcc.ProviderConfiguration{issuer: "https://accounts.google.com"} =
       ...>   Oidcc.ProviderConfiguration.Worker.get_provider_configuration(pid)
@@ -84,7 +84,7 @@ defmodule Oidcc.ProviderConfiguration.Worker do
 
       iex> {:ok, pid} =
       ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
-      ...>   issuer: "https://accounts.google.com/"
+      ...>   issuer: "https://accounts.google.com"
       ...> })
       ...> %JOSE.JWK{} =
       ...>   Oidcc.ProviderConfiguration.Worker.get_jwks(pid)
@@ -104,7 +104,7 @@ defmodule Oidcc.ProviderConfiguration.Worker do
 
       iex> {:ok, pid} =
       ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
-      ...>   issuer: "https://accounts.google.com/"
+      ...>   issuer: "https://accounts.google.com"
       ...> })
       ...> :ok = Oidcc.ProviderConfiguration.Worker.refresh_configuration(pid)
   """
@@ -120,7 +120,7 @@ defmodule Oidcc.ProviderConfiguration.Worker do
 
       iex> {:ok, pid} =
       ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
-      ...>   issuer: "https://accounts.google.com/"
+      ...>   issuer: "https://accounts.google.com"
       ...> })
       ...> :ok = Oidcc.ProviderConfiguration.Worker.refresh_jwks(pid)
   """
@@ -136,7 +136,7 @@ defmodule Oidcc.ProviderConfiguration.Worker do
 
       iex> {:ok, pid} =
       ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
-      ...>   issuer: "https://accounts.google.com/"
+      ...>   issuer: "https://accounts.google.com"
       ...> })
       ...> :ok = Oidcc.ProviderConfiguration.Worker.refresh_jwks_for_unknown_kid(pid, "kid")
   """

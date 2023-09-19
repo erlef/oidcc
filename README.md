@@ -117,7 +117,7 @@ init(_Args) ->
 ```elixir
 {:ok, _pid} =
   Oidcc.ProviderConfiguration.Worker.start_link(%{
-  issuer: "https://accounts.google.com/",
+  issuer: "https://accounts.google.com",
   name: Myapp.OidccConfigProvider
 })
 ```

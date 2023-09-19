@@ -9,7 +9,7 @@ defmodule Oidcc.AuthorizationTest do
     test "works" do
       pid =
         start_supervised!(
-          {Oidcc.ProviderConfiguration.Worker, %{issuer: "https://accounts.google.com/"}}
+          {Oidcc.ProviderConfiguration.Worker, %{issuer: "https://accounts.google.com"}}
         )
 
       {:ok, client_context} =

@@ -10,7 +10,7 @@ defmodule Oidcc.ClientContextTest do
       pid =
         start_supervised!(
           {Oidcc.ProviderConfiguration.Worker,
-           %{issuer: "https://accounts.google.com/", name: __MODULE__.GoogleProvider}}
+           %{issuer: "https://accounts.google.com", name: __MODULE__.GoogleProvider}}
         )
 
       assert {:ok, %Oidcc.ClientContext{}} =

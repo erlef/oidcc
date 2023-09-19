@@ -2,6 +2,7 @@
 
 -export([all/0]).
 -export([load_configuration/1]).
+-export([load_configuration_issuer_mismatch/1]).
 -export([load_jwks/1]).
 -export([load_well_known_openid_introspections/1]).
 -export([reads_configuration_expiry/1]).
@@ -14,6 +15,7 @@
 all() ->
     [
         load_configuration,
+        load_configuration_issuer_mismatch,
         load_jwks,
         reads_configuration_expiry,
         load_well_known_openid_introspections
@@ -28,6 +30,15 @@ load_configuration(_Config) ->
             },
             3_600_000
         }},
+        oidcc_provider_configuration:load_configuration(
+            <<"https://accounts.google.com">>,
+            #{}
+        )
+    ).
+
+load_configuration_issuer_mismatch(_Config) ->
+    ?assertMatch(
+        {error, {issuer_mismatch, <<"https://accounts.google.com">>}},
         oidcc_provider_configuration:load_configuration(
             <<"https://accounts.google.com/">>,
             #{}
@@ -45,9 +56,9 @@ load_jwks(_Config) ->
 
 reads_configuration_expiry(_Config) ->
     ?assertMatch(
-        {ok, {#oidcc_provider_configuration{}, 86_400_000}},
+        {ok, {#oidcc_provider_configuration{}, 3_600_000}},
         oidcc_provider_configuration:load_configuration(
-            <<"https://login.microsoftonline.com/common/v2.0">>,
+            <<"https://accounts.google.com">>,
             #{}
         )
     ).
@@ -66,7 +77,7 @@ load_well_known_openid_introspections(_Config) ->
     ?assertMatch(
         {ok, {#oidcc_provider_configuration{}, _}},
         oidcc_provider_configuration:load_configuration(
-            <<"https://login.yahoo.com">>,
+            <<"https://api.login.yahoo.com">>,
             #{}
         )
     ),
@@ -84,7 +95,7 @@ load_well_known_openid_introspections(_Config) ->
     ?assertMatch(
         {ok, {#oidcc_provider_configuration{}, _}},
         oidcc_provider_configuration:load_configuration(
-            <<"https://iam-test.indigo-datacloud.eu">>,
+            <<"https://iam-test.indigo-datacloud.eu/">>,
             #{}
         )
     ),
@@ -93,7 +104,7 @@ load_well_known_openid_introspections(_Config) ->
     ?assertMatch(
         {ok, {#oidcc_provider_configuration{}, _}},
         oidcc_provider_configuration:load_configuration(
-            <<"https://services.humanbrainproject.eu/oidc">>,
+            <<"https://services.humanbrainproject.eu/oidc/">>,
             #{}
         )
     ),

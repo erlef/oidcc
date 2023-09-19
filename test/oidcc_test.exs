@@ -37,7 +37,7 @@ defmodule OidccTest do
     test "works" do
       pid =
         start_supervised!(
-          {ProviderConfiguration.Worker, %{issuer: "https://accounts.google.com/"}}
+          {ProviderConfiguration.Worker, %{issuer: "https://accounts.google.com"}}
         )
 
       assert {:ok, _redirect_uri} =
@@ -54,7 +54,7 @@ defmodule OidccTest do
     test "works" do
       pid =
         start_supervised!(
-          {ProviderConfiguration.Worker, %{issuer: "https://accounts.google.com/"}}
+          {ProviderConfiguration.Worker, %{issuer: "https://accounts.google.com"}}
         )
 
       assert {:error, {:http_error, 400, _body}} =
@@ -72,7 +72,7 @@ defmodule OidccTest do
     test "works" do
       pid =
         start_supervised!(
-          {ProviderConfiguration.Worker, %{issuer: "https://accounts.google.com/"}}
+          {ProviderConfiguration.Worker, %{issuer: "https://accounts.google.com"}}
         )
 
       assert {:error, {:http_error, 401, _body}} =
@@ -97,7 +97,9 @@ defmodule OidccTest do
   describe inspect(&Oidcc.introspect_token/5) do
     test "works" do
       pid =
-        start_supervised!({ProviderConfiguration.Worker, %{issuer: "https://login.yahoo.com"}})
+        start_supervised!(
+          {ProviderConfiguration.Worker, %{issuer: "https://api.login.yahoo.com"}}
+        )
 
       assert {:error, {:http_error, 400, _body}} =
                Oidcc.introspect_token(
@@ -120,7 +122,9 @@ defmodule OidccTest do
   describe inspect(&Oidcc.retrieve_userinfo/5) do
     test "works" do
       pid =
-        start_supervised!({ProviderConfiguration.Worker, %{issuer: "https://login.yahoo.com"}})
+        start_supervised!(
+          {ProviderConfiguration.Worker, %{issuer: "https://api.login.yahoo.com"}}
+        )
 
       assert {:error, {:http_error, 401, _body}} =
                Oidcc.retrieve_userinfo(

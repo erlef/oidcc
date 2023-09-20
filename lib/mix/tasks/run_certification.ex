@@ -77,7 +77,7 @@ defmodule Mix.Tasks.RunCertification do
     Application.put_env(:logger, :log, path: log_file, level: :debug)
     Logger.add_backend({LoggerFileBackend, :log})
 
-    Application.ensure_all_started(:conformance)
+    {:ok, _apps} = Application.ensure_all_started(:conformance)
     JOSE.unsecured_signing(true)
 
     Process.register(self(), Conformance.Runner)

@@ -1,6 +1,11 @@
 -module(oidcc_authorization_test).
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("jose/include/jose_jwe.hrl").
+-include_lib("jose/include/jose_jwk.hrl").
+-include_lib("jose/include/jose_jws.hrl").
+-include_lib("jose/include/jose_jwt.hrl").
+-include_lib("oidcc/include/oidcc_provider_configuration.hrl").
 
 create_redirect_url_test() ->
     PrivDir = code:priv_dir(oidcc),
@@ -78,5 +83,117 @@ create_redirect_url_test() ->
     ExpUrl6 =
         <<"https://my.provider/auth?scope=openid&code_challenge=foo&code_challenge_method=plain&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
     ?assertEqual(ExpUrl6, iolist_to_binary(Url6)),
+
+    ok.
+
+create_redirect_url_with_request_object_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    %% Enable none algorithm for test
+    jose:unsecured_signing(true),
+
+    {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, #oidcc_provider_configuration{issuer = Issuer} = Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ValidConfigString)
+    ),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        request_parameter_supported = true,
+        request_object_signing_alg_values_supported = [
+            <<"none">>,
+            <<"HS256">>,
+            <<"RS256">>,
+            <<"PS256">>,
+            <<"ES256">>,
+            <<"EdDSA">>
+        ],
+        request_object_encryption_alg_values_supported = [
+            <<"RSA1_5">>,
+            <<"RSA-OAEP">>,
+            <<"RSA-OAEP-256">>,
+            <<"RSA-OAEP-384">>,
+            <<"RSA-OAEP-512">>,
+            <<"ECDH-ES">>,
+            <<"ECDH-ES+A128KW">>,
+            <<"ECDH-ES+A192KW">>,
+            <<"ECDH-ES+A256KW">>,
+            <<"A128KW">>,
+            <<"A192KW">>,
+            <<"A256KW">>,
+            <<"A128GCMKW">>,
+            <<"A192GCMKW">>,
+            <<"A256GCMKW">>,
+            <<"dir">>
+        ],
+        request_object_encryption_enc_values_supported = [
+            <<"A128CBC-HS256">>,
+            <<"A192CBC-HS384">>,
+            <<"A256CBC-HS512">>,
+            <<"A128GCM">>,
+            <<"A192GCM">>,
+            <<"A256GCM">>
+        ]
+    },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"at_least_32_character_client_secret">>,
+
+    Jwks0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    Jwks = Jwks0#jose_jwk{fields = #{<<"use">> => <<"enc">>}},
+
+    RedirectUri = <<"https://my.server/return">>,
+
+    ClientContext =
+        oidcc_client_context:from_manual(Configuration, Jwks, ClientId, ClientSecret),
+
+    {ok, Url} = oidcc_authorization:create_redirect_url(ClientContext, #{
+        redirect_uri => RedirectUri
+    }),
+
+    ?assertMatch(<<"https://my.provider/auth?request=", _/binary>>, iolist_to_binary(Url)),
+
+    #{query := QueryString} = uri_string:parse(Url),
+    QueryParams0 = uri_string:dissect_query(QueryString),
+    QueryParams1 = lists:map(
+        fun({Key, Value}) -> {list_to_binary(Key), list_to_binary(Value)} end, QueryParams0
+    ),
+    QueryParams = maps:from_list(QueryParams1),
+
+    ?assertMatch(
+        #{
+            <<"client_id">> := <<"client_id">>,
+            <<"redirect_uri">> := <<"https://my.server/return">>,
+            <<"response_type">> := <<"code">>,
+            <<"scope">> := <<"openid">>,
+            <<"request">> := _
+        },
+        QueryParams
+    ),
+
+    {SignedToken, Jwe} = jose_jwe:block_decrypt(Jwks, maps:get(<<"request">>, QueryParams)),
+
+    ?assertMatch(#jose_jwe{alg = {jose_jwe_alg_rsa, _}}, Jwe),
+
+    {true, Jwt, Jws} = jose_jwt:verify(jose_jwk:from_oct(ClientSecret), SignedToken),
+
+    ?assertMatch(#jose_jws{alg = {jose_jws_alg_hmac, 'HS256'}}, Jws),
+
+    ?assertMatch(
+        #jose_jwt{
+            fields = #{
+                <<"aud">> := Issuer,
+                <<"client_id">> := ClientId,
+                <<"exp">> := _,
+                <<"iat">> := _,
+                <<"iss">> := ClientId,
+                <<"jti">> := _,
+                <<"nbf">> := _,
+                <<"redirect_uri">> := RedirectUri,
+                <<"response_type">> := <<"code">>,
+                <<"scope">> := <<"openid">>
+            }
+        },
+        Jwt
+    ),
 
     ok.

@@ -7,6 +7,11 @@ This branch contains support materials for the certification.
 * `/[VERSION]/[PROFILE]/PLAN.txt` - Public Link to Test Plan
 * `/[VERSION]/[PROFILE]/[TEST_NAME].png` - Screenshot of token response / error
 * `/[VERSION]/[PROFILE]/Certification of Conformance.pdf` - Certification PDF
+* `/submitted_certifications/Erlang_Ecosystem_Foundation-oidcc-[PROFILE]-[DATE].zip`
+  - Submitted Certification Archive
+
+All `.png` files should be compressed using a tool like
+[`optipng`](https://optipng.sourceforge.net/).
 
 ## Conformance Testing
 
@@ -22,20 +27,7 @@ This branch contains support materials for the certification.
 - **Relevant for Certification: Yes**
 - Id: `oidcc-client-basic-certification-test-plan`
 - Request Type: `plain_http_request`
-- Client Registration Type: `static_client`
-- Config
-
-```json
-{
-  "alias": "test",
-  "description": "test",
-  "client": {
-    "client_id": "client_id",
-    "client_secret": "client_secret",
-    "redirect_uri": "http://localhost:4000/callback"
-  }
-}
-```
+- Client Registration Type: `dynamic_client`
 
 #### OpenID Connect Core Client Tests: Comprehensive client test
 
@@ -47,21 +39,8 @@ This branch contains support materials for the certification.
 - Client Authentication Type: `client_secret_post`
 - Request Type: `plain_http_request`
 - Response Type: `code`
-- Client Registration Type: `static_client`
+- Client Registration Type: `dynamic_client`
 - Response Mode: `default`
-- Config
-
-```json
-{
-  "alias": "test",
-  "description": "test",
-  "client": {
-    "client_id": "client_id",
-    "client_secret": "client_secret",
-    "redirect_uri": "http://localhost:4000/callback"
-  }
-}
-```
 
 #### OpenID Connect Core Client Refresh Token Profile Tests: Relying party refresh token tests
 
@@ -70,48 +49,62 @@ This branch contains support materials for the certification.
 - Client Authentication Type: `client_secret_basic`
 - Request Type: `plain_http_request`
 - Response Type: `code`
-- Client Registration Type: `static_client`
+- Client Registration Type: `dynamic_client`
 - Response Mode: `form_post`
-- Config
-
-```json
-{
-  "alias": "test",
-  "description": "test",
-  "client": {
-    "client_id": "client_id",
-    "client_secret": "client_secret",
-    "redirect_uri": "http://localhost:4000/callback"
-  }
-}
-```
 
 #### OpenID Connect Core: Form Post Basic Certification Profile Relying Party Tests
 
 - **Relevant for Certification: Yes**
 - Id: `oidcc-client-formpost-basic-certification-test-plan`
 - Request Type: `plain_http_request`
-- Client Registration Type: `static_client`
-- Config
+- Client Registration Type: `dynamic_client`
 
-```json
-{
-  "alias": "test",
-  "description": "test",
-  "client": {
-    "client_id": "client_id",
-    "client_secret": "client_secret",
-    "redirect_uri": "http://localhost:4000/callback"
-  }
-}
-```
+#### OpenID Connect Core: Configuration Certification Profile Relying Party Tests
+
+- **Relevant for Certification: Yes**
+- Id: `oidcc-client-config-certification-test-plan`
+- Client Authentication Type: `client_secret_basic`
+- Request Type: `plain_http_request`
+- Response Mode: `default`
+- Client Registration Type: `dynamic_client`
+
+#### OpenID Connect Core Client Login Tests: Relying party 3rd party initiated login tests
+
+- **Relevant for Certification: Yes**
+- Id: `oidcc-client-test-3rd-party-init-login-test-plan`
+- Client Authentication Type: `client_secret_basic`
+- Request Type: `plain_http_request`
+- Response Mode: `default`
+- Client Registration Type: `dynamic_client`
 
 ## How to Execute the tests
 
+### Setup
+
+```console
+mix deps.get
+```
+
+### Run
+
 - Open Plan / Specific Test
-- Start `./conformance_test_server.exs [alias]`
-- Open http://localhost:4000/authorize in your Browser
+- Execute the Conformance runner:
+  ```console
+  mix run_certification \
+    --profile [PROFILE_NAME] \
+    --test-name [TEST_NAME] \
+    --alias [ALIAS] \ # Alias in www.certification.openid.net; Default "test"
+    --version [VERSION] \ # Version to file Result artifacts for; Default "dev"
+    --[no-]register-client \ # Run Client Registration; Default true; Disable for config only tests
+    --[no-]start-server \ # Run Web Server; Default true; Disable for config / client only tests
+    --[no-]auto-stop \ # Auto Stop when result is received; Default true; Disable for tests with multiple actions
+    --[no-]auto-open \ # Auto open browser; Default false; Requires `xdg-open`
+    --[no-]auto-screenshot # Auto screenshot window; Default false; Requires `gnome-screenshot` & `optipng`
+  ```
+- Open http://localhost:4000/authorize in your Browser (or `auto-open`)
+- Follow Test Protocol
 - Test should pass
+- Upload Screenshot to Test Protocol
 
 ## How to Submit Certification
 

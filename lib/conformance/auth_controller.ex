@@ -63,12 +63,12 @@ defmodule Conformance.AuthController do
         {:error, reason} -> error_response(conn, reason)
       end
 
-      spawn(fn ->
-        Process.sleep(2_000)
+    spawn(fn ->
+      Process.sleep(2_000)
 
-        Conformance.Screenshot.take()
-        Process.send(Conformance.Runner, :stop, [])
-      end)
+      Conformance.Screenshot.take()
+      Process.send(Conformance.Runner, :stop, [])
+    end)
 
     conn
   end

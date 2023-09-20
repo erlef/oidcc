@@ -1,5 +1,5 @@
-# Ignore Dev Runs
-/dev
+# Ignore In Progress Certifications
+/test_plans
 
 # The directory Mix will write compiled artifacts to.
 /_build/

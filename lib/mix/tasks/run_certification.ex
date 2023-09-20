@@ -67,9 +67,7 @@ defmodule Mix.Tasks.RunCertification do
       |> Keyword.put_new(:auto_screenshot, false)
       |> Map.new()
 
-
-
-    artifact_out_dir = Path.join([@project_root, version, profile])
+    artifact_out_dir = Path.join([@project_root, "test_plans", version, profile])
     log_file = Path.join(artifact_out_dir, "#{test_name}.log")
 
     if File.exists?(log_file) do
@@ -84,10 +82,10 @@ defmodule Mix.Tasks.RunCertification do
 
     Process.register(self(), Conformance.Runner)
 
-    Application.put_env(:conformance, Conformance.Screenshot, [
+    Application.put_env(:conformance, Conformance.Screenshot,
       enable: auto_screenshot?,
-      path: Path.join(artifact_out_dir, "#{test_name}.png"),
-    ])
+      path: Path.join(artifact_out_dir, "#{test_name}.png")
+    )
 
     {:ok, _pid} =
       Conformance.Supervisor.start_link(
@@ -96,9 +94,9 @@ defmodule Mix.Tasks.RunCertification do
         start_server?: start_server?
       )
 
-      if start_server? and auto_open? do
-        System.cmd("xdg-open", [Conformance.Endpoint.url() <> "/authorize"])
-      end
+    if start_server? and auto_open? do
+      System.cmd("xdg-open", [Conformance.Endpoint.url() <> "/authorize"])
+    end
 
     if auto_stop? do
       receive do

@@ -4,14 +4,7 @@ This branch contains support materials for the certification.
 
 ## Files
 
-* `/[VERSION]/[PROFILE]/PLAN.txt` - Public Link to Test Plan
-* `/[VERSION]/[PROFILE]/[TEST_NAME].png` - Screenshot of token response / error
-* `/[VERSION]/[PROFILE]/Certification of Conformance.pdf` - Certification PDF
-* `/submitted_certifications/Erlang_Ecosystem_Foundation-oidcc-[PROFILE]-[DATE].zip`
-  - Submitted Certification Archive
-
-All `.png` files should be compressed using a tool like
-[`optipng`](https://optipng.sourceforge.net/).
+* `/submitted_certifications/Erlang_Ecosystem_Foundation-oidcc-[PROFILE]-[DATE].zip` - Finalized Certification
 
 ## Conformance Testing
 
@@ -85,6 +78,16 @@ All `.png` files should be compressed using a tool like
 mix deps.get
 ```
 
+Optionally, you can mount the certification branch in your worktree:
+
+```console
+git worktree add \
+  --track \
+  -b openid-foundation-certification \
+  certification \
+  origin/openid-foundation-certification
+```
+
 ### Run
 
 - Open Plan / Specific Test
@@ -106,11 +109,23 @@ mix deps.get
 - Test should pass
 - Upload Screenshot to Test Protocol
 
-## How to Submit Certification
+### Package Certification
 
-- Execute all `Relevant for Certification` profiles
-- All results must be passed (green) or skipped (orange)
-- Follow steps here: https://openid.net/certification/connect_rp_submission/
-- All support files must be added to the `openid-foundation-certification` branch
-  - To mount the branch in your worktree, call:
-    `git worktree add --track -b openid-foundation-certification certification origin/openid-foundation-certification`
+After all tests have completed, prepare the publication.
+
+- Create `Certification of Conformance.pdf` in `test_plans/[VERSION]/[PROFILE]`
+- Package Client Data
+  ```console
+  mix package_client_data \
+    --version [VERSION] \
+    --profile [PROFILE]
+  ```
+- Upload signed
+  [Certification of Conformance](https://openid.net/wordpress-content/uploads/2021/07/OpenID-Certification-of-Conformance.pdf) and
+  `test_plans/[VERSION]/[PROFILE]/client-data.zip` via
+  `Publish for certification` in certification.openid.net / Plan
+- File downloaded `.zip` as
+  `/submitted_certifications/Erlang_Ecosystem_Foundation-oidcc-[PROFILE]-[DATE].zip`
+- Commit & Push File into PR
+- Once merged, fill out the
+  [certification request form](https://openid.atlassian.net/servicedesk/customer/portal/3/group/3/create/10016).

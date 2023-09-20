@@ -1,0 +1,309 @@
+%%%-------------------------------------------------------------------
+%% @doc Dynamic Client Registration Utilities
+%%
+%% See [https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata]
+%%
+%% <h2>Records</h2>
+%%
+%% To use the record, import the definition:
+%%
+%% ```
+%% -include_lib(["oidcc/include/oidcc_client_registration.hrl"]).
+%% '''
+%%
+%% <h2>Telemetry</h2>
+%%
+%% See {@link 'Elixir.Oidcc.ClientRegistration'}
+%% @end
+%% @since 3.0.0
+%%%-------------------------------------------------------------------
+-module(oidcc_client_registration).
+
+-feature(maybe_expr, enable).
+
+-include("oidcc_client_registration.hrl").
+-include("oidcc_provider_configuration.hrl").
+
+-export([register/3]).
+
+-export_type([error/0]).
+-export_type([opts/0]).
+-export_type([response/0]).
+-export_type([t/0]).
+
+-type opts() :: #{
+    initial_access_token => binary() | undefined,
+    request_opts => oidcc_http_util:request_opts()
+}.
+% Configure configuration loading / parsing
+%
+% <h2>Parameters</h2>
+%
+% <ul>
+%   <li>`initial_access_token' - Access Token for registration</li>
+%   <li>`request_opts' - config for HTTP request</li>
+% </ul>
+
+-type t() ::
+    #oidcc_client_registration{
+        redirect_uris :: [uri_string:uri_string()],
+        response_types :: [binary()] | undefined,
+        grant_types :: [binary()] | undefined,
+        application_type :: web | native,
+        contacts :: [binary()] | undefined,
+        client_name :: binary() | undefined,
+        logo_uri :: uri_string:uri_string() | undefined,
+        client_uri :: uri_string:uri_string() | undefined,
+        policy_uri :: uri_string:uri_string() | undefined,
+        tos_uri :: uri_string:uri_string() | undefined,
+        jwks :: jose_jwk:key() | undefined,
+        jwks_uri :: uri_string:uri_string() | undefined,
+        sector_identifier_uri :: uri_string:uri_string() | undefined,
+        subject_type :: pairwise | public | undefined,
+        id_token_signed_response_alg :: binary() | undefined,
+        id_token_encrypted_response_alg :: binary() | undefined,
+        id_token_encrypted_response_enc :: binary() | undefined,
+        userinfo_signed_response_alg :: binary() | undefined,
+        userinfo_encrypted_response_alg :: binary() | undefined,
+        userinfo_encrypted_response_enc :: binary() | undefined,
+        request_object_signing_alg :: binary() | undefined,
+        request_object_encryption_alg :: binary() | undefined,
+        request_object_encryption_enc :: binary() | undefined,
+        %% @todo Remove ex_doc_gen_error when the following PR is merged
+        %% https://github.com/elixir-lang/ex_doc/pull/1763
+        token_endpoint_auth_method :: binary() | ex_doc_gen_error,
+        token_endpoint_auth_signing_alg :: binary() | undefined,
+        default_max_age :: pos_integer() | undefined,
+        require_auth_time :: boolean(),
+        default_acr_values :: [binary()] | undefined,
+        initiate_login_uri :: uri_string:uri_string() | undefined,
+        request_uris :: [uri_string:uri_string()] | undefined,
+        %% Unknown Fields
+        extra_fields :: #{binary() => term()}
+    }.
+%% Record containing Client Registration Metadata
+%%
+%% See [https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata]
+%%
+%% All unrecognized fields are stored in `extra_fields'.
+
+-type response() ::
+    #oidcc_client_registration_response{
+        %% @todo Remove ex_doc_gen_error when the following PR is merged
+        %% https://github.com/elixir-lang/ex_doc/pull/1763
+        client_id :: binary() | ex_doc_gen_error,
+        client_secret :: binary() | undefined,
+        registration_access_token :: binary() | undefined,
+        registration_client_uri :: uri_string:uri_string() | undefined,
+        client_id_issued_at :: pos_integer() | undefined,
+        client_secret_expires_at :: pos_integer() | undefined,
+        %% Unknown Fields
+        extra_fields :: #{binary() => term()}
+    }.
+%% Record containing Client Registration Response
+%%
+%% See [https://openid.net/specs/openid-connect-registration-1_0.html#RegistrationResponse]
+%%
+%% All unrecognized fields are stored in `extra_fields'.
+
+-type error() ::
+    registration_not_supported
+    | invalid_content_type
+    | oidcc_decode_util:error()
+    | oidcc_http_util:error().
+
+-telemetry_event(#{
+    event => [oidcc, register_client, start],
+    description => <<"Emitted at the start of registering the client">>,
+    measurements => <<"#{system_time => non_neg_integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, register_client, stop],
+    description => <<"Emitted at the end of registering the client">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, register_client, exception],
+    description => <<"Emitted at the end of registering the client">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string()}">>
+}).
+
+%% @doc Register Client
+%%
+%% <h2>Examples</h2>
+%%
+%% ```
+%% {ok, ProviderConfiguration} =
+%%   oidcc_provider_configuration:load_configuration("https://your.issuer"),
+%%
+%% {ok, #oidcc_client_registration_response{
+%%   client_id = ClientId,
+%%   client_secret = ClientSecret
+%% }} =
+%%   oidcc_client_registration:register(
+%%     ProviderConfiguration,
+%%     #oidcc_client_registration{
+%%       redirect_uris = ["https://your.application.com/oidcc/callback"]
+%%     },
+%%     #{initial_access_token => <<"optional token you got from the provider">>}
+%%   ).
+%% '''
+%% @end
+%% @since 3.0.0
+-spec register(ProviderConfiguration, Registration, Opts) ->
+    {ok, response()} | {error, error()}
+when
+    ProviderConfiguration :: oidcc_provider_configuration:t(),
+    Registration :: t(),
+    Opts :: opts().
+register(#oidcc_provider_configuration{registration_endpoint = undefined}, _Registration, _Opts) ->
+    {error, registration_not_supported};
+register(
+    #oidcc_provider_configuration{issuer = Issuer, registration_endpoint = RegistrationEndpoint},
+    Registration,
+    Opts
+) ->
+    RegistrationBody = encode(Registration),
+    TelemetryOpts = #{topic => [oidcc, register_client], extra_meta => #{issuer => Issuer}},
+    RequestOpts = maps:get(request_opts, Opts, #{}),
+    Headers = case maps:get(initial_access_token, Opts, undefined) of
+        undefined -> [];
+        Token -> [{"authorization", ["Bearer ", Token]}]
+    end,
+    Request = {RegistrationEndpoint, Headers, "application/json", RegistrationBody},
+
+    maybe
+        {ok, {{json, ResponseMap}, _Headers}} ?= oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
+        {ok, #oidcc_client_registration_response{} = Response} ?= decode_response(ResponseMap),
+        {ok, Response}
+    else
+        {error, Reason} -> {error, Reason};
+        {ok, {{_Format, _Body}, _}} -> {error, invalid_content_type}
+    end.
+
+-spec decode_response(Response) -> {ok, response()} | {error, error()} when Response :: map().
+decode_response(Response) ->
+    case
+        oidcc_decode_util:extract(
+            Response,
+            [
+                {required, client_id, fun oidcc_decode_util:parse_setting_binary/2},
+                {optional, client_secret, undefined, fun oidcc_decode_util:parse_setting_binary/2},
+                {optional, registration_access_token, undefined,
+                    fun oidcc_decode_util:parse_setting_binary/2},
+                {optional, registration_client_uri, undefined,
+                    fun oidcc_decode_util:parse_setting_uri_https/2},
+                {optional, client_id_issued_at, undefined,
+                    fun oidcc_decode_util:parse_setting_number/2},
+                {optional, client_secret_expires_at, undefined,
+                    fun oidcc_decode_util:parse_setting_number/2}
+            ],
+            #{}
+        )
+    of
+        {ok, {
+            #{
+                client_id := ClientId,
+                client_secret := ClientSecret,
+                registration_access_token := RegistrationAccessToken,
+                registration_client_uri := RegistrationClientUri,
+                client_id_issued_at := ClientIdIssuedAt,
+                client_secret_expires_at := ClientSecretExpiresAt
+            },
+            ExtraFields
+        }} ->
+            {ok, #oidcc_client_registration_response{
+                client_id = ClientId,
+                client_secret = ClientSecret,
+                registration_access_token = RegistrationAccessToken,
+                registration_client_uri = RegistrationClientUri,
+                client_id_issued_at = ClientIdIssuedAt,
+                client_secret_expires_at = ClientSecretExpiresAt,
+                extra_fields = ExtraFields
+            }};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+-spec encode(Metadata) -> binary() when Metadata :: t().
+encode(#oidcc_client_registration{
+    redirect_uris = RedirectUris,
+    response_types = ResponseTypes,
+    grant_types = GrantTypes,
+    application_type = ApplicationType,
+    contacts = Contacts,
+    client_name = ClientName,
+    logo_uri = LogoUri,
+    client_uri = ClientUri,
+    policy_uri = PolicyUri,
+    tos_uri = TosUri,
+    jwks = Jwks,
+    sector_identifier_uri = SectorIdentifierUri,
+    subject_type = SubjectType,
+    id_token_signed_response_alg = IdTokenSignedResponseAlg,
+    id_token_encrypted_response_alg = IdTokenencryptedResponseAlg,
+    id_token_encrypted_response_enc = IdTokenEncryptedResponseEnc,
+    userinfo_signed_response_alg = UserinfoSignedResponseAlg,
+    userinfo_encrypted_response_alg = UserinfoEncryptedResponseAlg,
+    userinfo_encrypted_response_enc = UserinfoEncryptedResponseEnc,
+    request_object_signing_alg = RequestObjectSigningAlg,
+    request_object_encryption_alg = RequestObjectEncryptionAlg,
+    request_object_encryption_enc = RequestObjectEncryptionEnc,
+    token_endpoint_auth_method = TokenEndpointAuthMethod,
+    token_endpoint_auth_signing_alg = TokenEndpointAuthSigningAlg,
+    default_max_age = DefaultMaxAge,
+    require_auth_time = RequireAuthTime,
+    default_acr_values = DefaultAcrValues,
+    initiate_login_uri = InitiateLoginUri,
+    request_uris = RequestUris,
+    extra_fields = ExtraFields
+}) ->
+    Map0 = #{
+        redirect_uris => RedirectUris,
+        response_types => ResponseTypes,
+        grant_types => GrantTypes,
+        application_type => ApplicationType,
+        contacts => Contacts,
+        client_name => ClientName,
+        logo_uri => LogoUri,
+        client_uri => ClientUri,
+        policy_uri => PolicyUri,
+        tos_uri => TosUri,
+        jwks =>
+            case Jwks of
+                undefined -> undefined;
+                _ -> jose_jwk:to_map(Jwks)
+            end,
+        sector_identifier_uri => SectorIdentifierUri,
+        subject_type => SubjectType,
+        id_token_signed_response_alg => IdTokenSignedResponseAlg,
+        id_token_encrypted_response_alg => IdTokenencryptedResponseAlg,
+        id_token_encrypted_response_enc => IdTokenEncryptedResponseEnc,
+        userinfo_signed_response_alg => UserinfoSignedResponseAlg,
+        userinfo_encrypted_response_alg => UserinfoEncryptedResponseAlg,
+        userinfo_encrypted_response_enc => UserinfoEncryptedResponseEnc,
+        request_object_signing_alg => RequestObjectSigningAlg,
+        request_object_encryption_alg => RequestObjectEncryptionAlg,
+        request_object_encryption_enc => RequestObjectEncryptionEnc,
+        token_endpoint_auth_method => TokenEndpointAuthMethod,
+        token_endpoint_auth_signing_alg => TokenEndpointAuthSigningAlg,
+        default_max_age => DefaultMaxAge,
+        require_auth_time => RequireAuthTime,
+        default_acr_values => DefaultAcrValues,
+        initiate_login_uri => InitiateLoginUri,
+        request_uris => RequestUris,
+        extra_fields => ExtraFields
+    },
+    Map = maps:filter(
+        fun
+            (_Key, undefined) -> false;
+            (_Key, _Value) -> true
+        end,
+        Map0
+    ),
+    jose:encode(Map).

@@ -1,6 +1,7 @@
 {
  "issuer": "https://my.provider",
  "authorization_endpoint": "https://my.provider/auth",
+ "registration_endpoint": "https://my.provider/register",
  "device_authorization_endpoint": "https://my.provider/device/code",
  "token_endpoint": "https://my.provider/token",
  "introspection_endpoint": "https://my.provider/introspection",

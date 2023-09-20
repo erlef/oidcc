@@ -107,19 +107,8 @@
 
 -type error() ::
     invalid_content_type
-    | {missing_config_property, Key :: atom()}
-    | {invalid_config_property, {
-        Type ::
-            uri
-            | uri_https
-            | list_of_binaries
-            | boolean
-            | scopes_including_openid
-            | enum
-            | alg_no_none,
-        Field :: atom()
-    }}
     | {issuer_mismatch, Issuer :: binary()}
+    | oidcc_decode_util:error()
     | oidcc_http_util:error().
 
 -define(DEFAULT_CONFIG_EXPIRY, timer:minutes(15)).
@@ -297,72 +286,72 @@ decode_configuration(Configuration) ->
                 IntrospectionEndpointAuthSigningAlgValuesSupported,
             code_challenge_methods_supported := CodeChallengeMethodsSupported},
           ExtraFields}} ?=
-            configuration_extract(Configuration,
-                             [{required, issuer, fun parse_setting_uri/2},
-                              {required, authorization_endpoint, fun parse_setting_uri/2},
-                              {optional, token_endpoint, undefined, fun parse_setting_uri/2},
+          oidcc_decode_util:extract(Configuration,
+                             [{required, issuer, fun oidcc_decode_util:parse_setting_uri/2},
+                              {required, authorization_endpoint, fun oidcc_decode_util:parse_setting_uri/2},
+                              {optional, token_endpoint, undefined, fun oidcc_decode_util:parse_setting_uri/2},
                               {optional,
                                userinfo_endpoint,
                                undefined,
-                               fun parse_setting_uri_https/2},
-                              {required, jwks_uri, fun parse_setting_uri/2},
-                              {optional, registration_endpoint, undefined, fun parse_setting_uri/2},
+                               fun oidcc_decode_util:parse_setting_uri_https/2},
+                              {required, jwks_uri, fun oidcc_decode_util:parse_setting_uri/2},
+                              {optional, registration_endpoint, undefined, fun oidcc_decode_util:parse_setting_uri/2},
                               {required, scopes_supported, fun parse_scopes_supported/2},
-                              {required, response_types_supported, fun parse_setting_binary_list/2},
+                              {required, response_types_supported, fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                response_modes_supported,
                                [<<"query">>, <<"fragment">>],
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                grant_types_supported,
                                [<<"authorization_code">>, <<"implicit">>],
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                acr_values_supported,
                                undefined,
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {required,
                                subject_types_supported,
                                fun parse_subject_types_supported/2},
                               {required,
                                id_token_signing_alg_values_supported,
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                id_token_encryption_alg_values_supported,
                                undefined,
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                id_token_encryption_enc_values_supported,
                                undefined,
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                userinfo_signing_alg_values_supported,
                                undefined,
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                userinfo_encryption_alg_values_supported,
                                undefined,
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                userinfo_encryption_enc_values_supported,
                                undefined,
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                request_object_signing_alg_values_supported,
                                undefined,
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                request_object_encryption_alg_values_supported,
                                undefined,
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                request_object_encryption_enc_values_supported,
                                undefined,
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                token_endpoint_auth_methods_supported,
                                undefined,
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                token_endpoint_auth_signing_alg_values_supported,
                                undefined,
@@ -370,7 +359,7 @@ decode_configuration(Configuration) ->
                               {optional,
                                display_values_supported,
                                undefined,
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                claim_types_supported,
                                [normal],
@@ -378,39 +367,39 @@ decode_configuration(Configuration) ->
                               {optional,
                                claims_supported,
                                undefined,
-                               fun parse_setting_binary_list/2},
-                              {optional, service_documentation, undefined, fun parse_setting_uri/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
+                              {optional, service_documentation, undefined, fun oidcc_decode_util:parse_setting_uri/2},
                               {optional,
                                claims_locales_supported,
                                undefined,
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                ui_locales_supported,
                                undefined,
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                claims_parameter_supported,
                                false,
-                               fun parse_setting_boolean/2},
+                               fun oidcc_decode_util:parse_setting_boolean/2},
                               {optional,
                                request_parameter_supported,
                                false,
-                               fun parse_setting_boolean/2},
+                               fun oidcc_decode_util:parse_setting_boolean/2},
                               {optional,
                                request_uri_parameter_supported,
                                true,
-                               fun parse_setting_boolean/2},
+                               fun oidcc_decode_util:parse_setting_boolean/2},
                               {optional,
                                require_request_uri_registration,
                                false,
-                               fun parse_setting_boolean/2},
-                              {optional, op_policy_uri, undefined, fun parse_setting_uri/2},
-                              {optional, op_tos_uri, undefined, fun parse_setting_uri/2},
-                              {optional, revocation_endpoint, undefined, fun parse_setting_uri/2},
+                               fun oidcc_decode_util:parse_setting_boolean/2},
+                              {optional, op_policy_uri, undefined, fun oidcc_decode_util:parse_setting_uri/2},
+                              {optional, op_tos_uri, undefined, fun oidcc_decode_util:parse_setting_uri/2},
+                              {optional, revocation_endpoint, undefined, fun oidcc_decode_util:parse_setting_uri/2},
                               {optional,
                                revocation_endpoint_auth_methods_supported,
                                [<<"client_secret_basic">>],
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                revocation_endpoint_auth_signing_alg_values_supported,
                                undefined,
@@ -418,11 +407,11 @@ decode_configuration(Configuration) ->
                               {optional,
                                introspection_endpoint,
                                undefined,
-                               fun parse_setting_uri/2},
+                               fun oidcc_decode_util:parse_setting_uri/2},
                               {optional,
                                introspection_endpoint_auth_methods_supported,
                                [<<"client_secret_basic">>],
-                               fun parse_setting_binary_list/2},
+                               fun oidcc_decode_util:parse_setting_binary_list/2},
                               {optional,
                                introspection_endpoint_auth_signing_alg_values_supported,
                                undefined,
@@ -430,7 +419,7 @@ decode_configuration(Configuration) ->
                               {optional,
                                code_challenge_methods_supported,
                                undefined,
-                               fun parse_setting_binary_list/2}],
+                               fun oidcc_decode_util:parse_setting_binary_list/2}],
                              #{}),
         {ok,
          #oidcc_provider_configuration{issuer = Issuer,
@@ -496,45 +485,6 @@ decode_configuration(Configuration) ->
                                        extra_fields = ExtraFields}}
     end.
 
--spec configuration_extract(
-    Map :: #{binary() => term()},
-    Keys :: [{required, Key, ParseFn} | {optional, Key, Default, ParseFn}],
-    Acc :: #{atom() => term()}
-) ->
-    {ok, {Matched, Rest}} | {error, error()}
-when
-    Key :: atom(),
-    Default :: term(),
-    ParseFn :: fun((Setting :: term(), Key) -> {ok, term()} | {error, error()}),
-    Matched :: #{Key => Default | undefined | term()},
-    Rest :: #{binary() => term()}.
-configuration_extract(Map1, [{required, Key, ParseFn} | RestKeys], Acc) ->
-    case maps:take(atom_to_binary(Key), Map1) of
-        {Value, Map2} ->
-            case ParseFn(Value, Key) of
-                {ok, Parsed} ->
-                    configuration_extract(Map2, RestKeys, maps:put(Key, Parsed, Acc));
-                {error, Reason} ->
-                    {error, Reason}
-            end;
-        error ->
-            {error, {missing_config_property, Key}}
-    end;
-configuration_extract(Map1, [{optional, Key, Default, ParseFn} | RestKeys], Acc) ->
-    case maps:take(atom_to_binary(Key), Map1) of
-        {Value, Map2} ->
-            case ParseFn(Value, Key) of
-                {ok, Parsed} ->
-                    configuration_extract(Map2, RestKeys, maps:put(Key, Parsed, Acc));
-                {error, Reason} ->
-                    {error, Reason}
-            end;
-        error ->
-            configuration_extract(Map1, RestKeys, maps:put(Key, Default, Acc))
-    end;
-configuration_extract(Map, [], Acc) ->
-    {ok, {Acc, Map}}.
-
 -spec headers_to_deadline(Headers, Opts) -> pos_integer() when
     Headers :: [{Header :: binary(), Value :: binary()}], Opts :: opts().
 headers_to_deadline(Headers, Opts) ->
@@ -568,48 +518,10 @@ cache_deadline(Cache, Fallback) ->
         end,
     lists:foldl(MaxAge, Fallback, Entries).
 
--spec parse_setting_uri(Setting :: term(), Field :: atom()) ->
-    {ok, uri_string:uri_string()} | {error, error()}.
-parse_setting_uri(Setting, _Field) when is_binary(Setting) ->
-    {ok, Setting};
-parse_setting_uri(_Setting, Field) ->
-    {error, {invalid_config_property, {uri, Field}}}.
-
--spec parse_setting_uri_https(Setting :: term(), Field :: atom()) ->
-    {ok, uri_string:uri_string()} | {error, error()}.
-parse_setting_uri_https(Setting, Field) when is_binary(Setting) ->
-    case uri_string:parse(Setting) of
-        #{scheme := <<"https">>} ->
-            {ok, Setting};
-        #{scheme := _Scheme} ->
-            {error, {invalid_config_property, {uri_https, Field}}}
-    end;
-parse_setting_uri_https(_Setting, Field) ->
-    {error, {invalid_config_property, {uri_https, Field}}}.
-
--spec parse_setting_binary_list(Setting :: term(), Field :: atom()) ->
-    {ok, [binary()]} | {error, error()}.
-parse_setting_binary_list(Setting, Field) when is_list(Setting) ->
-    case lists:all(fun is_binary/1, Setting) of
-        true ->
-            {ok, Setting};
-        false ->
-            {error, {invalid_config_property, {list_of_binaries, Field}}}
-    end;
-parse_setting_binary_list(_Setting, Field) ->
-    {error, {invalid_config_property, {list_of_binaries, Field}}}.
-
--spec parse_setting_boolean(Setting :: term(), Field :: atom()) ->
-    {ok, boolean()} | {error, error()}.
-parse_setting_boolean(Setting, _Field) when is_boolean(Setting) ->
-    {ok, Setting};
-parse_setting_boolean(_Setting, Field) ->
-    {error, {invalid_config_property, {boolean, Field}}}.
-
 -spec parse_scopes_supported(Setting :: term(), Field :: atom()) ->
     {ok, [binary()]} | {error, error()}.
 parse_scopes_supported(Setting, Field) ->
-    case parse_setting_binary_list(Setting, Field) of
+    case oidcc_decode_util:parse_setting_binary_list(Setting, Field) of
         {ok, Scopes} ->
             case lists:member(<<"openid">>, Scopes) of
                 true ->
@@ -621,54 +533,10 @@ parse_scopes_supported(Setting, Field) ->
             {error, Reason}
     end.
 
--spec parse_setting_list_enum(
-    Setting :: term(),
-    Field :: atom(),
-    Parse :: fun((binary()) -> {ok, Value} | error)
-) ->
-    {ok, [Value]} | {error, error()}
-when
-    Value :: term().
-parse_setting_list_enum(Setting, Field, Parse) ->
-    case parse_setting_binary_list(Setting, Field) of
-        {ok, Values} ->
-            Parsed =
-                lists:map(
-                    fun(Value) ->
-                        case Parse(Value) of
-                            {ok, ParsedValue} ->
-                                {ok, ParsedValue};
-                            error ->
-                                {error, Value}
-                        end
-                    end,
-                    Values
-                ),
-
-            case
-                lists:filter(
-                    fun
-                        ({ok, _Value}) ->
-                            false;
-                        ({error, _Value}) ->
-                            true
-                    end,
-                    Parsed
-                )
-            of
-                [] ->
-                    {ok, lists:map(fun({ok, Value}) -> Value end, Parsed)};
-                [{error, _InvalidValue} | _Rest] ->
-                    {error, {invalid_config_property, {enum, Field}}}
-            end;
-        {error, Reason} ->
-            {error, Reason}
-    end.
-
 -spec parse_subject_types_supported(Setting :: term(), Field :: atom()) ->
     {ok, [binary()]} | {error, error()}.
 parse_subject_types_supported(Setting, Field) ->
-    parse_setting_list_enum(
+    oidcc_decode_util:parse_setting_list_enum(
         Setting,
         Field,
         fun
@@ -684,7 +552,7 @@ parse_subject_types_supported(Setting, Field) ->
 -spec parse_token_signing_alg_values_no_none(Setting :: term(), Field :: atom()) ->
     {ok, [binary()]} | {error, error()}.
 parse_token_signing_alg_values_no_none(Setting, Field) ->
-    case parse_setting_binary_list(Setting, Field) of
+    case oidcc_decode_util:parse_setting_binary_list(Setting, Field) of
         {ok, SigningAlgValues} ->
             case
                 lists:any(
@@ -709,7 +577,7 @@ parse_token_signing_alg_values_no_none(Setting, Field) ->
 -spec parse_claim_types_supported(Setting :: term(), Field :: atom()) ->
     {ok, [binary()]} | {error, error()}.
 parse_claim_types_supported(Setting, Field) ->
-    parse_setting_list_enum(
+    oidcc_decode_util:parse_setting_list_enum(
         Setting,
         Field,
         fun

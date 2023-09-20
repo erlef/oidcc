@@ -123,7 +123,9 @@ when
     StatusCode :: pos_integer(),
     HttpHeader :: http_header(),
     HttpBodyResult :: binary().
-extract_successful_response({{_HttpVersion, 200, _HttpStatusName}, Headers, HttpBodyResult}) ->
+extract_successful_response({{_HttpVersion, Status, _HttpStatusName}, Headers, HttpBodyResult}) when
+    Status == 200 orelse Status == 201
+->
     case fetch_content_type(Headers) of
         json ->
             {ok, {json, jose:decode(HttpBodyResult)}};

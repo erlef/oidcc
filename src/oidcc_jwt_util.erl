@@ -9,8 +9,11 @@
 -include_lib("jose/include/jose_jwt.hrl").
 
 -export([client_secret_oct_keys/2]).
+-export([encrypt/4]).
+-export([evaluate_for_all_keys/2]).
 -export([merge_jwks/2]).
 -export([refresh_jwks_fun/1]).
+-export([sign/3]).
 -export([verify_claims/2]).
 -export([verify_signature/3]).
 
@@ -124,7 +127,8 @@ client_secret_oct_keys(AllowedAlgorithms, ClientSecret) ->
             lists:member(<<"HS512">>, AllowedAlgorithms)
     of
         true ->
-            jose_jwk:from_oct(ClientSecret);
+            Jwk = jose_jwk:from_oct(ClientSecret),
+            Jwk#jose_jwk{fields = maps:merge(Jwk#jose_jwk.fields, #{<<"use">> => <<"sig">>})};
         false ->
             none
     end.
@@ -155,3 +159,100 @@ merge_jwks(#jose_jwk{} = Left, #jose_jwk{keys = {jose_jwk_set, _RightKeys}} = Ri
     merge_jwks(#jose_jwk{keys = {jose_jwk_set, [Left]}}, Right);
 merge_jwks(Left, Right) ->
     merge_jwks(Left, #jose_jwk{keys = {jose_jwk_set, [Right]}}).
+
+%% @private
+-spec sign(Jwt :: #jose_jwt{}, Jwk :: jose_jwk:key(), SupportedAlgorithms :: [binary()]) ->
+    {ok, binary()} | {error, no_supported_alg_or_key}.
+sign(_Jwt, _Jwk, []) ->
+    {error, no_supported_alg_or_key};
+sign(Jwt, Jwk, [Algorithm | RestAlgorithms]) ->
+    Jws = jose_jws:from_map(#{<<"alg">> => Algorithm}),
+    SigningCallback = fun
+        (#jose_jwk{fields = #{<<"use">> := <<"sig">>}} = Key) ->
+            try
+                {_Jws, Token} = jose_jws:compact(jose_jwt:sign(Key, Jws, Jwt)),
+                {ok, Token}
+            catch
+                error:not_supported -> error;
+                error:{not_supported, _Alg} -> error;
+                %% Some Keys crash if a public key is provided
+                error:function_clause -> error
+            end;
+        (#jose_jwk{} = Key) when Algorithm == <<"none">> ->
+            {_Jws, Token} = jose_jws:compact(jose_jwt:sign(Key, Jws, Jwt)),
+            {ok, Token};
+        (_Key) ->
+            error
+    end,
+    case evaluate_for_all_keys(Jwk, SigningCallback) of
+        {ok, Token} -> {ok, Token};
+        error -> sign(Jwt, Jwk, RestAlgorithms)
+    end.
+
+%% @private
+-spec encrypt(
+    Jwt :: binary(),
+    Jwk :: jose_jwk:key(),
+    SupportedAlgorithms :: [binary()],
+    SupportedEncValues :: [binary()]
+) ->
+    {ok, binary()} | {error, no_supported_alg_or_key}.
+encrypt(Jwt, Jwk, SupportedAlgorithms, SupportedEncValues) ->
+    encrypt(Jwt, Jwk, SupportedAlgorithms, SupportedEncValues, SupportedEncValues).
+
+-spec encrypt(
+    Jwt :: binary(),
+    Jwk :: jose_jwk:key(),
+    SupportedAlgorithms :: [binary()],
+    SupportedEncValues :: [binary()],
+    AccEncValues :: [binary()]
+) ->
+    {ok, binary()} | {error, no_supported_alg_or_key}.
+encrypt(_Jwt, _Jwk, [], _SupportedEncValues, _AccEncValues) ->
+    {error, no_supported_alg_or_key};
+encrypt(Jwt, Jwk, [_Algorithm | RestAlgorithms], SupportedEncValues, []) ->
+    encrypt(Jwt, Jwk, RestAlgorithms, SupportedEncValues, SupportedEncValues);
+encrypt(Jwt, Jwk, [Algorithm | _RestAlgorithms] = SupportedAlgorithms, SupportedEncValues, [
+    EncValue | RestEncValues
+]) ->
+    EncryptionCallback = fun
+        (#jose_jwk{fields = #{<<"use">> := <<"enc">>} = Fields} = Key) ->
+            try
+                JweParams0 = #{<<"alg">> => Algorithm, <<"enc">> => EncValue},
+                JweParams =
+                    case maps:get(<<"kid">>, Fields, undefined) of
+                        undefined -> JweParams0;
+                        Kid -> maps:put(<<"kid">>, Kid, JweParams0)
+                    end,
+                Jwe = jose_jwe:from_map(JweParams),
+                {_Jws, Token} = jose_jwe:compact(jose_jwk:block_encrypt(Jwt, Jwe, Key)),
+                {ok, Token}
+            catch
+                error:{not_supported, _Alg} -> error
+            end;
+        (_Key) ->
+            error
+    end,
+    case evaluate_for_all_keys(Jwk, EncryptionCallback) of
+        {ok, Token} -> {ok, Token};
+        error -> encrypt(Jwt, Jwk, SupportedAlgorithms, SupportedEncValues, RestEncValues)
+    end.
+
+%% @private
+-spec evaluate_for_all_keys(Jwk :: jose_jwk:key(), fun((jose_jwk:key()) -> {ok, Result} | error)) ->
+    {ok, Result} | error
+when
+    Result :: term().
+evaluate_for_all_keys(#jose_jwk{keys = {jose_jwk_set, Keys}}, Callback) ->
+    lists:foldl(
+        fun
+            (_Key, {ok, Result}) ->
+                {ok, Result};
+            (Key, error) ->
+                evaluate_for_all_keys(Key, Callback)
+        end,
+        error,
+        Keys
+    );
+evaluate_for_all_keys(#jose_jwk{} = Jwk, Callback) ->
+    Callback(Jwk).

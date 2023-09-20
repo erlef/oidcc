@@ -8,7 +8,7 @@
 retrieve_none_test() ->
     PrivDir = code:priv_dir(oidcc),
 
-    %% Enable none algorythm for test
+    %% Enable none algorithm for test
     jose:unsecured_signing(true),
 
     {ok, _} = application:ensure_all_started(oidcc),

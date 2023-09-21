@@ -162,6 +162,7 @@
 
 -type error() ::
     {missing_claim, MissingClaim :: binary(), Claims :: oidcc_jwt_util:claims()}
+    | no_supported_auth_method
     | bad_access_token_hash
     | sub_invalid
     | token_expired
@@ -172,6 +173,9 @@
         authorization_code | refresh_token | jwt_bearer | client_credentials}
     | oidcc_jwt_util:error()
     | oidcc_http_util:error().
+
+-type auth_method() ::
+    client_secret_basic | client_secret_post | client_secret_jwt | private_key_jwt.
 
 -telemetry_event(#{
     event => [oidcc, request_token, start],
@@ -762,91 +766,252 @@ when
     TelemetryOpts :: oidcc_http_util:telemetry_opts(),
     AuthenticateClient :: boolean().
 retrieve_a_token(QsBodyIn, Pkce, ClientContext, Opts, TelemetryOpts, AuthenticateClient) ->
-    #oidcc_client_context{provider_configuration = Configuration,
-                          client_id = ClientId,
-                          client_secret = Secret} =
+    #oidcc_client_context{provider_configuration = Configuration, client_jwks = ClientJwks} =
         ClientContext,
     #oidcc_provider_configuration{token_endpoint = TokenEndpoint,
                                   token_endpoint_auth_methods_supported = SupportedAuthMethods} =
         Configuration,
 
-    AuthMethod = select_preferred_auth(SupportedAuthMethods),
     Header0 = [{"accept", "application/jwt, application/json"}],
-    {Body, Header} = case AuthenticateClient of
-        true -> add_authentication_code_verifier(QsBodyIn, Header0, AuthMethod, ClientId, Secret, Pkce);
-        false -> {QsBodyIn, Header0}
+
+    Body0 = add_pkce(QsBodyIn, Pkce),
+
+    MaybeAuthMethod = case AuthenticateClient of
+        true -> select_preferred_auth(SupportedAuthMethods);
+        false -> {ok, none}
     end,
 
-    Request =
-        {TokenEndpoint,
-         Header,
-         "application/x-www-form-urlencoded",
-         uri_string:compose_query(Body)},
+    case MaybeAuthMethod of
+        {ok, AuthMethod} ->
+            maybe
+                {ok, {Body, Header}} ?= add_authentication(Body0, Header0, AuthMethod, ClientContext),
+                Request =
+                    {TokenEndpoint,
+                    Header,
+                    "application/x-www-form-urlencoded",
+                    uri_string:compose_query(Body)},
 
-         RequestOpts = maps:get(request_opts, Opts, #{}),
+                RequestOpts = maps:get(request_opts, Opts, #{}),
 
-    maybe
-        {ok, {{json, TokenResponse}, _Headers}} ?= oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
-        {ok, TokenResponse}
+                {ok, {{json, TokenResponse}, _Headers}} ?= oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
+                {ok, TokenResponse}
+            else
+                {error, auth_method_not_possible} ->
+                    retrieve_a_token(QsBodyIn, Pkce, ClientContext#oidcc_client_context{
+                        provider_configuration = Configuration#oidcc_provider_configuration{
+                            token_endpoint_auth_methods_supported =
+                                SupportedAuthMethods -- [atom_to_binary(AuthMethod)]
+                        }
+                    }, Opts, TelemetryOpts, AuthenticateClient);
+
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+
+        {error, Reason} ->
+            {error, Reason}
     end.
 
--spec select_preferred_auth(AuthMethodsSupported :: [binary(), ...]) ->
-    post | basic | undefined.
+-spec select_preferred_auth(AuthMethodsSupported) ->
+    {ok, auth_method()} | {error, error()}
+when
+    AuthMethodsSupported :: [binary(), ...].
 select_preferred_auth(AuthMethodsSupported) ->
-    Selector =
-        fun(Method, Current) ->
-            case {Method, Current} of
-                {_, post} ->
-                    post;
-                {<<"client_secret_basic">>, _} ->
-                    basic;
-                {<<"client_secret_post">>, _} ->
-                    post;
-                {_, Current} ->
-                    Current
-            end
+    MethodPriority = #{
+        client_secret_basic => 0,
+        client_secret_post => 1,
+        client_secret_jwt => 2,
+        private_key_jwt => 3
+    },
+    KnownAuthMethods = lists:filtermap(
+        fun
+            (<<"client_secret_basic">>) -> {true, client_secret_basic};
+            (<<"client_secret_post">>) -> {true, client_secret_post};
+            (<<"client_secret_jwt">>) -> {true, client_secret_jwt};
+            (<<"private_key_jwt">>) -> {true, private_key_jwt};
+            (_Other) -> false
         end,
-    lists:foldl(Selector, undefined, AuthMethodsSupported).
+        AuthMethodsSupported
+    ),
+    SortedAuthMethods = lists:usort(
+        fun(A, B) ->
+            maps:get(A, MethodPriority) > maps:get(B, MethodPriority)
+        end,
+        KnownAuthMethods
+    ),
 
--spec add_authentication_code_verifier(
+    case SortedAuthMethods of
+        [] -> {error, no_supported_auth_method};
+        [PriorityAuthMethod | _Rest] -> {ok, PriorityAuthMethod}
+    end.
+
+-spec add_authentication(
     QueryList,
     Header,
     AuthMethod,
-    ClientId,
-    ClientSecret,
-    Pkce
+    ClientContext
 ) ->
-    {oidcc_http_util:query_params(), [oidcc_http_util:http_header()]}
+    {ok, {oidcc_http_util:query_params(), [oidcc_http_util:http_header()]}}
+    | {error, auth_method_not_possible}
 when
     QueryList :: oidcc_http_util:query_params(),
     Header :: [oidcc_http_util:http_header()],
-    AuthMethod :: basic | post | undefined,
-    ClientId :: binary(),
-    ClientSecret :: binary(),
-    Pkce :: pkce() | undefined.
-add_authentication_code_verifier(
+    AuthMethod :: auth_method() | none,
+    ClientContext :: oidcc_client_context:t().
+add_authentication(
     QsBodyList,
     Header,
-    basic,
-    ClientId,
-    Secret,
-    undefined
+    client_secret_basic,
+    #oidcc_client_context{client_id = ClientId, client_secret = ClientSecret}
 ) ->
-    NewHeader = [oidcc_http_util:basic_auth_header(ClientId, Secret) | Header],
-    {QsBodyList, NewHeader};
-add_authentication_code_verifier(
+    NewHeader = [oidcc_http_util:basic_auth_header(ClientId, ClientSecret) | Header],
+    {ok, {QsBodyList, NewHeader}};
+add_authentication(
     QsBodyList,
     Header,
-    post,
-    ClientId,
-    ClientSecret,
-    undefined
+    client_secret_post,
+    #oidcc_client_context{client_id = ClientId, client_secret = ClientSecret}
 ) ->
     NewBodyList =
         [{<<"client_id">>, ClientId}, {<<"client_secret">>, ClientSecret} | QsBodyList],
-    {NewBodyList, Header};
-add_authentication_code_verifier(B, H, undefined, CI, CS, undefined) ->
-    add_authentication_code_verifier(B, H, basic, CI, CS, undefined);
-add_authentication_code_verifier(BodyQs, Header, AuthMethod, CI, CS, #{verifier := CV}) ->
-    BodyQs1 = [{<<"code_verifier">>, CV} | BodyQs],
-    add_authentication_code_verifier(BodyQs1, Header, AuthMethod, CI, CS, undefined).
+    {ok, {NewBodyList, Header}};
+add_authentication(
+    QsBodyList,
+    Header,
+    client_secret_jwt,
+    ClientContext
+) ->
+    #oidcc_client_context{
+        provider_configuration = ProviderConfiguration,
+        client_id = ClientId,
+        client_secret = ClientSecret
+    } = ClientContext,
+    #oidcc_provider_configuration{
+        token_endpoint_auth_signing_alg_values_supported = AllowAlgorithms
+    } = ProviderConfiguration,
+
+    %% At least one HS algorithmm must be present when using this method
+    AdjustedAllowAlgorithms = case lists:member(<<"HS256">>, AllowAlgorithms) or
+        lists:member(<<"HS384">>, AllowAlgorithms) or
+        lists:member(<<"HS512">>, AllowAlgorithms) of
+        true -> AllowAlgorithms;
+        false -> [<<"HS256">> | AllowAlgorithms]
+    end,
+    AdjustedProviderConfiguration = ProviderConfiguration#oidcc_provider_configuration{
+        token_endpoint_auth_signing_alg_values_supported = AdjustedAllowAlgorithms
+    },
+    AdjustedClientContext = ClientContext#oidcc_client_context{
+        provider_configuration = AdjustedProviderConfiguration
+    },
+
+    maybe
+        #jose_jwk{} = OctJwk ?= oidcc_jwt_util:client_secret_oct_keys(
+            AdjustedAllowAlgorithms,
+            ClientSecret
+        ),
+        {ok, ClientAssertion} ?= signed_client_assertion(
+            AdjustedClientContext,
+            OctJwk
+        ),
+        {ok, {
+            [
+                {"client_assertion_type",
+                    "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"},
+                {"client_assertion", ClientAssertion},
+                {"client_id", ClientId}
+                | QsBodyList
+            ],
+            Header
+        }}
+    else
+        none ->
+            {error, auth_method_not_possible};
+
+        {error, no_supported_alg_or_key} ->
+            {error, auth_method_not_possible}
+    end;
+add_authentication(
+    QsBodyList,
+    Header,
+    private_key_jwt,
+    ClientContext
+) ->
+    #oidcc_client_context{
+        client_id = ClientId,
+        client_jwks = ClientJwks
+    } = ClientContext,
+
+    maybe
+        #jose_jwk{} ?= ClientJwks,
+        {ok, ClientAssertion} ?= signed_client_assertion(ClientContext, ClientJwks),
+        {ok, {
+            [
+                {"client_assertion_type",
+                    "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"},
+                {"client_assertion", ClientAssertion},
+                {"client_id", ClientId}
+                | QsBodyList
+            ],
+            Header
+        }}
+    else
+        none ->
+            {error, auth_method_not_possible};
+
+        {error, no_supported_alg_or_key} ->
+            {error, auth_method_not_possible}
+    end;
+add_authentication(
+    QsBodyList,
+    Header,
+    none,
+    _ClientContext
+) ->
+    {ok, {QsBodyList, Header}}.
+
+-spec add_pkce(QueryList, Pkce) -> oidcc_http_util:query_params() when
+    QueryList :: oidcc_http_util:query_params(),
+    Pkce :: pkce() | undefined.
+add_pkce(BodyQs, #{verifier := CV}) ->
+    [{<<"code_verifier">>, CV} | BodyQs];
+add_pkce(BodyQs, undefined) ->
+    BodyQs.
+
+-spec signed_client_assertion(ClientContext, Jwk) -> {ok, binary()} | {error, error()} when
+    Jwk :: jose_jwk:key(),
+    ClientContext :: oidcc_client_context:t().
+signed_client_assertion(ClientContext, Jwk) ->
+    #oidcc_client_context{provider_configuration = ProviderConfiguration} = ClientContext,
+    #oidcc_provider_configuration{
+        token_endpoint_auth_signing_alg_values_supported = AllowAlgorithms
+    } = ProviderConfiguration,
+
+    Jwt = jose_jwt:from(token_request_claims(ClientContext)),
+
+    oidcc_jwt_util:sign(Jwt, Jwk, AllowAlgorithms).
+
+-spec token_request_claims(ClientContext) -> oidcc_jwt_util:claims() when
+    ClientContext :: oidcc_client_context:t().
+token_request_claims(#oidcc_client_context{
+    client_id = ClientId,
+    provider_configuration = #oidcc_provider_configuration{token_endpoint = TokenEndpoint}
+}) ->
+    MaxClockSkew =
+        case application:get_env(oidcc, max_clock_skew) of
+            undefined -> 0;
+            ClockSkew -> ClockSkew
+        end,
+
+    #{
+        <<"iss">> => ClientId,
+        <<"sub">> => ClientId,
+        <<"aud">> => TokenEndpoint,
+        <<"jti">> => random_string(32),
+        <<"iat">> => os:system_time(seconds),
+        <<"exp">> => os:system_time(seconds) + 30,
+        <<"nbf">> => os:system_time(seconds) - MaxClockSkew
+    }.
+
+-spec random_string(Bytes :: pos_integer()) -> binary().
+random_string(Bytes) ->
+    base64:encode(crypto:strong_rand_bytes(Bytes), #{mode => urlsafe, padding => false}).

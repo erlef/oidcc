@@ -141,6 +141,7 @@ attempt_request_object(QueryParams, #oidcc_client_context{
 attempt_request_object(QueryParams, #oidcc_client_context{
     client_id = ClientId,
     client_secret = ClientSecret,
+    client_jwks = ClientJwks,
     provider_configuration = #oidcc_provider_configuration{
         issuer = Issuer,
         request_parameter_supported = true,
@@ -150,19 +151,25 @@ attempt_request_object(QueryParams, #oidcc_client_context{
     },
     jwks = Jwks
 }) ->
+    JwksWithClientJwks =
+        case ClientJwks of
+            none -> Jwks;
+            #jose_jwk{} -> oidcc_jwt_util:merge_jwks(Jwks, ClientJwks)
+        end,
+
     SigningJwks =
         case oidcc_jwt_util:client_secret_oct_keys(SigningAlgSupported, ClientSecret) of
             none ->
                 Jwks;
             SigningOctJwk ->
-                oidcc_jwt_util:merge_jwks(Jwks, SigningOctJwk)
+                oidcc_jwt_util:merge_jwks(JwksWithClientJwks, SigningOctJwk)
         end,
     EncryptionJwks =
         case oidcc_jwt_util:client_secret_oct_keys(EncryptionAlgSupported, ClientSecret) of
             none ->
                 Jwks;
             EncryptionOctJwk ->
-                oidcc_jwt_util:merge_jwks(Jwks, EncryptionOctJwk)
+                oidcc_jwt_util:merge_jwks(JwksWithClientJwks, EncryptionOctJwk)
         end,
 
     MaxClockSkew =

@@ -21,7 +21,8 @@ defmodule Oidcc.ClientContext do
           provider_configuration: ProviderConfiguration.t(),
           jwks: JOSE.JWK.t(),
           client_id: String.t(),
-          client_secret: String.t()
+          client_secret: String.t(),
+          client_jwks: JOSE.JWK.t() | none
         }
 
   @doc """
@@ -46,21 +47,26 @@ defmodule Oidcc.ClientContext do
       ...>   Oidcc.ClientContext.from_configuration_worker(
       ...>     pid,
       ...>     "client_id",
-      ...>     "client_Secret"
+      ...>     "client_Secret",
+      ...>     %{client_jwks: JOSE.JWK.generate_key(16)}
       ...>   )
   """
   @doc since: "3.0.0"
   @spec from_configuration_worker(
           provider_name :: GenServer.name(),
           client_id :: String.t(),
-          client_secret :: String.t()
+          client_secret :: String.t(),
+          opts :: :oidcc_client_context.opts()
         ) :: {:ok, t()} | {:error, :oidcc_client_context.t()}
-  def from_configuration_worker(provider_name, client_id, client_secret) do
+  def from_configuration_worker(provider_name, client_id, client_secret, opts \\ %{}) do
+    opts = Map.update(opts, :client_jwks, :none, &JOSE.JWK.to_record/1)
+
     with {:ok, client_context} <-
            :oidcc_client_context.from_configuration_worker(
              provider_name,
              client_id,
-             client_secret
+             client_secret,
+             opts
            ) do
       {:ok, record_to_struct(client_context)}
     end
@@ -86,7 +92,8 @@ defmodule Oidcc.ClientContext do
       ...>     configuration,
       ...>     jwks,
       ...>     "client_id",
-      ...>     "client_Secret"
+      ...>     "client_Secret",
+      ...>     %{client_jwks: JOSE.JWK.generate_key(16)}
       ...>   )
   """
   @doc since: "3.0.0"
@@ -94,14 +101,16 @@ defmodule Oidcc.ClientContext do
           configuration :: ProviderConfiguration.t(),
           jwks :: JOSE.JWK.t(),
           client_id :: String.t(),
-          client_secret :: String.t()
+          client_secret :: String.t(),
+          opts :: :oidcc_client_context.opts()
         ) :: t()
-  def from_manual(configuration, jwks, client_id, client_secret) do
+  def from_manual(configuration, jwks, client_id, client_secret, opts \\ %{}) do
     configuration = ProviderConfiguration.struct_to_record(configuration)
     jwks = JOSE.JWK.to_record(jwks)
+    opts = Map.update(opts, :client_jwks, :none, &JOSE.JWK.to_record/1)
 
     configuration
-    |> :oidcc_client_context.from_manual(jwks, client_id, client_secret)
+    |> :oidcc_client_context.from_manual(jwks, client_id, client_secret, opts)
     |> record_to_struct()
   end
 
@@ -111,6 +120,7 @@ defmodule Oidcc.ClientContext do
     |> super()
     |> Map.update!(:provider_configuration, &ProviderConfiguration.record_to_struct/1)
     |> Map.update!(:jwks, &JOSE.JWK.from_record/1)
+    |> update_if_not_none(:client_jwks, &JOSE.JWK.from_record/1)
   end
 
   @impl Oidcc.RecordStruct
@@ -118,6 +128,14 @@ defmodule Oidcc.ClientContext do
     struct
     |> Map.update!(:provider_configuration, &ProviderConfiguration.struct_to_record/1)
     |> Map.update!(:jwks, &JOSE.JWK.to_record/1)
+    |> update_if_not_none(:client_jwks, &JOSE.JWK.to_record/1)
     |> super()
+  end
+
+  defp update_if_not_none(map, key, callback) do
+    Map.update!(map, key, fn
+      :none -> :none
+      other -> callback.(other)
+    end)
   end
 end

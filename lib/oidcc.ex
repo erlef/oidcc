@@ -47,7 +47,7 @@ defmodule Oidcc do
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
           client_secret :: String.t(),
-          opts :: :oidcc_authorization.opts()
+          opts :: :oidcc_authorization.opts() | :oidcc_client_context.opts()
         ) ::
           {:ok, :uri_string.uri_string()}
           | {:error, :oidcc_client_context.error() | :oidcc_client_context.error()}
@@ -87,7 +87,7 @@ defmodule Oidcc do
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
           client_secret :: String.t(),
-          opts :: :oidcc_token.retrieve_opts()
+          opts :: :oidcc_token.retrieve_opts() | :oidcc_client_context.opts()
         ) ::
           {:ok, Oidcc.Token.t()} | {:error, :oidcc_client_context.error() | :oidcc_token.error()}
   def retrieve_token(auth_code, provider_configuration_name, client_id, client_secret, opts),
@@ -130,14 +130,14 @@ defmodule Oidcc do
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
           client_secret :: String.t(),
-          opts :: :oidcc_token.refresh_opts()
+          opts :: :oidcc_token.refresh_opts() | :oidcc_client_context.opts()
         ) :: {:ok, Oidcc.Token.t()} | {:error, :oidcc_token.error()}
   @spec refresh_token(
           token :: Oidcc.Token.t(),
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
           client_secret :: String.t(),
-          opts :: :oidcc_token.refresh_opts_no_sub()
+          opts :: :oidcc_token.refresh_opts_no_sub() | :oidcc_client_context.opts()
         ) ::
           {:ok, Oidcc.Token.t()} | {:error, :oidcc_client_context.error() | :oidcc_token.error()}
   def refresh_token(token, provider_configuration_name, client_id, client_secret, opts \\ %{}) do
@@ -182,7 +182,7 @@ defmodule Oidcc do
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
           client_secret :: String.t(),
-          opts :: :oidcc_token_introspection.opts()
+          opts :: :oidcc_token_introspection.opts() | :oidcc_client_context.opts()
         ) ::
           {:ok, Oidcc.TokenIntrospection.t()}
           | {:error, :oidcc_client_context.error() | :oidcc_token_introspection.error()}
@@ -240,14 +240,14 @@ defmodule Oidcc do
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
           client_secret :: String.t(),
-          opts :: :oidcc_userinfo.retrieve_opts_no_sub()
+          opts :: :oidcc_userinfo.retrieve_opts_no_sub() | :oidcc_client_context.opts()
         ) :: {:ok, :oidcc_jwt_util.claims()} | {:error, :oidcc_userinfo.error()}
   @spec retrieve_userinfo(
           access_token :: String.t(),
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
           client_secret :: String.t(),
-          opts :: :oidcc_userinfo.retrieve_opts()
+          opts :: :oidcc_userinfo.retrieve_opts() | :oidcc_client_context.opts()
         ) ::
           {:ok, :oidcc_jwt_util.claims()}
           | {:error, :oidcc_client_context.error() | :oidcc_userinfo.error()}
@@ -297,7 +297,7 @@ defmodule Oidcc do
           client_id :: String.t(),
           client_secret :: String.t(),
           jwk :: JOSE.JWK.t(),
-          opts :: :oidcc_token.jwt_profile_opts()
+          opts :: :oidcc_token.jwt_profile_opts() | :oidcc_client_context.opts()
         ) ::
           {:ok, Oidcc.Token.t()} | {:error, :oidcc_client_context.error() | :oidcc_token.error()}
   def jwt_profile_token(subject, provider_configuration_name, client_id, client_secret, jwk, opts) do
@@ -340,7 +340,7 @@ defmodule Oidcc do
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
           client_secret :: String.t(),
-          opts :: :oidcc_token.client_credentials_opts()
+          opts :: :oidcc_token.client_credentials_opts() | :oidcc_client_context.opts()
         ) ::
           {:ok, Oidcc.Token.t()} | {:error, :oidcc_client_context.error() | :oidcc_token.error()}
   def client_credentials_token(provider_configuration_name, client_id, client_secret, opts),

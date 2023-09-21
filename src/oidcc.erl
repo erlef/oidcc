@@ -43,10 +43,12 @@
 %%
 %% ```
 %% {ok, RedirectUri} =
-%%     oidcc:create_redirect_url(provider_name,
-%%                               <<"client_id">>,
-%%                               <<"client_secret">>
-%%                               #{redirect_uri: <<"https://my.server/return"}),
+%%   oidcc:create_redirect_url(
+%%     provider_name,
+%%     <<"client_id">>,
+%%     <<"client_secret">>
+%%     #{redirect_uri: <<"https://my.server/return"}
+%%   ),
 %%
 %% %% RedirectUri = https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn
 %% '''
@@ -63,15 +65,19 @@ when
     ProviderConfigurationWorkerName :: gen_server:server_ref(),
     ClientId :: binary(),
     ClientSecret :: binary(),
-    Opts :: oidcc_authorization:opts(),
+    Opts :: oidcc_authorization:opts() | oidcc_client_context:opts(),
     Uri :: uri_string:uri_string().
 create_redirect_url(ProviderConfigurationWorkerName, ClientId, ClientSecret, Opts) ->
+    {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
     maybe
         {ok, ClientContext} ?=
-            oidcc_client_context:from_configuration_worker(ProviderConfigurationWorkerName,
-                                                      ClientId,
-                                                      ClientSecret),
-        oidcc_authorization:create_redirect_url(ClientContext, Opts)
+            oidcc_client_context:from_configuration_worker(
+                ProviderConfigurationWorkerName,
+                ClientId,
+                ClientSecret,
+                ClientContextOpts
+        ),
+        oidcc_authorization:create_redirect_url(ClientContext, OtherOpts)
     end.
 
 %% @doc
@@ -87,11 +93,13 @@ create_redirect_url(ProviderConfigurationWorkerName, ClientId, ClientSecret, Opt
 %% %% Get AuthCode from Redirect
 %%
 %% {ok, #oidcc_token{}} =
-%%   oidcc:retrieve_token(AuthCode,
-%%                        provider_name,
-%%                        <<"client_id">>,
-%%                        <<"client_secret">>,
-%%                        #{redirect_uri => <<"https://example.com/callback">>}).
+%%   oidcc:retrieve_token(
+%%     AuthCode,
+%%     provider_name,
+%%     <<"client_id">>,
+%%     <<"client_secret">>,
+%%     #{redirect_uri => <<"https://example.com/callback">>}
+%%   ).
 %% '''
 %% @end
 %% @since 3.0.0
@@ -108,20 +116,25 @@ when
     ProviderConfigurationWorkerName :: gen_server:server_ref(),
     ClientId :: binary(),
     ClientSecret :: binary(),
-    Opts :: oidcc_token:retrieve_opts().
+    Opts :: oidcc_token:retrieve_opts() | oidcc_client_context:opts().
 retrieve_token(AuthCode,
-                            ProviderConfigurationWorkerName,
-                            ClientId,
-                            ClientSecret,
-                            Opts) ->
+               ProviderConfigurationWorkerName,
+               ClientId,
+               ClientSecret,
+               Opts) ->
+    {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
+
     RefreshJwksFun = oidcc_jwt_util:refresh_jwks_fun(ProviderConfigurationWorkerName),
-    OptsWithRefresh = maps_put_new(refresh_jwks, RefreshJwksFun, Opts),
+    OptsWithRefresh = maps_put_new(refresh_jwks, RefreshJwksFun, OtherOpts),
 
     maybe
         {ok, ClientContext} ?=
-            oidcc_client_context:from_configuration_worker(ProviderConfigurationWorkerName,
-                                                      ClientId,
-                                                      ClientSecret),
+            oidcc_client_context:from_configuration_worker(
+                ProviderConfigurationWorkerName,
+                ClientId,
+                ClientSecret,
+                ClientContextOpts
+            ),
         oidcc_token:retrieve(AuthCode, ClientContext, OptsWithRefresh)
     end.
 
@@ -134,11 +147,13 @@ retrieve_token(AuthCode,
 %% %% Get Token
 %%
 %% {ok, #{<<"sub">> => Sub}} =
-%%   oidcc:retrieve_userinfo(Token,
-%%                           provider_name,
-%%                           <<"client_id">>,
-%%                           <<"client_secret">>,
-%%                           #{}).
+%%   oidcc:retrieve_userinfo(
+%%     Token,
+%%     provider_name,
+%%     <<"client_id">>,
+%%     <<"client_secret">>,
+%%     #{}
+%%   ).
 %% '''
 %% @end
 %% @since 3.0.0
@@ -156,7 +171,7 @@ retrieve_token(AuthCode,
         ProviderConfigurationWorkerName :: gen_server:server_ref(),
         ClientId :: binary(),
         ClientSecret :: binary(),
-        Opts :: oidcc_userinfo:retrieve_opts_no_sub();
+        Opts :: oidcc_userinfo:retrieve_opts_no_sub() | oidcc_client_context:opts();
     (Token, ProviderConfigurationWorkerName, ClientId, ClientSecret, Opts) ->
         {ok, map()} | {error, any()}
     when
@@ -166,16 +181,21 @@ retrieve_token(AuthCode,
         ClientSecret :: binary(),
         Opts :: oidcc_userinfo:retrieve_opts().
 retrieve_userinfo(Token,
-                   ProviderConfigurationWorkerName,
-                   ClientId,
-                   ClientSecret,
-                   Opts) ->
+                  ProviderConfigurationWorkerName,
+                  ClientId,
+                  ClientSecret,
+                  Opts) ->
+    {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
+
     maybe
         {ok, ClientContext} ?=
-            oidcc_client_context:from_configuration_worker(ProviderConfigurationWorkerName,
-                                                      ClientId,
-                                                      ClientSecret),
-        oidcc_userinfo:retrieve(Token, ClientContext, Opts)
+            oidcc_client_context:from_configuration_worker(
+                ProviderConfigurationWorkerName,
+                ClientId,
+                ClientSecret,
+                ClientContextOpts
+            ),
+        oidcc_userinfo:retrieve(Token, ClientContext, OtherOpts)
     end.
 
 %% @doc Refresh Token
@@ -186,11 +206,13 @@ retrieve_userinfo(Token,
 %% %% Get Token and wait for its expiry
 %%
 %% {ok, #oidcc_token{}} =
-%%   oidcc:refresh_token(Token,
-%%                       provider_name,
-%%                       <<"client_id">>,
-%%                       <<"client_secret">>,
-%%                       #{expected_subject => <<"sub_from_initial_id_token>>}).
+%%   oidcc:refresh_token(
+%%     Token,
+%%     provider_name,
+%%     <<"client_id">>,
+%%     <<"client_secret">>,
+%%     #{expected_subject => <<"sub_from_initial_id_token>>}
+%%   ).
 %% '''
 %% @end
 %% @since 3.0.0
@@ -208,7 +230,7 @@ retrieve_userinfo(Token,
         ProviderConfigurationWorkerName :: gen_server:server_ref(),
         ClientId :: binary(),
         ClientSecret :: binary(),
-        Opts :: oidcc_token:refresh_opts();
+        Opts :: oidcc_token:refresh_opts() | oidcc_client_context:opts();
     (
         Token,
         ProviderConfigurationWorkerName,
@@ -224,18 +246,23 @@ retrieve_userinfo(Token,
         ClientSecret :: binary(),
         Opts :: oidcc_token:refresh_opts_no_sub().
 refresh_token(RefreshToken,
-                     ProviderConfigurationWorkerName,
-                     ClientId,
-                     ClientSecret,
-                     Opts) ->
+              ProviderConfigurationWorkerName,
+              ClientId,
+              ClientSecret,
+              Opts) ->
+    {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
+
     RefreshJwksFun = oidcc_jwt_util:refresh_jwks_fun(ProviderConfigurationWorkerName),
-    OptsWithRefresh = maps_put_new(refresh_jwks, RefreshJwksFun, Opts),
+    OptsWithRefresh = maps_put_new(refresh_jwks, RefreshJwksFun, OtherOpts),
 
     maybe
         {ok, ClientContext} ?=
-            oidcc_client_context:from_configuration_worker(ProviderConfigurationWorkerName,
-                                                      ClientId,
-                                                      ClientSecret),
+            oidcc_client_context:from_configuration_worker(
+                ProviderConfigurationWorkerName,
+                ClientId,
+                ClientSecret,
+                ClientContextOpts
+            ),
         oidcc_token:refresh(RefreshToken, ClientContext, OptsWithRefresh)
     end.
 
@@ -248,11 +275,13 @@ refresh_token(RefreshToken,
 %% %% Get AccessToken
 %%
 %% {ok, #oidcc_token_introspection{active = True}} =
-%%   oidcc:introspect_token(AccessToken,
-%%                          provider_name,
-%%                          <<"client_id">>,
-%%                          <<"client_secret">>,
-%%                          #{}).
+%%   oidcc:introspect_token(
+%%     AccessToken,
+%%     provider_name,
+%%     <<"client_id">>,
+%%     <<"client_secret">>,
+%%     #{}
+%%   ).
 %% '''
 %% @end
 %% @since 3.0.0
@@ -270,18 +299,23 @@ when
     ProviderConfigurationWorkerName :: gen_server:server_ref(),
     ClientId :: binary(),
     ClientSecret :: binary(),
-    Opts :: oidcc_token_introspection:opts().
+    Opts :: oidcc_token_introspection:opts() | oidcc_client_context:opts().
 introspect_token(Token,
                  ProviderConfigurationWorkerName,
                  ClientId,
                  ClientSecret,
                  Opts) ->
+    {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
+
     maybe
         {ok, ClientContext} ?=
-            oidcc_client_context:from_configuration_worker(ProviderConfigurationWorkerName,
-                                                      ClientId,
-                                                      ClientSecret),
-        oidcc_token_introspection:introspect(Token, ClientContext, Opts)
+            oidcc_client_context:from_configuration_worker(
+                ProviderConfigurationWorkerName,
+                ClientId,
+                ClientSecret,
+                ClientContextOpts
+            ),
+        oidcc_token_introspection:introspect(Token, ClientContext, OtherOpts)
     end.
 
 %% @doc Retrieve JSON Web Token (JWT) Profile Token
@@ -296,13 +330,17 @@ introspect_token(Token,
 %% Key = jose_jwk:from_pem(maps:get(<<"key">>, KeyMap)),
 %%
 %% {ok, #oidcc_token{}} =
-%%   oidcc_token:jwt_profile(<<"subject">>,
-%%                           provider_name,
-%%                           <<"client_id">>,
-%%                           <<"client_secret">>,
-%%                           Key,
-%%                           #{scope => [<<"scope">>],
-%%                             kid => maps:get(<<"keyId">>, KeyMap)}).
+%%   oidcc_token:jwt_profile(
+%%     <<"subject">>,
+%%     provider_name,
+%%     <<"client_id">>,
+%%     <<"client_secret">>,
+%%     Key,
+%%     #{
+%%      scope => [<<"scope">>],
+%%      kid => maps:get(<<"keyId">>, KeyMap)
+%%     }
+%%   ).
 %% '''
 %% @end
 %% @since 3.0.0
@@ -319,16 +357,21 @@ introspect_token(Token,
     ClientId :: binary(),
     ClientSecret :: binary(),
     Jwk :: jose_jwk:key(),
-    Opts :: oidcc_token:jwt_profile_opts().
+    Opts :: oidcc_token:jwt_profile_opts() | oidcc_client_context:opts().
 jwt_profile_token(Subject, ProviderConfigurationWorkerName, ClientId, ClientSecret, Jwk, Opts) ->
+    {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
+
     RefreshJwksFun = oidcc_jwt_util:refresh_jwks_fun(ProviderConfigurationWorkerName),
-    OptsWithRefresh = maps_put_new(refresh_jwks, RefreshJwksFun, Opts),
+    OptsWithRefresh = maps_put_new(refresh_jwks, RefreshJwksFun, OtherOpts),
 
     maybe
         {ok, ClientContext} ?=
-            oidcc_client_context:from_configuration_worker(ProviderConfigurationWorkerName,
-                                                      ClientId,
-                                                      ClientSecret),
+            oidcc_client_context:from_configuration_worker(
+                ProviderConfigurationWorkerName,
+                ClientId,
+                ClientSecret,
+                ClientContextOpts
+            ),
         oidcc_token:jwt_profile(Subject, ClientContext, Jwk, OptsWithRefresh)
     end.
 
@@ -340,10 +383,12 @@ jwt_profile_token(Subject, ProviderConfigurationWorkerName, ClientId, ClientSecr
 %%
 %% ```
 %% {ok, #oidcc_token{}} =
-%%   oidcc:client_credentials_token(provider_name,
-%%                                  <<"client_id">>,
-%%                                  <<"client_secret">>,
-%%                                  #{scope => [<<"scope">>]}).
+%%   oidcc:client_credentials_token(
+%%     provider_name,
+%%     <<"client_id">>,
+%%     <<"client_secret">>,
+%%     #{scope => [<<"scope">>]}
+%%   ).
 %% '''
 %% @end
 %% @since 3.0.0
@@ -356,16 +401,21 @@ jwt_profile_token(Subject, ProviderConfigurationWorkerName, ClientId, ClientSecr
     ProviderConfigurationWorkerName :: gen_server:server_ref(),
     ClientId :: binary(),
     ClientSecret :: binary(),
-    Opts :: oidcc_token:client_credentials_opts().
+    Opts :: oidcc_token:client_credentials_opts() | oidcc_client_context:opts().
 client_credentials_token(ProviderConfigurationWorkerName, ClientId, ClientSecret, Opts) ->
+    {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
+
     RefreshJwksFun = oidcc_jwt_util:refresh_jwks_fun(ProviderConfigurationWorkerName),
-    OptsWithRefresh = maps_put_new(refresh_jwks, RefreshJwksFun, Opts),
+    OptsWithRefresh = maps_put_new(refresh_jwks, RefreshJwksFun, OtherOpts),
 
     maybe
         {ok, ClientContext} ?=
-            oidcc_client_context:from_configuration_worker(ProviderConfigurationWorkerName,
-                                                      ClientId,
-                                                      ClientSecret),
+            oidcc_client_context:from_configuration_worker(
+                ProviderConfigurationWorkerName,
+                ClientId,
+                ClientSecret,
+                ClientContextOpts
+            ),
         oidcc_token:client_credentials(ClientContext, OptsWithRefresh)
     end.
 
@@ -376,3 +426,13 @@ maps_put_new(Key, Value, Map) ->
         true -> Map;
         false -> maps:put(Key, Value, Map)
     end.
+
+-spec extract_client_context_opts(Opts) -> {ClientContextOpts, RestOpts} when
+    Opts :: RestOpts | ClientContextOpts,
+    RestOpts :: map(),
+    ClientContextOpts :: oidcc_client_context:opts().
+extract_client_context_opts(Opts) ->
+    {
+        maps:with([client_jwks], Opts),
+        maps:without([client_jwks], Opts)
+    }.

@@ -102,7 +102,8 @@ git worktree add \
     --[no-]start-server \ # Run Web Server; Default true; Disable for config / client only tests
     --[no-]auto-stop \ # Auto Stop when result is received; Default true; Disable for tests with multiple actions
     --[no-]auto-open \ # Auto open browser; Default false; Requires `xdg-open`
-    --[no-]auto-screenshot # Auto screenshot window; Default false; Requires `gnome-screenshot` & `optipng`
+    --[no-]auto-screenshot \ # Auto screenshot window; Default false; Requires `gnome-screenshot` & `optipng`
+    --token-endpoint-auth-method \ # Registration token_endpoint_auth_method; Default "client_secret_basic"
   ```
 - Open http://localhost:4000/authorize in your Browser (or `auto-open`)
 - Follow Test Protocol

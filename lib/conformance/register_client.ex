@@ -4,10 +4,12 @@ defmodule Conformance.RegisterClient do
 
   require Logger
 
-  def start_link(_opts), do: GenServer.start_link(__MODULE__, nil, name: __MODULE__)
+  def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
 
   @impl GenServer
-  def init(_init_opt) do
+  def init(opts) do
+    token_endpoint_auth_method = Keyword.fetch!(opts, :token_endpoint_auth_method)
+
     {:ok,
      %Oidcc.ClientRegistration.Response{client_id: client_id, client_secret: client_secret} =
        response} =
@@ -15,7 +17,8 @@ defmodule Conformance.RegisterClient do
         Oidcc.ProviderConfiguration.Worker.get_provider_configuration(Conformance.ConfigWorker),
         %Oidcc.ClientRegistration{
           redirect_uris: [url(~p"/callback")],
-          initiate_login_uri: url(~p"/authorize")
+          initiate_login_uri: url(~p"/authorize"),
+          token_endpoint_auth_method: token_endpoint_auth_method
         }
       )
 

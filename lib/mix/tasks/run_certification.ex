@@ -18,7 +18,8 @@ defmodule Mix.Tasks.RunCertification do
     start_server: :boolean,
     auto_stop: :boolean,
     auto_open: :boolean,
-    auto_screenshot: :boolean
+    auto_screenshot: :boolean,
+    token_endpoint_auth_method: :string
   ]
 
   @project_root __ENV__.file |> Path.dirname() |> Path.join("../../..") |> Path.expand()
@@ -45,7 +46,8 @@ defmodule Mix.Tasks.RunCertification do
       start_server: start_server?,
       auto_stop: auto_stop?,
       auto_open: auto_open?,
-      auto_screenshot: auto_screenshot?
+      auto_screenshot: auto_screenshot?,
+      token_endpoint_auth_method: token_endpoint_auth_method
     } =
       opts
       |> Keyword.put_new(:alias, "test")
@@ -65,6 +67,7 @@ defmodule Mix.Tasks.RunCertification do
       |> Keyword.put_new(:auto_stop, true)
       |> Keyword.put_new(:auto_open, false)
       |> Keyword.put_new(:auto_screenshot, false)
+      |> Keyword.put_new(:token_endpoint_auth_method, "client_secret_basic")
       |> Map.new()
 
     artifact_out_dir = Path.join([@project_root, "test_plans", version, profile])
@@ -91,6 +94,7 @@ defmodule Mix.Tasks.RunCertification do
       Conformance.Supervisor.start_link(
         alias: alias_name,
         register_client?: register_client?,
+        token_endpoint_auth_method: token_endpoint_auth_method,
         start_server?: start_server?
       )
 

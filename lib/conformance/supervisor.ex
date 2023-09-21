@@ -11,6 +11,8 @@ defmodule Conformance.Supervisor do
     register_client? = Keyword.fetch!(opts, :register_client?)
     start_server? = Keyword.fetch!(opts, :start_server?)
 
+    register_client_opts = Keyword.take(opts, [:token_endpoint_auth_method])
+
     Application.put_env(
       :conformance,
       Conformance.Endpoint,
@@ -26,7 +28,7 @@ defmodule Conformance.Supervisor do
          issuer: "https://www.certification.openid.net/test/a/#{alias_name}/",
          name: Conformance.ConfigWorker
        }},
-      if(register_client?, do: Conformance.RegisterClient),
+      if(register_client?, do: {Conformance.RegisterClient, register_client_opts}),
       unless(start_server?, do: Conformance.AutoStopper)
     ]
     |> Enum.reject(&is_nil/1)

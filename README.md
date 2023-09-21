@@ -44,9 +44,10 @@ OpenID Connect client library for Erlang.
   />
 </picture>
 
-OpenID Certified by Jonatan Männchen at the Erlang Ecosystem Foundation for the
-basic and configuration profile of the OpenID Connect protocol. For details,
-check the [Conformance Documentation](https://github.com/erlef/oidcc/tree/openid-foundation-certification).
+OpenID Certified by Jonatan Männchen at the Erlang Ecosystem Foundation of
+multiple relaying party conformance profiles of the OpenID Connect protocol.
+For details, check the
+[Conformance Documentation](https://github.com/erlef/oidcc/tree/openid-foundation-certification).
 
 <br clear="left"/>
 -->
@@ -77,6 +78,25 @@ The refactoring for `v3` and the certification is funded as an
 [Security Working Group](https://erlef.org/wg/security).
 
 <br clear="left"/>
+
+## Supported Features
+
+* [Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html)
+  (`[ISSUER]/.well-known/openid-configuration`)
+* [Client Registration](https://openid.net/specs/openid-connect-registration-1_0.html)
+* Authorization (Code Flow)
+  * [Request Object](https://openid.net/specs/openid-connect-core-1_0.html#RequestObject)
+  * [PKCE](https://oauth.net/2/pkce/)
+* Token
+  * Authorization: `client_secret_basic`, `client_secret_post`,
+    `client_secret_jwt`, and `private_key_jwt`
+  * Grant Types: `authorization_code`, `refresh_token`, `jwt_bearer`, and
+    `client_credentials`
+  * Automatic JWK Refreshing when needed
+* Userinfo
+  * [JWT Response](https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse)
+  * [Aggregated and Distributed Claims](https://openid.net/specs/openid-connect-core-1_0.html#AggregatedDistributedClaims)
+* [Token Introspection](https://datatracker.ietf.org/doc/html/rfc7662)
 
 ## Setup
 

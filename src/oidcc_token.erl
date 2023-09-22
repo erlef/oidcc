@@ -93,11 +93,9 @@
 %%   <li>`scope' - {@link oidcc_scope:scopes()}</li>
 %% </ul>
 
--type pkce() :: #{verifier := binary()}.
-
 -type retrieve_opts() ::
     #{
-        pkce => pkce(),
+        pkce_verifier => binary(),
         nonce => binary() | any,
         scope => oidcc_scope:scopes(),
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
@@ -111,7 +109,9 @@
 %% <h2>Fields</h2>
 %%
 %% <ul>
-%%   <li>`pkce' - PKCE verification options</li>
+%%   <li>`pkce_verifier' - pkce verifier (random string previously given to
+%%     `oidcc_authorization'), see
+%%     [https://datatracker.ietf.org/doc/html/rfc7636#section-4.1]</li>
 %%   <li>`nonce' - Nonce to check</li>
 %%   <li>`scope' - Scope to store with the token</li>
 %%   <li>`refresh_jwks' - How to handle tokens with an unknown `kid'.
@@ -301,7 +301,7 @@ retrieve(AuthCode, ClientContext, Opts) ->
     case lists:member(<<"authorization_code">>, GrantTypesSupported) of
         true ->
 
-            Pkce = maps:get(pkce, Opts, undefined),
+            PkceVerifier = maps:get(pkce_verifier, Opts, none),
             QsBody =
                 [{<<"grant_type">>, <<"authorization_code">>},
                 {<<"code">>, AuthCode},
@@ -311,7 +311,7 @@ retrieve(AuthCode, ClientContext, Opts) ->
                 extra_meta => #{issuer => Issuer, client_id => ClientId}},
 
             maybe
-                {ok, Token} ?= retrieve_a_token(QsBody, Pkce, ClientContext, Opts, TelemetryOpts, true),
+                {ok, Token} ?= retrieve_a_token(QsBody, PkceVerifier, ClientContext, Opts, TelemetryOpts, true),
                 extract_response(Token, ClientContext, Opts)
             end;
         false ->
@@ -378,7 +378,7 @@ refresh(RefreshToken, ClientContext, Opts) ->
                 extra_meta => #{issuer => Issuer, client_id => ClientId}},
 
             maybe
-                {ok, Token} ?= retrieve_a_token(QueryString1, undefined, ClientContext, Opts, TelemetryOpts, true),
+                {ok, Token} ?= retrieve_a_token(QueryString1, none, ClientContext, Opts, TelemetryOpts, true),
                 {ok, TokenRecord} ?=
                     extract_response(Token, ClientContext, maps:put(nonce, any, Opts)),
                 case TokenRecord of
@@ -464,7 +464,7 @@ jwt_profile(Subject, ClientContext, Jwk, Opts) ->
                 extra_meta => #{issuer => Issuer, client_id => ClientId}},
 
             maybe
-                {ok, Token} ?= retrieve_a_token(QueryString1, undefined, ClientContext, Opts, TelemetryOpts, false),
+                {ok, Token} ?= retrieve_a_token(QueryString1, none, ClientContext, Opts, TelemetryOpts, false),
                 {ok, TokenRecord} ?= extract_response(Token, ClientContext, maps:put(nonce, any, Opts)),
                 case TokenRecord of
                     #oidcc_token{id = none} ->
@@ -519,7 +519,7 @@ client_credentials(ClientContext, Opts) ->
                 extra_meta => #{issuer => Issuer, client_id => ClientId}},
 
             maybe
-                {ok, Token} ?= retrieve_a_token(QueryString1, undefined, ClientContext, Opts, TelemetryOpts, true),
+                {ok, Token} ?= retrieve_a_token(QueryString1, none, ClientContext, Opts, TelemetryOpts, true),
                 extract_response(Token, ClientContext, maps:put(nonce, any, Opts))
             end;
         false ->
@@ -756,16 +756,18 @@ verify_missing_required_claims(Claims) ->
             {error, {missing_claim, MissingClaim, Claims}}
     end.
 
--spec retrieve_a_token(QsBodyIn, Pkce, ClientContext, Opts, TelemetryOpts, AuthenticateClient) ->
+-spec retrieve_a_token(
+    QsBodyIn, PkceVerifier, ClientContext, Opts, TelemetryOpts, AuthenticateClient
+) ->
     {ok, map()} | {error, error()}
 when
     QsBodyIn :: oidcc_http_util:query_params(),
-    Pkce :: pkce() | undefined,
+    PkceVerifier :: binary() | none,
     ClientContext :: oidcc_client_context:t(),
     Opts :: retrieve_opts() | refresh_opts(),
     TelemetryOpts :: oidcc_http_util:telemetry_opts(),
     AuthenticateClient :: boolean().
-retrieve_a_token(QsBodyIn, Pkce, ClientContext, Opts, TelemetryOpts, AuthenticateClient) ->
+retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext, Opts, TelemetryOpts, AuthenticateClient) ->
     #oidcc_client_context{provider_configuration = Configuration, client_jwks = ClientJwks} =
         ClientContext,
     #oidcc_provider_configuration{token_endpoint = TokenEndpoint,
@@ -774,7 +776,7 @@ retrieve_a_token(QsBodyIn, Pkce, ClientContext, Opts, TelemetryOpts, Authenticat
 
     Header0 = [{"accept", "application/jwt, application/json"}],
 
-    Body0 = add_pkce(QsBodyIn, Pkce),
+    Body0 = add_pkce_verifier(QsBodyIn, PkceVerifier),
 
     MaybeAuthMethod = case AuthenticateClient of
         true -> select_preferred_auth(SupportedAuthMethods);
@@ -797,7 +799,7 @@ retrieve_a_token(QsBodyIn, Pkce, ClientContext, Opts, TelemetryOpts, Authenticat
                 {ok, TokenResponse}
             else
                 {error, auth_method_not_possible} ->
-                    retrieve_a_token(QsBodyIn, Pkce, ClientContext#oidcc_client_context{
+                    retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext#oidcc_client_context{
                         provider_configuration = Configuration#oidcc_provider_configuration{
                             token_endpoint_auth_methods_supported =
                                 SupportedAuthMethods -- [atom_to_binary(AuthMethod)]
@@ -969,13 +971,13 @@ add_authentication(
 ) ->
     {ok, {QsBodyList, Header}}.
 
--spec add_pkce(QueryList, Pkce) -> oidcc_http_util:query_params() when
+-spec add_pkce_verifier(QueryList, PkceVerifier) -> oidcc_http_util:query_params() when
     QueryList :: oidcc_http_util:query_params(),
-    Pkce :: pkce() | undefined.
-add_pkce(BodyQs, #{verifier := CV}) ->
-    [{<<"code_verifier">>, CV} | BodyQs];
-add_pkce(BodyQs, undefined) ->
-    BodyQs.
+    PkceVerifier :: binary() | none.
+add_pkce_verifier(BodyQs, none) ->
+    BodyQs;
+add_pkce_verifier(BodyQs, PkceVerifier) ->
+    [{<<"code_verifier">>, PkceVerifier} | BodyQs].
 
 -spec signed_client_assertion(ClientContext, Jwk) -> {ok, binary()} | {error, error()} when
     Jwk :: jose_jwk:key(),

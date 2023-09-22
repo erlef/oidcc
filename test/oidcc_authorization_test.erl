@@ -14,6 +14,12 @@ create_redirect_url_test() ->
     {ok, Configuration} = oidcc_provider_configuration:decode_configuration(
         jose:decode(ValidConfigString)
     ),
+    PkcePlainConfiguration = Configuration#oidcc_provider_configuration{
+        code_challenge_methods_supported = [<<"plain">>]
+    },
+    NoPkceConfiguration = Configuration#oidcc_provider_configuration{
+        code_challenge_methods_supported = undefined
+    },
 
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 
@@ -24,6 +30,12 @@ create_redirect_url_test() ->
 
     ClientContext =
         oidcc_client_context:from_manual(Configuration, Jwks, ClientId, <<"client_secret">>),
+    PkcePlainClientContext =
+        oidcc_client_context:from_manual(
+            PkcePlainConfiguration, Jwks, ClientId, <<"client_secret">>
+        ),
+    NoPkceClientContext =
+        oidcc_client_context:from_manual(NoPkceConfiguration, Jwks, ClientId, <<"client_secret">>),
 
     BaseOpts =
         #{
@@ -50,8 +62,7 @@ create_redirect_url_test() ->
                 url_extension => [{<<"test">>, <<"id">>}, {<<"other">>, <<"green">>}]
             }
         ),
-    Opts5 =
-        maps:merge(BaseOpts, #{pkce => #{challenge => <<"foo">>, method => <<"plain">>}}),
+    Opts5 = maps:merge(BaseOpts, #{pkce_verifier => <<"foo">>}),
 
     {ok, Url1} = oidcc_authorization:create_redirect_url(ClientContext, BaseOpts),
     {ok, Url2} = oidcc_authorization:create_redirect_url(ClientContext, Opts1),
@@ -59,6 +70,8 @@ create_redirect_url_test() ->
     {ok, Url4} = oidcc_authorization:create_redirect_url(ClientContext, Opts3),
     {ok, Url5} = oidcc_authorization:create_redirect_url(ClientContext, Opts4),
     {ok, Url6} = oidcc_authorization:create_redirect_url(ClientContext, Opts5),
+    {ok, Url7} = oidcc_authorization:create_redirect_url(PkcePlainClientContext, Opts5),
+    {ok, Url8} = oidcc_authorization:create_redirect_url(NoPkceClientContext, Opts5),
 
     ExpUrl1 =
         <<"https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
@@ -81,8 +94,16 @@ create_redirect_url_test() ->
     ?assertEqual(ExpUrl5, iolist_to_binary(Url5)),
 
     ExpUrl6 =
-        <<"https://my.provider/auth?scope=openid&code_challenge=foo&code_challenge_method=plain&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
+        <<"https://my.provider/auth?scope=openid&code_challenge=LCa0a2j_xo_5m0U8HTBBNBNCLXBkg7-g-YpeiGJm564&code_challenge_method=S256&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
     ?assertEqual(ExpUrl6, iolist_to_binary(Url6)),
+
+    ExpUrl7 =
+        <<"https://my.provider/auth?scope=openid&code_challenge=foo&code_challenge_method=plain&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
+    ?assertEqual(ExpUrl7, iolist_to_binary(Url7)),
+
+    ExpUrl8 =
+        <<"https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
+    ?assertEqual(ExpUrl8, iolist_to_binary(Url8)),
 
     ok.
 

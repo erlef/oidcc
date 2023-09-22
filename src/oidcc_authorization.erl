@@ -15,20 +15,14 @@
 -export([create_redirect_url/2]).
 
 -export_type([error/0]).
--export_type([pkce/0]).
 -export_type([opts/0]).
-
--type pkce() :: #{challenge := binary(), method := binary()}.
-%% Configure PKCE for authorization
-%%
-%% See [https://datatracker.ietf.org/doc/html/rfc7636#section-4.3]
 
 -type opts() ::
     #{
         scopes => oidcc_scope:scopes(),
         state => binary(),
         nonce => binary(),
-        pkce => pkce() | undefined,
+        pkce_verifier => binary(),
         redirect_uri := uri_string:uri_string(),
         url_extension => oidcc_http_util:query_params()
     }.
@@ -42,7 +36,8 @@
 %%   <li>`scopes' - list of scopes to request (defaults to `[<<"openid">>]')</li>
 %%   <li>`state' - state to pass to the provider</li>
 %%   <li>`nonce' - nonce to pass to the provider</li>
-%%   <li>`pkce' - pkce arguments to pass to the provider</li>
+%%   <li>`pkce_verifier' - pkce verifier (random string), see
+%%     [https://datatracker.ietf.org/doc/html/rfc7636#section-4.1]</li>
 %%   <li>`redirect_uri' - redirect target after authorization is completed</li>
 %%   <li>`url_extension' - add custom query parameters to the authorization url</li>
 %% </ul>
@@ -105,22 +100,56 @@ redirect_params(#oidcc_client_context{client_id = ClientId} = ClientContext, Opt
             | maps:get(url_extension, Opts, [])
         ],
     QueryParams1 = maybe_append(<<"state">>, maps:get(state, Opts, undefined), QueryParams),
-    QueryParams2 =
-        maybe_append(<<"nonce">>, maps:get(nonce, Opts, undefined), QueryParams1),
-    QueryParams3 = append_code_challenge(maps:get(pkce, Opts, undefined), QueryParams2),
+    QueryParams2 = maybe_append(<<"nonce">>, maps:get(nonce, Opts, undefined), QueryParams1),
+    QueryParams3 = append_code_challenge(
+        maps:get(pkce_verifier, Opts, none), QueryParams2, ClientContext
+    ),
     QueryParams4 = oidcc_scope:query_append_scope(
         maps:get(scopes, Opts, [openid]), QueryParams3
     ),
     attempt_request_object(QueryParams4, ClientContext).
 
--spec append_code_challenge(
-    Pkce :: pkce() | undefined, QueryParams :: oidcc_http_util:query_params()
-) ->
-    oidcc_http_util:query_params().
-append_code_challenge(#{challenge := Challenge, method := Method}, QueryParams) ->
-    [{<<"code_challenge">>, Challenge}, {<<"code_challenge_method">>, Method} | QueryParams];
-append_code_challenge(undefined, QueryParams) ->
-    QueryParams.
+-spec append_code_challenge(PkceVerifier, QueryParams, ClientContext) ->
+    oidcc_http_util:query_params()
+when
+    PkceVerifier :: binary() | none,
+    QueryParams :: oidcc_http_util:query_params(),
+    ClientContext :: oidcc_client_context:t().
+append_code_challenge(none, QueryParams, _ClientContext) ->
+    QueryParams;
+append_code_challenge(CodeVerifier, QueryParams, ClientContext) ->
+    #oidcc_client_context{provider_configuration = ProviderConfiguration} = ClientContext,
+    #oidcc_provider_configuration{code_challenge_methods_supported = CodeChallengeMethodsSupported} =
+        ProviderConfiguration,
+    case CodeChallengeMethodsSupported of
+        undefined ->
+            QueryParams;
+        Methods when is_list(Methods) ->
+            case
+                {
+                    lists:member(<<"S256">>, CodeChallengeMethodsSupported),
+                    lists:member(<<"plain">>, CodeChallengeMethodsSupported)
+                }
+            of
+                {true, _PlainSupported} ->
+                    CodeChallenge = base64:encode(crypto:hash(sha256, CodeVerifier), #{
+                        mode => urlsafe, padding => false
+                    }),
+                    [
+                        {"code_challenge", CodeChallenge},
+                        {"code_challenge_method", <<"S256">>}
+                        | QueryParams
+                    ];
+                {false, true} ->
+                    [
+                        {"code_challenge", CodeVerifier},
+                        {"code_challenge_method", <<"plain">>}
+                        | QueryParams
+                    ];
+                {false, false} ->
+                    QueryParams
+            end
+    end.
 
 -spec maybe_append(Key, Value, QueryParams) -> QueryParams when
     Key :: unicode:chardata(),

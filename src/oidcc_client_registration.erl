@@ -69,9 +69,7 @@
         request_object_signing_alg :: binary() | undefined,
         request_object_encryption_alg :: binary() | undefined,
         request_object_encryption_enc :: binary() | undefined,
-        %% @todo Remove ex_doc_gen_error when the following PR is merged
-        %% https://github.com/elixir-lang/ex_doc/pull/1763
-        token_endpoint_auth_method :: binary() | ex_doc_gen_error,
+        token_endpoint_auth_method :: erlang:binary(),
         token_endpoint_auth_signing_alg :: binary() | undefined,
         default_max_age :: pos_integer() | undefined,
         require_auth_time :: boolean(),
@@ -89,9 +87,7 @@
 
 -type response() ::
     #oidcc_client_registration_response{
-        %% @todo Remove ex_doc_gen_error when the following PR is merged
-        %% https://github.com/elixir-lang/ex_doc/pull/1763
-        client_id :: binary() | ex_doc_gen_error,
+        client_id :: erlang:binary(),
         client_secret :: binary() | undefined,
         registration_access_token :: binary() | undefined,
         registration_client_uri :: uri_string:uri_string() | undefined,

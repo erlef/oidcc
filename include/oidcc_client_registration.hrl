@@ -25,9 +25,7 @@
     request_object_signing_alg = undefined :: binary() | undefined,
     request_object_encryption_alg = undefined :: binary() | undefined,
     request_object_encryption_enc = undefined :: binary() | undefined,
-    %% @todo Remove ex_doc_gen_error when the following PR is merged
-    %% https://github.com/elixir-lang/ex_doc/pull/1763
-    token_endpoint_auth_method = <<"client_secret_basic">> :: binary() | ex_doc_gen_error,
+    token_endpoint_auth_method = <<"client_secret_basic">> :: erlang:binary(),
     token_endpoint_auth_signing_alg = undefined :: binary() | undefined,
     default_max_age = undefined :: pos_integer() | undefined,
     require_auth_time = false :: boolean(),
@@ -40,9 +38,7 @@
 
 %% @see https://openid.net/specs/openid-connect-registration-1_0.html#RegistrationResponse
 -record(oidcc_client_registration_response, {
-    %% @todo Remove ex_doc_gen_error when the following PR is merged
-    %% https://github.com/elixir-lang/ex_doc/pull/1763
-    client_id :: binary() | ex_doc_gen_error,
+    client_id :: erlang:binary(),
     client_secret = undefined :: binary() | undefined,
     registration_access_token = undefined :: binary() | undefined,
     registration_client_uri = undefined :: uri_string:uri_string() | undefined,

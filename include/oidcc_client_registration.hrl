@@ -25,7 +25,7 @@
     request_object_signing_alg = undefined :: binary() | undefined,
     request_object_encryption_alg = undefined :: binary() | undefined,
     request_object_encryption_enc = undefined :: binary() | undefined,
-    token_endpoint_auth_method = <<"client_secret_basic">> :: erlang:binary(),
+    token_endpoint_auth_method = <<"client_secret_basic">> :: binary(),
     token_endpoint_auth_signing_alg = undefined :: binary() | undefined,
     default_max_age = undefined :: pos_integer() | undefined,
     require_auth_time = false :: boolean(),
@@ -38,7 +38,7 @@
 
 %% @see https://openid.net/specs/openid-connect-registration-1_0.html#RegistrationResponse
 -record(oidcc_client_registration_response, {
-    client_id :: erlang:binary(),
+    client_id :: binary(),
     client_secret = undefined :: binary() | undefined,
     registration_access_token = undefined :: binary() | undefined,
     registration_client_uri = undefined :: uri_string:uri_string() | undefined,

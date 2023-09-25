@@ -96,34 +96,46 @@ when
     Token :: oidcc_token:t() | binary(),
     ClientContext :: oidcc_client_context:t(),
     Opts :: opts().
-introspect(#oidcc_token{access = #oidcc_token_access{token = AccessToken}},
-                 ClientContext,
-                 Opts) ->
+introspect(
+    #oidcc_token{access = #oidcc_token_access{token = AccessToken}},
+    ClientContext,
+    Opts
+) ->
     introspect(AccessToken, ClientContext, Opts);
 introspect(AccessToken, ClientContext, Opts) ->
-    #oidcc_client_context{provider_configuration = Configuration,
-                          client_id = ClientId,
-                          client_secret = ClientSecret} =
+    #oidcc_client_context{
+        provider_configuration = Configuration,
+        client_id = ClientId,
+        client_secret = ClientSecret
+    } =
         ClientContext,
-    #oidcc_provider_configuration{introspection_endpoint = Endpoint,
-                                  issuer = Issuer} = Configuration,
+    #oidcc_provider_configuration{
+        introspection_endpoint = Endpoint,
+        issuer = Issuer
+    } = Configuration,
 
     case Endpoint of
         undefined ->
             {error, introspection_not_supported};
         _ ->
             Header =
-                [{"accept", "application/json"},
-                oidcc_http_util:basic_auth_header(ClientId, ClientSecret)],
+                [
+                    {"accept", "application/json"},
+                    oidcc_http_util:basic_auth_header(ClientId, ClientSecret)
+                ],
             Body = [{<<"token">>, AccessToken}],
             Request =
-                {Endpoint, Header, "application/x-www-form-urlencoded", uri_string:compose_query(Body)},
+                {Endpoint, Header, "application/x-www-form-urlencoded",
+                    uri_string:compose_query(Body)},
             RequestOpts = maps:get(request_opts, Opts, #{}),
-            TelemetryOpts = #{topic => [oidcc, introspect_token],
-                                extra_meta => #{issuer => Issuer, client_id => ClientId}},
+            TelemetryOpts = #{
+                topic => [oidcc, introspect_token],
+                extra_meta => #{issuer => Issuer, client_id => ClientId}
+            },
 
             maybe
-                {ok, {{json, Token}, _Headers}} ?= oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
+                {ok, {{json, Token}, _Headers}} ?=
+                    oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
                 extract_response(Token, ClientContext)
             end
     end.

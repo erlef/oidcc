@@ -76,7 +76,7 @@ create_redirect_url(ProviderConfigurationWorkerName, ClientId, ClientSecret, Opt
                 ClientId,
                 ClientSecret,
                 ClientContextOpts
-        ),
+            ),
         oidcc_authorization:create_redirect_url(ClientContext, OtherOpts)
     end.
 
@@ -117,11 +117,13 @@ when
     ClientId :: binary(),
     ClientSecret :: binary(),
     Opts :: oidcc_token:retrieve_opts() | oidcc_client_context:opts().
-retrieve_token(AuthCode,
-               ProviderConfigurationWorkerName,
-               ClientId,
-               ClientSecret,
-               Opts) ->
+retrieve_token(
+    AuthCode,
+    ProviderConfigurationWorkerName,
+    ClientId,
+    ClientSecret,
+    Opts
+) ->
     {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
 
     RefreshJwksFun = oidcc_jwt_util:refresh_jwks_fun(ProviderConfigurationWorkerName),
@@ -180,11 +182,13 @@ retrieve_token(AuthCode,
         ClientId :: binary(),
         ClientSecret :: binary(),
         Opts :: oidcc_userinfo:retrieve_opts().
-retrieve_userinfo(Token,
-                  ProviderConfigurationWorkerName,
-                  ClientId,
-                  ClientSecret,
-                  Opts) ->
+retrieve_userinfo(
+    Token,
+    ProviderConfigurationWorkerName,
+    ClientId,
+    ClientSecret,
+    Opts
+) ->
     {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
 
     maybe
@@ -245,11 +249,13 @@ retrieve_userinfo(Token,
         ClientId :: binary(),
         ClientSecret :: binary(),
         Opts :: oidcc_token:refresh_opts_no_sub().
-refresh_token(RefreshToken,
-              ProviderConfigurationWorkerName,
-              ClientId,
-              ClientSecret,
-              Opts) ->
+refresh_token(
+    RefreshToken,
+    ProviderConfigurationWorkerName,
+    ClientId,
+    ClientSecret,
+    Opts
+) ->
     {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
 
     RefreshJwksFun = oidcc_jwt_util:refresh_jwks_fun(ProviderConfigurationWorkerName),
@@ -300,11 +306,13 @@ when
     ClientId :: binary(),
     ClientSecret :: binary(),
     Opts :: oidcc_token_introspection:opts() | oidcc_client_context:opts().
-introspect_token(Token,
-                 ProviderConfigurationWorkerName,
-                 ClientId,
-                 ClientSecret,
-                 Opts) ->
+introspect_token(
+    Token,
+    ProviderConfigurationWorkerName,
+    ClientId,
+    ClientSecret,
+    Opts
+) ->
     {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
 
     maybe

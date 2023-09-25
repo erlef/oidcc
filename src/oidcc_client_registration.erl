@@ -167,14 +167,16 @@ register(
     RegistrationBody = encode(Registration),
     TelemetryOpts = #{topic => [oidcc, register_client], extra_meta => #{issuer => Issuer}},
     RequestOpts = maps:get(request_opts, Opts, #{}),
-    Headers = case maps:get(initial_access_token, Opts, undefined) of
-        undefined -> [];
-        Token -> [{"authorization", ["Bearer ", Token]}]
-    end,
+    Headers =
+        case maps:get(initial_access_token, Opts, undefined) of
+            undefined -> [];
+            Token -> [{"authorization", ["Bearer ", Token]}]
+        end,
     Request = {RegistrationEndpoint, Headers, "application/json", RegistrationBody},
 
     maybe
-        {ok, {{json, ResponseMap}, _Headers}} ?= oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
+        {ok, {{json, ResponseMap}, _Headers}} ?=
+            oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
         {ok, #oidcc_client_registration_response{} = Response} ?= decode_response(ResponseMap),
         {ok, Response}
     else

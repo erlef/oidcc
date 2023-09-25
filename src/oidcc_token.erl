@@ -294,24 +294,33 @@ when
     ClientContext :: oidcc_client_context:t(),
     Opts :: retrieve_opts().
 retrieve(AuthCode, ClientContext, Opts) ->
-    #oidcc_client_context{provider_configuration = Configuration,
-                          client_id = ClientId} = ClientContext,
-    #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} = Configuration,
+    #oidcc_client_context{
+        provider_configuration = Configuration,
+        client_id = ClientId
+    } = ClientContext,
+    #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} =
+        Configuration,
 
     case lists:member(<<"authorization_code">>, GrantTypesSupported) of
         true ->
-
             PkceVerifier = maps:get(pkce_verifier, Opts, none),
             QsBody =
-                [{<<"grant_type">>, <<"authorization_code">>},
-                {<<"code">>, AuthCode},
-                {<<"redirect_uri">>, maps:get(redirect_uri, Opts)}],
+                [
+                    {<<"grant_type">>, <<"authorization_code">>},
+                    {<<"code">>, AuthCode},
+                    {<<"redirect_uri">>, maps:get(redirect_uri, Opts)}
+                ],
 
-            TelemetryOpts = #{topic => [oidcc, request_token],
-                extra_meta => #{issuer => Issuer, client_id => ClientId}},
+            TelemetryOpts = #{
+                topic => [oidcc, request_token],
+                extra_meta => #{issuer => Issuer, client_id => ClientId}
+            },
 
             maybe
-                {ok, Token} ?= retrieve_a_token(QsBody, PkceVerifier, ClientContext, Opts, TelemetryOpts, true),
+                {ok, Token} ?=
+                    retrieve_a_token(
+                        QsBody, PkceVerifier, ClientContext, Opts, TelemetryOpts, true
+                    ),
                 extract_response(Token, ClientContext, Opts)
             end;
         false ->
@@ -359,12 +368,22 @@ retrieve(AuthCode, ClientContext, Opts) ->
         Token :: oidcc_token:t(),
         ClientContext :: oidcc_client_context:t(),
         Opts :: refresh_opts_no_sub().
-refresh(#oidcc_token{refresh = #oidcc_token_refresh{token = RefreshToken}, id = #oidcc_token_id{claims = #{<<"sub">> := ExpectedSubject}}}, ClientContext, Opts) ->
+refresh(
+    #oidcc_token{
+        refresh = #oidcc_token_refresh{token = RefreshToken},
+        id = #oidcc_token_id{claims = #{<<"sub">> := ExpectedSubject}}
+    },
+    ClientContext,
+    Opts
+) ->
     refresh(RefreshToken, ClientContext, maps:put(expected_subject, ExpectedSubject, Opts));
 refresh(RefreshToken, ClientContext, Opts) ->
-    #oidcc_client_context{provider_configuration = Configuration,
-                          client_id = ClientId} = ClientContext,
-    #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} = Configuration,
+    #oidcc_client_context{
+        provider_configuration = Configuration,
+        client_id = ClientId
+    } = ClientContext,
+    #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} =
+        Configuration,
 
     case lists:member(<<"refresh_token">>, GrantTypesSupported) of
         true ->
@@ -374,11 +393,14 @@ refresh(RefreshToken, ClientContext, Opts) ->
                 [{<<"refresh_token">>, RefreshToken}, {<<"grant_type">>, <<"refresh_token">>}],
             QueryString1 = oidcc_scope:query_append_scope(Scope, QueryString),
 
-            TelemetryOpts = #{topic => [oidcc, refresh_token],
-                extra_meta => #{issuer => Issuer, client_id => ClientId}},
+            TelemetryOpts = #{
+                topic => [oidcc, refresh_token],
+                extra_meta => #{issuer => Issuer, client_id => ClientId}
+            },
 
             maybe
-                {ok, Token} ?= retrieve_a_token(QueryString1, none, ClientContext, Opts, TelemetryOpts, true),
+                {ok, Token} ?=
+                    retrieve_a_token(QueryString1, none, ClientContext, Opts, TelemetryOpts, true),
                 {ok, TokenRecord} ?=
                     extract_response(Token, ClientContext, maps:put(nonce, any, Opts)),
                 case TokenRecord of
@@ -426,8 +448,10 @@ refresh(RefreshToken, ClientContext, Opts) ->
     Jwk :: jose_jwk:key(),
     Opts :: jwt_profile_opts().
 jwt_profile(Subject, ClientContext, Jwk, Opts) ->
-    #oidcc_client_context{provider_configuration = Configuration, client_id = ClientId} = ClientContext,
-    #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} = Configuration,
+    #oidcc_client_context{provider_configuration = Configuration, client_id = ClientId} =
+        ClientContext,
+    #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} =
+        Configuration,
 
     case lists:member(<<"urn:ietf:params:oauth:grant-type:jwt-bearer">>, GrantTypesSupported) of
         true ->
@@ -448,24 +472,32 @@ jwt_profile(Subject, ClientContext, Jwk, Opts) ->
                 <<"alg">> => <<"RS256">>,
                 <<"typ">> => <<"JWT">>
             },
-            AssertionJws = case maps:get(kid, Opts, none) of
-                none -> AssertionJws0;
-                Kid -> maps:put(<<"kid">>, Kid, AssertionJws0)
-            end,
+            AssertionJws =
+                case maps:get(kid, Opts, none) of
+                    none -> AssertionJws0;
+                    Kid -> maps:put(<<"kid">>, Kid, AssertionJws0)
+                end,
 
             {_Jws, Assertion} = jose_jws:compact(jose_jwt:sign(Jwk, AssertionJws, AssertionJwt)),
 
             Scope = maps:get(scope, Opts, []),
             QueryString =
-                [{<<"assertion">>, Assertion}, {<<"grant_type">>, <<"urn:ietf:params:oauth:grant-type:jwt-bearer">>}],
+                [
+                    {<<"assertion">>, Assertion},
+                    {<<"grant_type">>, <<"urn:ietf:params:oauth:grant-type:jwt-bearer">>}
+                ],
             QueryString1 = oidcc_scope:query_append_scope(Scope, QueryString),
 
-            TelemetryOpts = #{topic => [oidcc, jwt_profile_token],
-                extra_meta => #{issuer => Issuer, client_id => ClientId}},
+            TelemetryOpts = #{
+                topic => [oidcc, jwt_profile_token],
+                extra_meta => #{issuer => Issuer, client_id => ClientId}
+            },
 
             maybe
-                {ok, Token} ?= retrieve_a_token(QueryString1, none, ClientContext, Opts, TelemetryOpts, false),
-                {ok, TokenRecord} ?= extract_response(Token, ClientContext, maps:put(nonce, any, Opts)),
+                {ok, Token} ?=
+                    retrieve_a_token(QueryString1, none, ClientContext, Opts, TelemetryOpts, false),
+                {ok, TokenRecord} ?=
+                    extract_response(Token, ClientContext, maps:put(nonce, any, Opts)),
                 case TokenRecord of
                     #oidcc_token{id = none} ->
                         {ok, TokenRecord};
@@ -475,7 +507,6 @@ jwt_profile(Subject, ClientContext, Jwk, Opts) ->
                         {error, sub_invalid}
                 end
             end;
-
         false ->
             {error, {grant_type_not_supported, jwt_bearer}}
     end.
@@ -505,9 +536,12 @@ jwt_profile(Subject, ClientContext, Jwk, Opts) ->
     ClientContext :: oidcc_client_context:t(),
     Opts :: client_credentials_opts().
 client_credentials(ClientContext, Opts) ->
-    #oidcc_client_context{provider_configuration = Configuration,
-                          client_id = ClientId} = ClientContext,
-    #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} = Configuration,
+    #oidcc_client_context{
+        provider_configuration = Configuration,
+        client_id = ClientId
+    } = ClientContext,
+    #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} =
+        Configuration,
 
     case lists:member(<<"client_credentials">>, GrantTypesSupported) of
         true ->
@@ -515,11 +549,14 @@ client_credentials(ClientContext, Opts) ->
             QueryString = [{<<"grant_type">>, <<"client_credentials">>}],
             QueryString1 = oidcc_scope:query_append_scope(Scope, QueryString),
 
-            TelemetryOpts = #{topic => [oidcc, client_credentials],
-                extra_meta => #{issuer => Issuer, client_id => ClientId}},
+            TelemetryOpts = #{
+                topic => [oidcc, client_credentials],
+                extra_meta => #{issuer => Issuer, client_id => ClientId}
+            },
 
             maybe
-                {ok, Token} ?= retrieve_a_token(QueryString1, none, ClientContext, Opts, TelemetryOpts, true),
+                {ok, Token} ?=
+                    retrieve_a_token(QueryString1, none, ClientContext, Opts, TelemetryOpts, true),
                 extract_response(Token, ClientContext, maps:put(nonce, any, Opts))
             end;
         false ->
@@ -563,10 +600,11 @@ int_extract_response(TokenMap, ClientContext, Opts) ->
     AccessExpire = maps:get(<<"expires_in">>, TokenMap, undefined),
     RefreshToken = maps:get(<<"refresh_token">>, TokenMap, none),
     Scope = maps:get(<<"scope">>, TokenMap, oidcc_scope:scopes_to_bin(Scopes)),
-    AccessTokenRecord = case AccessToken of
-        none -> none;
-        _ -> #oidcc_token_access{token = AccessToken, expires = AccessExpire}
-    end,
+    AccessTokenRecord =
+        case AccessToken of
+            none -> none;
+            _ -> #oidcc_token_access{token = AccessToken, expires = AccessExpire}
+        end,
     RefreshTokenRecord =
         case RefreshToken of
             none ->
@@ -576,27 +614,32 @@ int_extract_response(TokenMap, ClientContext, Opts) ->
         end,
     case IdToken of
         none ->
-            {ok, #oidcc_token{id = none,
+            {ok, #oidcc_token{
+                id = none,
                 access = AccessTokenRecord,
                 refresh = RefreshTokenRecord,
-                scope = oidcc_scope:parse(Scope)}};
+                scope = oidcc_scope:parse(Scope)
+            }};
         _ ->
-            RescueNone = case validate_id_token(IdToken, ClientContext, Nonce) of
-                {ok, OkClaims} ->
-                    {ok, {OkClaims, false}};
-                {error, {none_alg_used, NoneClaims}} ->
-                    {ok, {NoneClaims, true}};
-                {error, Reason} ->
-                    {error, Reason}
-            end,
+            RescueNone =
+                case validate_id_token(IdToken, ClientContext, Nonce) of
+                    {ok, OkClaims} ->
+                        {ok, {OkClaims, false}};
+                    {error, {none_alg_used, NoneClaims}} ->
+                        {ok, {NoneClaims, true}};
+                    {error, Reason} ->
+                        {error, Reason}
+                end,
 
             maybe
                 {ok, {Claims, NoneUsed}} ?= RescueNone,
                 IdTokenRecord = #oidcc_token_id{token = IdToken, claims = Claims},
-                TokenRecord = #oidcc_token{id = IdTokenRecord,
+                TokenRecord = #oidcc_token{
+                    id = IdTokenRecord,
                     access = AccessTokenRecord,
                     refresh = RefreshTokenRecord,
-                    scope = oidcc_scope:parse(Scope)},
+                    scope = oidcc_scope:parse(Scope)
+                },
                 ok ?= verify_access_token_map_hash(TokenRecord),
                 %% If none alg was used, continue with checks to allow the user to decide
                 %% if he wants to use the result
@@ -657,13 +700,17 @@ when
     Nonce :: binary() | any,
     Claims :: oidcc_jwt_util:claims().
 validate_id_token(IdToken, ClientContext, Nonce) ->
-    #oidcc_client_context{provider_configuration = Configuration,
-                          jwks = #jose_jwk{} = Jwks,
-                          client_id = ClientId,
-                          client_secret = ClientSecret} =
+    #oidcc_client_context{
+        provider_configuration = Configuration,
+        jwks = #jose_jwk{} = Jwks,
+        client_id = ClientId,
+        client_secret = ClientSecret
+    } =
         ClientContext,
-    #oidcc_provider_configuration{id_token_signing_alg_values_supported = AllowAlgorithms,
-                                  issuer = Issuer} =
+    #oidcc_provider_configuration{
+        id_token_signing_alg_values_supported = AllowAlgorithms,
+        issuer = Issuer
+    } =
         Configuration,
     maybe
         ExpClaims0 = [{<<"iss">>, Issuer}],
@@ -770,46 +817,52 @@ when
 retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext, Opts, TelemetryOpts, AuthenticateClient) ->
     #oidcc_client_context{provider_configuration = Configuration, client_jwks = ClientJwks} =
         ClientContext,
-    #oidcc_provider_configuration{token_endpoint = TokenEndpoint,
-                                  token_endpoint_auth_methods_supported = SupportedAuthMethods} =
+    #oidcc_provider_configuration{
+        token_endpoint = TokenEndpoint,
+        token_endpoint_auth_methods_supported = SupportedAuthMethods
+    } =
         Configuration,
 
     Header0 = [{"accept", "application/jwt, application/json"}],
 
     Body0 = add_pkce_verifier(QsBodyIn, PkceVerifier),
 
-    MaybeAuthMethod = case AuthenticateClient of
-        true -> select_preferred_auth(SupportedAuthMethods);
-        false -> {ok, none}
-    end,
+    MaybeAuthMethod =
+        case AuthenticateClient of
+            true -> select_preferred_auth(SupportedAuthMethods);
+            false -> {ok, none}
+        end,
 
     case MaybeAuthMethod of
         {ok, AuthMethod} ->
             maybe
-                {ok, {Body, Header}} ?= add_authentication(Body0, Header0, AuthMethod, ClientContext),
+                {ok, {Body, Header}} ?=
+                    add_authentication(Body0, Header0, AuthMethod, ClientContext),
                 Request =
-                    {TokenEndpoint,
-                    Header,
-                    "application/x-www-form-urlencoded",
-                    uri_string:compose_query(Body)},
-
+                    {TokenEndpoint, Header, "application/x-www-form-urlencoded",
+                        uri_string:compose_query(Body)},
                 RequestOpts = maps:get(request_opts, Opts, #{}),
-
-                {ok, {{json, TokenResponse}, _Headers}} ?= oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
+                {ok, {{json, TokenResponse}, _Headers}} ?=
+                    oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
                 {ok, TokenResponse}
             else
                 {error, auth_method_not_possible} ->
-                    retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext#oidcc_client_context{
-                        provider_configuration = Configuration#oidcc_provider_configuration{
-                            token_endpoint_auth_methods_supported =
-                                SupportedAuthMethods -- [atom_to_binary(AuthMethod)]
-                        }
-                    }, Opts, TelemetryOpts, AuthenticateClient);
-
+                    retrieve_a_token(
+                        QsBodyIn,
+                        PkceVerifier,
+                        ClientContext#oidcc_client_context{
+                            provider_configuration = Configuration#oidcc_provider_configuration{
+                                token_endpoint_auth_methods_supported =
+                                    SupportedAuthMethods -- [atom_to_binary(AuthMethod)]
+                            }
+                        },
+                        Opts,
+                        TelemetryOpts,
+                        AuthenticateClient
+                    );
                 {error, Reason} ->
                     {error, Reason}
             end;
-
         {error, Reason} ->
             {error, Reason}
     end.
@@ -893,12 +946,15 @@ add_authentication(
     } = ProviderConfiguration,
 
     %% At least one HS algorithmm must be present when using this method
-    AdjustedAllowAlgorithms = case lists:member(<<"HS256">>, AllowAlgorithms) or
-        lists:member(<<"HS384">>, AllowAlgorithms) or
-        lists:member(<<"HS512">>, AllowAlgorithms) of
-        true -> AllowAlgorithms;
-        false -> [<<"HS256">> | AllowAlgorithms]
-    end,
+    AdjustedAllowAlgorithms =
+        case
+            lists:member(<<"HS256">>, AllowAlgorithms) or
+                lists:member(<<"HS384">>, AllowAlgorithms) or
+                lists:member(<<"HS512">>, AllowAlgorithms)
+        of
+            true -> AllowAlgorithms;
+            false -> [<<"HS256">> | AllowAlgorithms]
+        end,
     AdjustedProviderConfiguration = ProviderConfiguration#oidcc_provider_configuration{
         token_endpoint_auth_signing_alg_values_supported = AdjustedAllowAlgorithms
     },
@@ -907,18 +963,19 @@ add_authentication(
     },
 
     maybe
-        #jose_jwk{} = OctJwk ?= oidcc_jwt_util:client_secret_oct_keys(
-            AdjustedAllowAlgorithms,
-            ClientSecret
-        ),
-        {ok, ClientAssertion} ?= signed_client_assertion(
-            AdjustedClientContext,
-            OctJwk
-        ),
+        #jose_jwk{} = OctJwk ?=
+            oidcc_jwt_util:client_secret_oct_keys(
+                AdjustedAllowAlgorithms,
+                ClientSecret
+            ),
+        {ok, ClientAssertion} ?=
+            signed_client_assertion(
+                AdjustedClientContext,
+                OctJwk
+            ),
         {ok, {
             [
-                {"client_assertion_type",
-                    "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"},
+                {"client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"},
                 {"client_assertion", ClientAssertion},
                 {"client_id", ClientId}
                 | QsBodyList
@@ -928,7 +985,6 @@ add_authentication(
     else
         none ->
             {error, auth_method_not_possible};
-
         {error, no_supported_alg_or_key} ->
             {error, auth_method_not_possible}
     end;
@@ -948,8 +1004,7 @@ add_authentication(
         {ok, ClientAssertion} ?= signed_client_assertion(ClientContext, ClientJwks),
         {ok, {
             [
-                {"client_assertion_type",
-                    "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"},
+                {"client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"},
                 {"client_assertion", ClientAssertion},
                 {"client_id", ClientId}
                 | QsBodyList
@@ -959,7 +1014,6 @@ add_authentication(
     else
         none ->
             {error, auth_method_not_possible};
-
         {error, no_supported_alg_or_key} ->
             {error, auth_method_not_possible}
     end;

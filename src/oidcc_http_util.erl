@@ -91,10 +91,11 @@ request(Method, Request, TelemetryOpts, RequestOpts) ->
     SslOpts = maps:get(ssl, RequestOpts, undefined),
 
     HttpOpts0 = [{timeout, Timeout}],
-    HttpOpts = case SslOpts of
-        undefined -> HttpOpts0;
-        _Opts -> [{ssl, SslOpts} | HttpOpts0]
-    end,
+    HttpOpts =
+        case SslOpts of
+            undefined -> HttpOpts0;
+            _Opts -> [{ssl, SslOpts} | HttpOpts0]
+        end,
 
     telemetry:span(
         TelemetryTopic,
@@ -102,10 +103,12 @@ request(Method, Request, TelemetryOpts, RequestOpts) ->
         fun() ->
             maybe
                 {ok, {_StatusLine, Headers, _Result} = Response} ?=
-                    httpc:request(Method,
-                                  Request,
-                                  HttpOpts,
-                                  [{body_format, binary}]),
+                    httpc:request(
+                        Method,
+                        Request,
+                        HttpOpts,
+                        [{body_format, binary}]
+                    ),
                 {ok, BodyAndFormat} ?= extract_successful_response(Response),
                 {{ok, {BodyAndFormat, Headers}}, TelemetryExtraMeta}
             else

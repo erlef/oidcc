@@ -30,3 +30,17 @@ jobs:
       rebarVersion: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
       elixirVersion: "${{ needs.detectToolVersions.outputs.elixirVersion }}"
       releaseName: "${{ github.ref_name }}"
+
+  publish:
+    name: "Publish"
+
+    needs: ["detectToolVersions"]
+
+    uses: ./.github/workflows/part_publish.yml
+    with:
+      otpVersion: "${{ needs.detectToolVersions.outputs.otpVersion }}"
+      rebarVersion: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
+      elixirVersion: "${{ needs.detectToolVersions.outputs.elixirVersion }}"
+      releaseName: "${{ github.ref_name }}"
+    secrets:
+      HEX_API_KEY: "${{ secrets.HEX_API_KEY }}"

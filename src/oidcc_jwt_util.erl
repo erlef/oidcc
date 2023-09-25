@@ -118,8 +118,10 @@ verify_claims(Claims, ExpClaims) ->
 
 %% @private
 -spec client_secret_oct_keys(AllowedAlgorithms, ClientSecret) -> jose_jwk:key() | none when
-    AllowedAlgorithms :: [binary()],
+    AllowedAlgorithms :: [binary()] | undefined,
     ClientSecret :: binary().
+client_secret_oct_keys(undefined, _ClientSecret) ->
+    none;
 client_secret_oct_keys(AllowedAlgorithms, ClientSecret) ->
     case
         lists:member(<<"HS256">>, AllowedAlgorithms) or
@@ -193,10 +195,14 @@ sign(Jwt, Jwk, [Algorithm | RestAlgorithms]) ->
 -spec encrypt(
     Jwt :: binary(),
     Jwk :: jose_jwk:key(),
-    SupportedAlgorithms :: [binary()],
-    SupportedEncValues :: [binary()]
+    SupportedAlgorithms :: [binary()] | undefined,
+    SupportedEncValues :: [binary()] | undefined
 ) ->
     {ok, binary()} | {error, no_supported_alg_or_key}.
+encrypt(_Jwt, _Jwk, undefined, _SupportedEncValues) ->
+    {error, no_supported_alg_or_key};
+encrypt(_Jwt, _Jwk, _SupportedAlgorithms, undefined) ->
+    {error, no_supported_alg_or_key};
 encrypt(Jwt, Jwk, SupportedAlgorithms, SupportedEncValues) ->
     encrypt(Jwt, Jwk, SupportedAlgorithms, SupportedEncValues, SupportedEncValues).
 

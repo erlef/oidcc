@@ -156,18 +156,19 @@ validate_userinfo_body({jwt, UserinfoBody}, ClientContext, Opts) ->
         ClientContext,
     #oidcc_provider_configuration{issuer = Issuer} = Configuration,
     ExpectedSubject = maps:get(expected_subject, Opts),
+    ExpectedClaims0 = [
+        {<<"aud">>, ClientId},
+        {<<"iss">>, Issuer}
+    ],
+    ExpectedClaims =
+        case maps:get(expected_subject, Opts) of
+            any -> ExpectedClaims0;
+            ExpectedSubject -> [{<<"sub">>, ExpectedSubject} | ExpectedClaims0]
+        end,
     validate_userinfo_token(
         UserinfoBody,
         ClientContext,
-        maps:put(
-            expected_claims,
-            [
-                {<<"aud">>, ClientId},
-                {<<"iss">>, Issuer},
-                {<<"sub">>, ExpectedSubject}
-            ],
-            Opts
-        )
+        maps:put(expected_claims, ExpectedClaims, Opts)
     ).
 
 -spec validate_userinfo_token(Token, ClientContext, Opts) ->

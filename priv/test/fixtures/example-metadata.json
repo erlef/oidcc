@@ -49,6 +49,7 @@
  ],
  "userinfo_signing_alg_values_supported": [
   "none",
+  "HS256",
   "RS256",
   "RS384",
   "RS512",

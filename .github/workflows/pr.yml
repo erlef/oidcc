@@ -33,3 +33,14 @@ jobs:
       otpVersion: "${{ needs.detectToolVersions.outputs.otpVersion }}"
       rebarVersion: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
       elixirVersion: "${{ needs.detectToolVersions.outputs.elixirVersion }}"
+
+  publish:
+    name: "Publish"
+
+    needs: ["detectToolVersions"]
+
+    uses: ./.github/workflows/part_publish.yml
+    with:
+      otpVersion: "${{ needs.detectToolVersions.outputs.otpVersion }}"
+      rebarVersion: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
+      elixirVersion: "${{ needs.detectToolVersions.outputs.elixirVersion }}"

@@ -101,7 +101,7 @@ jobs:
       - uses: actions/download-artifact@v3
         with:
           name: package
-          path: package.tar
+          path: .
       - name: Upload
         env:
           GITHUB_TOKEN: ${{ github.token }}

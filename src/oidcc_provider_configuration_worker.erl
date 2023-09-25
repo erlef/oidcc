@@ -107,8 +107,12 @@ init(Opts) ->
         {ok, Issuer} ?= get_issuer(Opts),
         ProviderConfigurationOpts = maps:get(provider_configuration_opts, Opts, #{}),
         {ok,
-         #state{issuer = Issuer, provider_configuration_opts = ProviderConfigurationOpts, ets_table = EtsTable},
-         {continue, load_configuration}}
+            #state{
+                issuer = Issuer,
+                provider_configuration_opts = ProviderConfigurationOpts,
+                ets_table = EtsTable
+            },
+            {continue, load_configuration}}
     end.
 
 %% @private
@@ -148,13 +152,17 @@ handle_continue(
     maybe_cancel_timer(OldTimer),
 
     maybe
-        {ok, {Configuration, Expiry}} ?=  oidcc_provider_configuration:load_configuration(
-            Issuer,
-            ProviderConfigurationOpts
-        ),
+        {ok, {Configuration, Expiry}} ?=
+            oidcc_provider_configuration:load_configuration(
+                Issuer,
+                ProviderConfigurationOpts
+            ),
         {ok, NewTimer} = timer:send_after(Expiry, configuration_expired),
         ok = store_in_ets(EtsTable, provider_configuration, Configuration),
-        {noreply, State#state{provider_configuration = Configuration, configuration_refresh_timer = NewTimer},
+        {noreply,
+            State#state{
+                provider_configuration = Configuration, configuration_refresh_timer = NewTimer
+            },
             {continue, load_jwks}}
     else
         {error, Reason} ->
@@ -175,7 +183,8 @@ handle_continue(
     maybe_cancel_timer(OldTimer),
 
     maybe
-        {ok, {Jwks, Expiry}} ?= oidcc_provider_configuration:load_jwks(JwksUri, ProviderConfigurationOpts),
+        {ok, {Jwks, Expiry}} ?=
+            oidcc_provider_configuration:load_jwks(JwksUri, ProviderConfigurationOpts),
         {ok, NewTimer} = timer:send_after(Expiry, jwks_expired),
         ok = store_in_ets(EtsTable, jwks, Jwks),
         {noreply, State#state{jwks = Jwks, jwks_refresh_timer = NewTimer}}

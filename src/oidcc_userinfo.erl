@@ -110,24 +110,33 @@ retrieve(#oidcc_token{} = Token, ClientContext, Opts) ->
     #oidcc_token{access = AccessTokenRecord, id = IdTokenRecord} = Token,
     #oidcc_token_access{token = AccessToken} = AccessTokenRecord,
     #oidcc_token_id{claims = #{<<"sub">> := ExpectedSubject}} = IdTokenRecord,
-    retrieve(AccessToken,
-                       ClientContext,
-                       maps:put(expected_subject, ExpectedSubject, Opts));
+    retrieve(
+        AccessToken,
+        ClientContext,
+        maps:put(expected_subject, ExpectedSubject, Opts)
+    );
 retrieve(AccessToken, ClientContext, Opts) when is_binary(AccessToken) ->
-    #oidcc_client_context{provider_configuration = Configuration,
-                          client_id = ClientId} = ClientContext,
-    #oidcc_provider_configuration{userinfo_endpoint = Endpoint,
-                                  issuer = Issuer} = Configuration,
+    #oidcc_client_context{
+        provider_configuration = Configuration,
+        client_id = ClientId
+    } = ClientContext,
+    #oidcc_provider_configuration{
+        userinfo_endpoint = Endpoint,
+        issuer = Issuer
+    } = Configuration,
 
     Header = [oidcc_http_util:bearer_auth_header(AccessToken)],
 
     Request = {Endpoint, Header},
     RequestOpts = maps:get(request_opts, Opts, #{}),
-    TelemetryOpts = #{topic => [oidcc, userinfo],
-                        extra_meta => #{issuer => Issuer, client_id => ClientId}},
+    TelemetryOpts = #{
+        topic => [oidcc, userinfo],
+        extra_meta => #{issuer => Issuer, client_id => ClientId}
+    },
 
     maybe
-        {ok, {UserinfoResponse, _Headers}} ?= oidcc_http_util:request(get, Request, TelemetryOpts, RequestOpts),
+        {ok, {UserinfoResponse, _Headers}} ?=
+            oidcc_http_util:request(get, Request, TelemetryOpts, RequestOpts),
         {ok, Claims} ?= validate_userinfo_body(UserinfoResponse, ClientContext, Opts),
         lookup_distributed_claims(Claims, ClientContext, Opts)
     end.
@@ -186,13 +195,17 @@ when
 validate_userinfo_token(UserinfoToken, ClientContext, Opts) ->
     RefreshJwksFun = maps:get(refresh_jwks, Opts, undefined),
     ExpClaims = maps:get(expected_claims, Opts, []),
-    #oidcc_client_context{provider_configuration = Configuration,
-                          jwks = #jose_jwk{} = Jwks,
-                          client_id = ClientId,
-                          client_secret = ClientSecret} =
+    #oidcc_client_context{
+        provider_configuration = Configuration,
+        jwks = #jose_jwk{} = Jwks,
+        client_id = ClientId,
+        client_secret = ClientSecret
+    } =
         ClientContext,
-    #oidcc_provider_configuration{userinfo_signing_alg_values_supported = AllowAlgorithms,
-                                  issuer = Issuer} =
+    #oidcc_provider_configuration{
+        userinfo_signing_alg_values_supported = AllowAlgorithms,
+        issuer = Issuer
+    } =
         Configuration,
     maybe
         JwksInclOct =
@@ -223,11 +236,15 @@ when
     Claims :: oidcc_jwt_util:claims(),
     ClientContext :: oidcc_client_context:t(),
     Opts :: retrieve_opts().
-lookup_distributed_claims(#{<<"_claim_names">> := ClaimNames,
-                            <<"_claim_sources">> := ClaimSources} =
-                              Claims,
-                          ClientContext,
-                          Opts) ->
+lookup_distributed_claims(
+    #{
+        <<"_claim_names">> := ClaimNames,
+        <<"_claim_sources">> := ClaimSources
+    } =
+        Claims,
+    ClientContext,
+    Opts
+) ->
     maybe
         {ok, DistributedClaims} ?=
             lookup_distributed_claim(maps:to_list(ClaimSources), Opts, []),
@@ -246,16 +263,20 @@ lookup_distributed_claim([], _Opts, Acc) ->
     {ok, Acc};
 lookup_distributed_claim([{ClaimName, #{<<"JWT">> := Jwt}} | Rest], Opts, Acc) ->
     lookup_distributed_claim(Rest, Opts, [{ClaimName, Jwt} | Acc]);
-lookup_distributed_claim([{ClaimName,
-                           #{<<"endpoint">> := Endpoint, <<"access_token">> := AccessToken}}
-                          | Rest],
-                         Opts,
-                         Acc) ->
+lookup_distributed_claim(
+    [
+        {ClaimName, #{<<"endpoint">> := Endpoint, <<"access_token">> := AccessToken}}
+        | Rest
+    ],
+    Opts,
+    Acc
+) ->
     Request =
-        {Endpoint,
-         [oidcc_http_util:bearer_auth_header(AccessToken), {"accept", "application/jwt"}]},
+        {Endpoint, [oidcc_http_util:bearer_auth_header(AccessToken), {"accept", "application/jwt"}]},
 
-    TelemetryOpts = #{topic => [oidcc, userinfo_distributed_claim], extra_meta => #{endpoint => Endpoint}},
+    TelemetryOpts = #{
+        topic => [oidcc, userinfo_distributed_claim], extra_meta => #{endpoint => Endpoint}
+    },
     RequestOpts = maps:get(request_opts, Opts, #{}),
 
     maybe

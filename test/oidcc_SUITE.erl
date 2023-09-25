@@ -12,6 +12,7 @@
 -export([retrieve_userinfo/1]).
 
 -include_lib("common_test/include/ct.hrl").
+-include_lib("oidcc/include/oidcc_token.hrl").
 -include_lib("stdlib/include/assert.hrl").
 
 all() ->
@@ -108,6 +109,18 @@ refresh_token(_Config) ->
             <<"client_id">>,
             <<"client_secret">>,
             #{expected_subject => <<"some sub">>}
+        ),
+
+    {error, Reason} =
+        oidcc:refresh_token(
+            #oidcc_token{
+                refresh = #oidcc_token_refresh{token = <<"invalid_refresh_token">>},
+                id = #oidcc_token_id{claims = #{<<"sub">> => <<"some sub">>}}
+            },
+            ConfigurationPid,
+            <<"client_id">>,
+            <<"client_secret">>,
+            #{}
         ),
 
     ?assertMatch({http_error, 400, _}, Reason),

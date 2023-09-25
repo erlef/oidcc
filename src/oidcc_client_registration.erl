@@ -272,8 +272,11 @@ encode(#oidcc_client_registration{
         tos_uri => TosUri,
         jwks =>
             case Jwks of
-                undefined -> undefined;
-                _ -> jose_jwk:to_map(Jwks)
+                undefined ->
+                    undefined;
+                _ ->
+                    {_KeyType, KeyMap} = jose_jwk:to_map(Jwks),
+                    KeyMap
             end,
         sector_identifier_uri => SectorIdentifierUri,
         subject_type => SubjectType,

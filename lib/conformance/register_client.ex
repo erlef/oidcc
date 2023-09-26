@@ -18,7 +18,11 @@ defmodule Conformance.RegisterClient do
         %Oidcc.ClientRegistration{
           redirect_uris: [url(~p"/callback")],
           initiate_login_uri: url(~p"/authorize"),
-          token_endpoint_auth_method: token_endpoint_auth_method
+          token_endpoint_auth_method: token_endpoint_auth_method,
+          post_logout_redirect_uris: [url(~p"/logged-out")],
+          extra_fields: %{
+            "frontchannel_logout_uri" => url(~p"/frontchannel-log-out")
+          }
         }
       )
 

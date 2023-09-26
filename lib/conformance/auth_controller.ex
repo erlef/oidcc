@@ -44,33 +44,50 @@ defmodule Conformance.AuthController do
     Logger.info("Retrieved Token: #{inspect(token, pretty: true)}")
     Logger.info("Retrieved Userinfo: #{inspect(userinfo, pretty: true)}")
 
-    conn =
-      with {:ok, {refreshed_token, refreshed_userinfo}} <- maybe_refresh(token) do
-        send_resp(
-          conn,
-          200,
-          inspect(
-            %{
-              token: token,
-              userinfo: userinfo,
-              refreshed_token: refreshed_token,
-              refreshed_userinfo: refreshed_userinfo
-            },
-            pretty: true
+    case Oidcc.ProviderConfiguration.Worker.get_provider_configuration(Conformance.ConfigWorker) do
+      %Oidcc.ProviderConfiguration{end_session_endpoint: :undefined} ->
+        conn =
+          with {:ok, {refreshed_token, refreshed_userinfo}} <- maybe_refresh(token) do
+            send_resp(
+              conn,
+              200,
+              inspect(
+                %{
+                  token: token,
+                  userinfo: userinfo,
+                  refreshed_token: refreshed_token,
+                  refreshed_userinfo: refreshed_userinfo
+                },
+                pretty: true
+              )
+            )
+          else
+            {:error, reason} -> error_response(conn, reason)
+          end
+
+        spawn(fn ->
+          Process.sleep(2_000)
+
+          Conformance.Screenshot.take()
+          Process.send(Conformance.Runner, :stop, [])
+        end)
+
+        conn
+
+      %Oidcc.ProviderConfiguration{} ->
+        target_uri = url(~p"/logged-out")
+
+        {:ok, redirect_uri} =
+          Oidcc.initiate_logout_url(
+            token,
+            Conformance.ConfigWorker,
+            Conformance.RegisterClient.client_id(),
+            Conformance.RegisterClient.client_secret(),
+            %{post_logout_redirect_uri: target_uri, state: "example_state"}
           )
-        )
-      else
-        {:error, reason} -> error_response(conn, reason)
-      end
 
-    spawn(fn ->
-      Process.sleep(2_000)
-
-      Conformance.Screenshot.take()
-      Process.send(Conformance.Runner, :stop, [])
-    end)
-
-    conn
+        redirect(conn, external: IO.iodata_to_binary(redirect_uri))
+    end
   end
 
   def callback(
@@ -91,6 +108,27 @@ defmodule Conformance.AuthController do
     end)
 
     conn
+  end
+
+  def logged_out(conn, params) do
+    spawn(fn ->
+      Process.sleep(2_000)
+
+      Conformance.Screenshot.take()
+      Process.send(Conformance.Runner, :stop, [])
+    end)
+
+    send_resp(conn, 200, inspect(%{params: params}, pretty: true))
+  end
+
+  def front_channel_log_out(conn, params) do
+    Logger.info("""
+    Received Frontchannel Log Out
+
+    Params: #{inspect(params, pretty: true)}
+    """)
+
+    send_resp(conn, 200, inspect(%{params: params}, pretty: true))
   end
 
   defp maybe_refresh(%Token{refresh: %Token.Refresh{token: _refresh_token}} = token) do

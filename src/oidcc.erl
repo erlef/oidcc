@@ -30,7 +30,7 @@
 
 -export([client_credentials_token/4]).
 -export([create_redirect_url/4]).
--export([initiate_logout_url/5]).
+-export([initiate_logout_url/4]).
 -export([introspect_token/5]).
 -export([jwt_profile_token/6]).
 -export([refresh_token/5]).
@@ -65,7 +65,7 @@
 when
     ProviderConfigurationWorkerName :: gen_server:server_ref(),
     ClientId :: binary(),
-    ClientSecret :: binary(),
+    ClientSecret :: binary() | unauthenticated,
     Opts :: oidcc_authorization:opts() | oidcc_client_context:opts(),
     Uri :: uri_string:uri_string().
 create_redirect_url(ProviderConfigurationWorkerName, ClientId, ClientSecret, Opts) ->
@@ -108,7 +108,7 @@ create_redirect_url(ProviderConfigurationWorkerName, ClientId, ClientSecret, Opt
     AuthCode,
     ProviderConfigurationWorkerName,
     ClientId,
-    ClientSecret,
+    ClientSecret | unauthenticated,
     Opts
 ) ->
     {ok, oidcc_token:t()} | {error, oidcc_client_context:error() | oidcc_token:error()}
@@ -165,7 +165,7 @@ retrieve_token(
         Token,
         ProviderConfigurationWorkerName,
         ClientId,
-        ClientSecret,
+        ClientSecret | unauthenticated,
         Opts
     ) ->
         {ok, map()} | {error, oidcc_client_context:error() | oidcc_userinfo:error()}
@@ -173,7 +173,7 @@ retrieve_token(
         Token :: oidcc_token:t(),
         ProviderConfigurationWorkerName :: gen_server:server_ref(),
         ClientId :: binary(),
-        ClientSecret :: binary(),
+        ClientSecret :: binary() | unauthenticated,
         Opts :: oidcc_userinfo:retrieve_opts_no_sub() | oidcc_client_context:opts();
     (Token, ProviderConfigurationWorkerName, ClientId, ClientSecret, Opts) ->
         {ok, map()} | {error, any()}
@@ -226,7 +226,7 @@ retrieve_userinfo(
         RefreshToken,
         ProviderConfigurationWorkerName,
         ClientId,
-        ClientSecret,
+        ClientSecret | unauthenticated,
         Opts
     ) ->
         {ok, oidcc_token:t()} | {error, oidcc_client_context:error() | oidcc_token:error()}
@@ -357,7 +357,7 @@ introspect_token(
     Subject,
     ProviderConfigurationWorkerName,
     ClientId,
-    ClientSecret,
+    ClientSecret | unauthenticated,
     Jwk,
     Opts
 ) -> {ok, oidcc_token:t()} | {error, oidcc_client_context:error() | oidcc_token:error()} when
@@ -443,7 +443,6 @@ client_credentials_token(ProviderConfigurationWorkerName, ClientId, ClientSecret
 %%     Token,
 %%     provider_name,
 %%     <<"client_id">>,
-%%     <<"client_secret">>,
 %%     #{post_logout_redirect_uri: <<"https://my.server/return"}
 %% ),
 %%
@@ -455,7 +454,6 @@ client_credentials_token(ProviderConfigurationWorkerName, ClientId, ClientSecret
     Token,
     ProviderConfigurationWorkerName,
     ClientId,
-    ClientSecret,
     Opts
 ) ->
     {ok, uri_string:uri_string()} | {error, oidcc_client_context:error() | oidcc_logout:error()}
@@ -464,9 +462,8 @@ when
     IdToken :: binary(),
     ProviderConfigurationWorkerName :: gen_server:server_ref(),
     ClientId :: binary(),
-    ClientSecret :: binary(),
-    Opts :: oidcc_logout:initiate_url_opts() | oidcc_client_context:opts().
-initiate_logout_url(Token, ProviderConfigurationWorkerName, ClientId, ClientSecret, Opts) ->
+    Opts :: oidcc_logout:initiate_url_opts() | oidcc_client_context:unauthenticated_opts().
+initiate_logout_url(Token, ProviderConfigurationWorkerName, ClientId, Opts) ->
     {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
 
     maybe
@@ -474,7 +471,7 @@ initiate_logout_url(Token, ProviderConfigurationWorkerName, ClientId, ClientSecr
             oidcc_client_context:from_configuration_worker(
                 ProviderConfigurationWorkerName,
                 ClientId,
-                ClientSecret,
+                unauthenticated,
                 ClientContextOpts
             ),
         oidcc_logout:initiate_url(Token, ClientContext, OtherOpts)

@@ -17,12 +17,24 @@ defmodule Oidcc.ClientContext do
   alias Oidcc.ProviderConfiguration
 
   @typedoc since: "3.0.0"
-  @type t() :: %__MODULE__{
+  @type t() :: authenticated_t() | unauthenticated_t()
+
+  @typedoc since: "3.0.0"
+  @type authenticated_t() :: %__MODULE__{
           provider_configuration: ProviderConfiguration.t(),
           jwks: JOSE.JWK.t(),
           client_id: String.t(),
           client_secret: String.t(),
           client_jwks: JOSE.JWK.t() | none
+        }
+
+  @typedoc since: "3.0.0"
+  @type unauthenticated_t() :: %__MODULE__{
+          provider_configuration: ProviderConfiguration.t(),
+          jwks: JOSE.JWK.t(),
+          client_id: String.t(),
+          client_secret: :unauthenticated,
+          client_jwks: :none
         }
 
   @doc """
@@ -56,8 +68,14 @@ defmodule Oidcc.ClientContext do
           provider_name :: GenServer.name(),
           client_id :: String.t(),
           client_secret :: String.t(),
-          opts :: :oidcc_client_context.opts()
-        ) :: {:ok, t()} | {:error, :oidcc_client_context.t()}
+          opts :: :oidcc_client_context.authenticated_opts()
+        ) :: {:ok, authenticated_t()} | {:error, :oidcc_client_context.t()}
+  @spec from_configuration_worker(
+          provider_name :: GenServer.name(),
+          client_id :: String.t(),
+          client_secret :: :unauthenticated,
+          opts :: :oidcc_client_context.unauthenticated_opts()
+        ) :: {:ok, unauthenticated_t()} | {:error, :oidcc_client_context.t()}
   def from_configuration_worker(provider_name, client_id, client_secret, opts \\ %{}) do
     opts = Map.update(opts, :client_jwks, :none, &JOSE.JWK.to_record/1)
 
@@ -102,8 +120,15 @@ defmodule Oidcc.ClientContext do
           jwks :: JOSE.JWK.t(),
           client_id :: String.t(),
           client_secret :: String.t(),
-          opts :: :oidcc_client_context.opts()
-        ) :: t()
+          opts :: :oidcc_client_context.authenticated_opts()
+        ) :: authenticated_t()
+  @spec from_manual(
+          configuration :: ProviderConfiguration.t(),
+          jwks :: JOSE.JWK.t(),
+          client_id :: String.t(),
+          client_secret :: :unauthenticated,
+          opts :: :oidcc_client_context.unauthenticated_opts()
+        ) :: unauthenticated_t()
   def from_manual(configuration, jwks, client_id, client_secret, opts \\ %{}) do
     configuration = ProviderConfiguration.struct_to_record(configuration)
     jwks = JOSE.JWK.to_record(jwks)

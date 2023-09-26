@@ -12,7 +12,7 @@ defmodule Oidcc.Logout do
   See https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout
 
   For a high level interface using `Oidcc.ProviderConfiguration.Worker`
-  see `Oidcc.initiate_logout_url/5`.
+  see `Oidcc.initiate_logout_url/4`.
 
   ## Examples
 
@@ -25,7 +25,7 @@ defmodule Oidcc.Logout do
       ...>   Oidcc.ClientContext.from_configuration_worker(
       ...>     pid,
       ...>     "client_id",
-      ...>     "client_secret"
+      ...>     :unauthenticated
       ...>   )
       ...>
       ...> # Get `token` from `Oidcc.retrieve_token/5`

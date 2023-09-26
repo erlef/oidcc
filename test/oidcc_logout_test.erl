@@ -17,21 +17,21 @@ initiate_url_test() ->
         end_session_endpoint = <<"https://example.provider/logout">>
     },
     NormalClientContext = oidcc_client_context:from_manual(
-        NormalConfiguration, Jwks, <<"client_id">>, <<"client_secret">>
+        NormalConfiguration, Jwks, <<"client_id">>, unauthenticated
     ),
 
     QueryParamConfiguration = Configuration#oidcc_provider_configuration{
         end_session_endpoint = <<"https://example.provider/logout?query=param">>
     },
     QueryParamClientContext = oidcc_client_context:from_manual(
-        QueryParamConfiguration, Jwks, <<"client_id">>, <<"client_secret">>
+        QueryParamConfiguration, Jwks, <<"client_id">>, unauthenticated
     ),
 
     NoEndSessionEndpointConfiguration = Configuration#oidcc_provider_configuration{
         end_session_endpoint = undefined
     },
     NoEndSessionEndpointClientContext = oidcc_client_context:from_manual(
-        NoEndSessionEndpointConfiguration, Jwks, <<"client_id">>, <<"client_secret">>
+        NoEndSessionEndpointConfiguration, Jwks, <<"client_id">>, unauthenticated
     ),
 
     ?assertMatch(

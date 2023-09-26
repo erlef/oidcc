@@ -167,6 +167,8 @@ attempt_request_object(QueryParams, #oidcc_client_context{
     provider_configuration = #oidcc_provider_configuration{request_parameter_supported = false}
 }) ->
     QueryParams;
+attempt_request_object(QueryParams, #oidcc_client_context{client_secret = unauthenticated}) ->
+    QueryParams;
 attempt_request_object(QueryParams, #oidcc_client_context{
     client_id = ClientId,
     client_secret = ClientSecret,

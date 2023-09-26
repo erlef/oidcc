@@ -175,7 +175,7 @@
     | oidcc_http_util:error().
 
 -type auth_method() ::
-    client_secret_basic | client_secret_post | client_secret_jwt | private_key_jwt.
+    none | client_secret_basic | client_secret_post | client_secret_jwt | private_key_jwt.
 
 -telemetry_event(#{
     event => [oidcc, request_token, start],
@@ -533,7 +533,7 @@ jwt_profile(Subject, ClientContext, Jwk, Opts) ->
 %% @end
 %% @since 3.0.0
 -spec client_credentials(ClientContext, Opts) -> {ok, t()} | {error, error()} when
-    ClientContext :: oidcc_client_context:t(),
+    ClientContext :: oidcc_client_context:authenticated_t(),
     Opts :: client_credentials_opts().
 client_credentials(ClientContext, Opts) ->
     #oidcc_client_context{
@@ -721,13 +721,16 @@ validate_id_token(IdToken, ClientContext, Nonce) ->
                 Bin when is_binary(Bin) ->
                     [{<<"nonce">>, Nonce} | ExpClaims0]
             end,
-        JwksInclOct =
-            case oidcc_jwt_util:client_secret_oct_keys(AllowAlgorithms, ClientSecret) of
+        JwksInclOct = case ClientSecret of
+            unauthenticated -> Jwks;
+            Secret ->
+            case oidcc_jwt_util:client_secret_oct_keys(AllowAlgorithms, Secret) of
                 none ->
                     Jwks;
                 OctJwk ->
                     oidcc_jwt_util:merge_jwks(Jwks, OctJwk)
-            end,
+            end
+        end,
         {ok, {#jose_jwt{fields = Claims}, Jws}} ?=
             oidcc_jwt_util:verify_signature(IdToken, AllowAlgorithms, JwksInclOct),
         ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),
@@ -873,13 +876,15 @@ when
     AuthMethodsSupported :: [binary(), ...].
 select_preferred_auth(AuthMethodsSupported) ->
     MethodPriority = #{
-        client_secret_basic => 0,
-        client_secret_post => 1,
-        client_secret_jwt => 2,
-        private_key_jwt => 3
+        none => 0,
+        client_secret_basic => 1,
+        client_secret_post => 2,
+        client_secret_jwt => 3,
+        private_key_jwt => 4
     },
     KnownAuthMethods = lists:filtermap(
         fun
+            (<<"none">>) -> {true, none};
             (<<"client_secret_basic">>) -> {true, client_secret_basic};
             (<<"client_secret_post">>) -> {true, client_secret_post};
             (<<"client_secret_jwt">>) -> {true, client_secret_jwt};
@@ -911,8 +916,23 @@ select_preferred_auth(AuthMethodsSupported) ->
 when
     QueryList :: oidcc_http_util:query_params(),
     Header :: [oidcc_http_util:http_header()],
-    AuthMethod :: auth_method() | none,
+    AuthMethod :: auth_method(),
     ClientContext :: oidcc_client_context:t().
+add_authentication(
+    QsBodyList,
+    Header,
+    none,
+    #oidcc_client_context{client_id = ClientId}
+) ->
+    NewBodyList = [{<<"client_id">>, ClientId} | QsBodyList],
+    {ok, {NewBodyList, Header}};
+add_authentication(
+    _QsBodyList,
+    _Header,
+    _Method,
+    #oidcc_client_context{client_secret = unauthenticated}
+) ->
+    {error, auth_method_not_possible};
 add_authentication(
     QsBodyList,
     Header,
@@ -921,6 +941,7 @@ add_authentication(
 ) ->
     NewHeader = [oidcc_http_util:basic_auth_header(ClientId, ClientSecret) | Header],
     {ok, {QsBodyList, NewHeader}};
+
 add_authentication(
     QsBodyList,
     Header,
@@ -1016,14 +1037,7 @@ add_authentication(
             {error, auth_method_not_possible};
         {error, no_supported_alg_or_key} ->
             {error, auth_method_not_possible}
-    end;
-add_authentication(
-    QsBodyList,
-    Header,
-    none,
-    _ClientContext
-) ->
-    {ok, {QsBodyList, Header}}.
+    end.
 
 -spec add_pkce_verifier(QueryList, PkceVerifier) -> oidcc_http_util:query_params() when
     QueryList :: oidcc_http_util:query_params(),

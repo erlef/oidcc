@@ -216,7 +216,6 @@ initiate_logout_url(_Config) ->
         #oidcc_token{id = #oidcc_token_id{token = <<"id_token">>}},
         ZitadelConfigurationPid,
         <<"client_id">>,
-        <<"client_secret">>,
         #{}
     ),
     ?assertEqual(

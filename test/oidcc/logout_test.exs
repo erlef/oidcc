@@ -17,7 +17,7 @@ defmodule Oidcc.LogoutTest do
         Oidcc.ClientContext.from_configuration_worker(
           pid,
           "client_id",
-          "client_secret"
+          :unauthenticated
         )
 
       assert {:ok, _redirect_uri} =

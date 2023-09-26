@@ -4,7 +4,7 @@
     provider_configuration :: oidcc_provider_configuration:t(),
     jwks :: jose_jwk:key(),
     client_id :: binary(),
-    client_secret :: binary(),
+    client_secret :: binary() | unauthenticated,
     client_jwks = none :: jose_jwk:key() | none
 }).
 

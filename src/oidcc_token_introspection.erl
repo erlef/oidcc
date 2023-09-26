@@ -94,7 +94,7 @@
     | {error, error()}
 when
     Token :: oidcc_token:t() | binary(),
-    ClientContext :: oidcc_client_context:t(),
+    ClientContext :: oidcc_client_context:authenticated_t(),
     Opts :: opts().
 introspect(
     #oidcc_token{access = #oidcc_token_access{token = AccessToken}},

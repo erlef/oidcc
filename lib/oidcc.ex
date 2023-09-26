@@ -371,8 +371,7 @@ defmodule Oidcc do
       ...> {:ok, _redirect_uri} = Oidcc.initiate_logout_url(
       ...>   token,
       ...>   pid,
-      ...>   "client_id",
-      ...>   "client_secret"
+      ...>   "client_id"
       ...> )
 
   """
@@ -381,7 +380,6 @@ defmodule Oidcc do
           token :: id_token | Oidcc.Token.t() | :undefined,
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
-          client_secret :: String.t(),
           opts :: :oidcc_logout.initiate_url_opts() | :oidcc_client_context.opts()
         ) ::
           {:ok, :uri_string.uri_string()}
@@ -391,7 +389,6 @@ defmodule Oidcc do
         token,
         provider_configuration_name,
         client_id,
-        client_secret,
         opts \\ %{}
       ) do
     token =
@@ -405,7 +402,6 @@ defmodule Oidcc do
       token,
       provider_configuration_name,
       client_id,
-      client_secret,
       opts
     )
   end

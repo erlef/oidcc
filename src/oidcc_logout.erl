@@ -46,7 +46,7 @@
 %% See [https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout]
 %%
 %% For a high level interface using {@link oidcc_provider_configuration_worker}
-%% see {@link oidcc:initiate_logout_url/5}.
+%% see {@link oidcc:initiate_logout_url/4}.
 %%
 %% <h2>Examples</h2>
 %%
@@ -54,7 +54,7 @@
 %% {ok, ClientContext} = oidcc_client_context:from_configuration_worker(
 %%   provider_name,
 %%   <<"client_id">>,
-%%   <<"client_secret">>
+%%   unauthenticated
 %% ),
 %%
 %% %% Get `Token` from `oidcc_token`

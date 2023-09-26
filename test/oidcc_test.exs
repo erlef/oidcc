@@ -184,7 +184,7 @@ defmodule OidccTest do
     end
   end
 
-  describe inspect(&Oidcc.initiate_logout_url/5) do
+  describe inspect(&Oidcc.initiate_logout_url/4) do
     test "works" do
       pid =
         start_supervised!(
@@ -195,8 +195,7 @@ defmodule OidccTest do
                Oidcc.initiate_logout_url(
                  "id_token",
                  pid,
-                 "client_id",
-                 "client_secret"
+                 "client_id"
                )
     end
   end

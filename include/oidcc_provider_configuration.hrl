@@ -2,6 +2,7 @@
 
 %% @see https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
 %% @see https://datatracker.ietf.org/doc/html/draft-jones-oauth-discovery-01#section-4.1
+%% @see https://openid.net/specs/openid-connect-rpinitiated-1_0.html#OPMetadata
 -record(oidcc_provider_configuration,
     %% OpenID Connect Discovery 1.0 / OAuth 2.0 Discovery (draft-jones-oauth-discovery-01)
     {
@@ -90,6 +91,8 @@
             [binary()] | undefined,
         %% OAuth 2.0 Discovery (draft-jones-oauth-discovery-01)
         code_challenge_methods_supported = undefined :: [binary()] | undefined,
+        %% OpenID Connect RP-Initiated Logout 1.0
+        end_session_endpoint = undefined :: uri_string:uri_string() | undefined,
         %% Unknown Fields
         extra_fields = #{} :: #{binary() => term()}
     }

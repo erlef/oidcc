@@ -63,6 +63,7 @@ defmodule Oidcc.ProviderConfiguration do
   For details on the fields see:
   * https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
   * https://datatracker.ietf.org/doc/html/draft-jones-oauth-discovery-01#section-4.1
+  * https://openid.net/specs/openid-connect-rpinitiated-1_0.html#OPMetadata
   """
   @typedoc since: "3.0.0"
   @type t() :: %__MODULE__{
@@ -108,6 +109,7 @@ defmodule Oidcc.ProviderConfiguration do
           introspection_endpoint_auth_methods_supported: [String.t()],
           introspection_endpoint_auth_signing_alg_values_supported: [String.t()] | :undefined,
           code_challenge_methods_supported: [String.t()] | :undefined,
+          end_session_endpoint: :uri_string.uri_string() | :undefined,
           extra_fields: %{String.t() => term()}
         }
 

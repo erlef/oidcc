@@ -3,6 +3,7 @@
 -export([all/0]).
 -export([create_redirect_url/1]).
 -export([end_per_suite/1]).
+-export([initiate_logout_url/1]).
 -export([init_per_suite/1]).
 -export([introspect_token/1]).
 -export([refresh_token/1]).
@@ -21,6 +22,7 @@ all() ->
         retrieve_token,
         retrieve_userinfo,
         refresh_token,
+        initiate_logout_url,
         introspect_token,
         retrieve_jwt_profile_token,
         retrieve_client_credentials_token
@@ -200,6 +202,26 @@ retrieve_client_credentials_token(_Config) ->
             ZitadelClientCredentialsClientSecret,
             #{scope => [<<"openid">>]}
         )
+    ),
+
+    ok.
+
+initiate_logout_url(_Config) ->
+    {ok, ZitadelConfigurationPid} =
+        oidcc_provider_configuration_worker:start_link(#{
+            issuer => <<"https://erlef-test-w4a8z2.zitadel.cloud">>
+        }),
+
+    {ok, Uri} = oidcc:initiate_logout_url(
+        #oidcc_token{id = #oidcc_token_id{token = <<"id_token">>}},
+        ZitadelConfigurationPid,
+        <<"client_id">>,
+        <<"client_secret">>,
+        #{}
+    ),
+    ?assertEqual(
+        <<"https://erlef-test-w4a8z2.zitadel.cloud/oidc/v1/end_session?id_token_hint=id_token&client_id=client_id">>,
+        iolist_to_binary(Uri)
     ),
 
     ok.

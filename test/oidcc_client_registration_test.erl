@@ -53,7 +53,6 @@ register_test() ->
             ?assertMatch(
                 #{
                     <<"application_type">> := <<"web">>,
-                    <<"extra_fields">> := #{},
                     <<"redirect_uris">> := [RedirectUri],
                     <<"require_auth_time">> := false,
                     <<"token_endpoint_auth_method">> := <<"client_secret_basic">>

@@ -44,7 +44,8 @@ defmodule Oidcc.ClientRegistration do
   @typedoc """
   Client Metdata Struct
 
-  See https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata
+  See https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata and
+  https://openid.net/specs/openid-connect-rpinitiated-1_0.html#ClientMetadata
   """
   @typedoc since: "3.0.0"
   @type t() :: %__MODULE__{
@@ -78,6 +79,7 @@ defmodule Oidcc.ClientRegistration do
           default_acr_values: [String.t()] | :undefined,
           initiate_login_uri: :uri_string.uri_string() | :undefined,
           request_uris: [:uri_string.uri_string()] | :undefined,
+          post_logout_redirect_uris: [:uri_string.uri_string()] | :undefined,
           extra_fields: %{String.t() => term()}
         }
 

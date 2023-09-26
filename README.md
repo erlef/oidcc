@@ -97,6 +97,8 @@ The refactoring for `v3` and the certification is funded as an
   * [JWT Response](https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse)
   * [Aggregated and Distributed Claims](https://openid.net/specs/openid-connect-core-1_0.html#AggregatedDistributedClaims)
 * [Token Introspection](https://datatracker.ietf.org/doc/html/rfc7662)
+* Logout
+  * [RP-Initiated](https://openid.net/specs/openid-connect-rpinitiated-1_0.html)
 
 ## Setup
 

@@ -96,12 +96,14 @@
         introspection_endpoint_auth_signing_alg_values_supported ::
             [binary()] | undefined,
         code_challenge_methods_supported :: [binary()] | undefined,
+        end_session_endpoint :: uri_string:uri_string() | undefined,
         extra_fields :: #{binary() => term()}
     }.
 %% Record containing OpenID and OAuth 2.0 Configuration
 %%
-%% See [https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata] and
-%% [https://datatracker.ietf.org/doc/html/draft-jones-oauth-discovery-01#section-4.1]
+%% See [https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata],
+%% [https://datatracker.ietf.org/doc/html/draft-jones-oauth-discovery-01#section-4.1] and
+%% [https://openid.net/specs/openid-connect-rpinitiated-1_0.html#OPMetadata]
 %%
 %% All unrecognized fields are stored in `extra_fields'.
 
@@ -292,7 +294,8 @@ decode_configuration(Configuration) ->
                     IntrospectionEndpointAuthMethodsSupported,
                 introspection_endpoint_auth_signing_alg_values_supported :=
                     IntrospectionEndpointAuthSigningAlgValuesSupported,
-                code_challenge_methods_supported := CodeChallengeMethodsSupported
+                code_challenge_methods_supported := CodeChallengeMethodsSupported,
+                end_session_endpoint := EndSessionEndpoint
             },
             ExtraFields
         }} ?=
@@ -376,7 +379,9 @@ decode_configuration(Configuration) ->
                     {optional, introspection_endpoint_auth_signing_alg_values_supported, undefined,
                         fun parse_token_signing_alg_values_no_none/2},
                     {optional, code_challenge_methods_supported, undefined,
-                        fun oidcc_decode_util:parse_setting_binary_list/2}
+                        fun oidcc_decode_util:parse_setting_binary_list/2},
+                    {optional, end_session_endpoint, undefined,
+                        fun oidcc_decode_util:parse_setting_uri_https/2}
                 ],
                 #{}
             ),
@@ -441,6 +446,7 @@ decode_configuration(Configuration) ->
                 IntrospectionEndpointAuthSigningAlgValuesSupported,
             code_challenge_methods_supported =
                 CodeChallengeMethodsSupported,
+            end_session_endpoint = EndSessionEndpoint,
             extra_fields = ExtraFields
         }}
     end.

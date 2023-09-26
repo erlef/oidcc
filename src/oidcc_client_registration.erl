@@ -46,42 +46,75 @@
 
 -type t() ::
     #oidcc_client_registration{
+        %% OpenID Connect Dynamic Client Registration 1.0
         redirect_uris :: [uri_string:uri_string()],
+        %% OpenID Connect Dynamic Client Registration 1.0
         response_types :: [binary()] | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         grant_types :: [binary()] | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         application_type :: web | native,
+        %% OpenID Connect Dynamic Client Registration 1.0
         contacts :: [binary()] | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         client_name :: binary() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         logo_uri :: uri_string:uri_string() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         client_uri :: uri_string:uri_string() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         policy_uri :: uri_string:uri_string() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         tos_uri :: uri_string:uri_string() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         jwks :: jose_jwk:key() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         jwks_uri :: uri_string:uri_string() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         sector_identifier_uri :: uri_string:uri_string() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         subject_type :: pairwise | public | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         id_token_signed_response_alg :: binary() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         id_token_encrypted_response_alg :: binary() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         id_token_encrypted_response_enc :: binary() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         userinfo_signed_response_alg :: binary() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         userinfo_encrypted_response_alg :: binary() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         userinfo_encrypted_response_enc :: binary() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         request_object_signing_alg :: binary() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         request_object_encryption_alg :: binary() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         request_object_encryption_enc :: binary() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         token_endpoint_auth_method :: erlang:binary(),
+        %% OpenID Connect Dynamic Client Registration 1.0
         token_endpoint_auth_signing_alg :: binary() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         default_max_age :: pos_integer() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         require_auth_time :: boolean(),
+        %% OpenID Connect Dynamic Client Registration 1.0
         default_acr_values :: [binary()] | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         initiate_login_uri :: uri_string:uri_string() | undefined,
+        %% OpenID Connect Dynamic Client Registration 1.0
         request_uris :: [uri_string:uri_string()] | undefined,
+        %% OpenID Connect RP-Initiated Logout 1.0
+        post_logout_redirect_uris :: [uri_string:uri_string()] | undefined,
         %% Unknown Fields
         extra_fields :: #{binary() => term()}
     }.
 %% Record containing Client Registration Metadata
 %%
-%% See [https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata]
+%% See [https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata] and
+%% [https://openid.net/specs/openid-connect-rpinitiated-1_0.html#ClientMetadata]
 %%
 %% All unrecognized fields are stored in `extra_fields'.
 
@@ -259,6 +292,7 @@ encode(#oidcc_client_registration{
     default_acr_values = DefaultAcrValues,
     initiate_login_uri = InitiateLoginUri,
     request_uris = RequestUris,
+    post_logout_redirect_uris = PostLogoutRedirectUris,
     extra_fields = ExtraFields
 }) ->
     Map0 = #{
@@ -298,13 +332,14 @@ encode(#oidcc_client_registration{
         default_acr_values => DefaultAcrValues,
         initiate_login_uri => InitiateLoginUri,
         request_uris => RequestUris,
-        extra_fields => ExtraFields
+        post_logout_redirect_uris => PostLogoutRedirectUris
     },
+    Map1 = maps:merge(Map0, ExtraFields),
     Map = maps:filter(
         fun
             (_Key, undefined) -> false;
             (_Key, _Value) -> true
         end,
-        Map0
+        Map1
     ),
     jose:encode(Map).

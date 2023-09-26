@@ -183,4 +183,21 @@ defmodule OidccTest do
                )
     end
   end
+
+  describe inspect(&Oidcc.initiate_logout_url/5) do
+    test "works" do
+      pid =
+        start_supervised!(
+          {ProviderConfiguration.Worker, %{issuer: "https://erlef-test-w4a8z2.zitadel.cloud"}}
+        )
+
+      assert {:ok, _redirect_uri} =
+               Oidcc.initiate_logout_url(
+                 "id_token",
+                 pid,
+                 "client_id",
+                 "client_secret"
+               )
+    end
+  end
 end

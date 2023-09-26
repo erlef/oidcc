@@ -30,6 +30,7 @@
 
 -export([client_credentials_token/4]).
 -export([create_redirect_url/4]).
+-export([initiate_logout_url/5]).
 -export([introspect_token/5]).
 -export([jwt_profile_token/6]).
 -export([refresh_token/5]).
@@ -425,6 +426,58 @@ client_credentials_token(ProviderConfigurationWorkerName, ClientId, ClientSecret
                 ClientContextOpts
             ),
         oidcc_token:client_credentials(ClientContext, OptsWithRefresh)
+    end.
+
+%% @doc
+%% Create Initiate URI for Relaying Party initated Logout
+%%
+%% See [https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout]
+%%
+%% <h2>Examples</h2>
+%%
+%% ```
+%% %% Get `Token` from `oidcc_token`
+%%
+%% {ok, RedirectUri} =
+%%   oidcc:initiate_logout_url(
+%%     Token,
+%%     provider_name,
+%%     <<"client_id">>,
+%%     <<"client_secret">>,
+%%     #{post_logout_redirect_uri: <<"https://my.server/return"}
+%% ),
+%%
+%% %% RedirectUri = https://my.provider/logout?id_token_hint=IDToken&client_id=ClientId&post_logout_redirect_uri=https%3A%2F%2Fmy.server%2Freturn
+%% '''
+%% @end
+%% @since 3.0.0
+-spec initiate_logout_url(
+    Token,
+    ProviderConfigurationWorkerName,
+    ClientId,
+    ClientSecret,
+    Opts
+) ->
+    {ok, uri_string:uri_string()} | {error, oidcc_client_context:error() | oidcc_logout:error()}
+when
+    Token :: IdToken | oidcc_token:t() | undefined,
+    IdToken :: binary(),
+    ProviderConfigurationWorkerName :: gen_server:server_ref(),
+    ClientId :: binary(),
+    ClientSecret :: binary(),
+    Opts :: oidcc_logout:initiate_url_opts() | oidcc_client_context:opts().
+initiate_logout_url(Token, ProviderConfigurationWorkerName, ClientId, ClientSecret, Opts) ->
+    {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
+
+    maybe
+        {ok, ClientContext} ?=
+            oidcc_client_context:from_configuration_worker(
+                ProviderConfigurationWorkerName,
+                ClientId,
+                ClientSecret,
+                ClientContextOpts
+            ),
+        oidcc_logout:initiate_url(Token, ClientContext, OtherOpts)
     end.
 
 -spec maps_put_new(Key, Value, Map1) -> Map2 when

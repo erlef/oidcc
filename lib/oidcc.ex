@@ -352,4 +352,61 @@ defmodule Oidcc do
         opts
       )
       |> Oidcc.Token.normalize_token_response()
+
+  @doc """
+  Create Initiate URI for Relaying Party initated Logout
+
+  See [https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout]
+
+  ## Examples
+
+      iex> {:ok, pid} =
+      ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
+      ...>     issuer: "https://erlef-test-w4a8z2.zitadel.cloud"
+      ...>   })
+      ...>
+      ...> # Get access_token from Oidcc.Token.retrieve/3
+      ...> token = "token"
+      ...>
+      ...> {:ok, _redirect_uri} = Oidcc.initiate_logout_url(
+      ...>   token,
+      ...>   pid,
+      ...>   "client_id",
+      ...>   "client_secret"
+      ...> )
+
+  """
+  @doc since: "3.0.0"
+  @spec initiate_logout_url(
+          token :: id_token | Oidcc.Token.t() | :undefined,
+          provider_configuration_name :: GenServer.name(),
+          client_id :: String.t(),
+          client_secret :: String.t(),
+          opts :: :oidcc_logout.initiate_url_opts() | :oidcc_client_context.opts()
+        ) ::
+          {:ok, :uri_string.uri_string()}
+          | {:error, :oidcc_client_context.error() | :oidcc_logout.error()}
+        when id_token: String.t()
+  def initiate_logout_url(
+        token,
+        provider_configuration_name,
+        client_id,
+        client_secret,
+        opts \\ %{}
+      ) do
+    token =
+      case token do
+        %Oidcc.Token{} = token -> Oidcc.Token.struct_to_record(token)
+        token when is_binary(token) -> token
+        :undefined -> :undefined
+      end
+
+    :oidcc.initiate_logout_url(
+      token,
+      provider_configuration_name,
+      client_id,
+      client_secret,
+      opts
+    )
+  end
 end

@@ -287,6 +287,7 @@ jobs:
         with:
           name: coverage-report
           path: _build/test/cover/
+      - run: rebar3 as test compile
       - run: rebar3 as test coveralls send
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,15 +1,5 @@
 on:
-  workflow_call:
-    inputs:
-      otpVersion:
-        required: true
-        type: string
-      rebarVersion:
-        required: true
-        type: string
-      elixirVersion:
-        required: true
-        type: string
+  workflow_call: {}
 
 name: "Test"
 
@@ -17,6 +7,33 @@ env:
   ERL_AFLAGS: "-enable-feature all"
 
 jobs:
+  detectToolVersions:
+    name: "Detect Tool Versions"
+
+    runs-on: ubuntu-latest
+
+    outputs:
+      otpVersion: "${{ steps.toolVersions.outputs.OTP_VERSION }}"
+      rebarVersion: "${{ steps.toolVersions.outputs.REBAR_VERSION }}"
+      elixirVersion: "${{ steps.toolVersions.outputs.ELIXIR_VERSION }}"
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: "Read .tool-versions"
+        id: toolVersions
+        run: |
+          OTP_VERSION="$(cat .tool-versions | grep erlang | cut -d' ' -f2-)"
+          echo OTP: $OTP_VERSION
+          echo "OTP_VERSION=${OTP_VERSION}" >> $GITHUB_OUTPUT
+
+          REBAR_VERSION="$(cat .tool-versions | grep rebar | cut -d' ' -f2-)"
+          echo Rebar: $REBAR_VERSION
+          echo "REBAR_VERSION=${REBAR_VERSION}" >> $GITHUB_OUTPUT
+
+          ELIXIR_VERSION="$(cat .tool-versions | grep elixir | cut -d' ' -f2-)"
+          echo Rebar: $ELIXIR_VERSION
+          echo "ELIXIR_VERSION=${ELIXIR_VERSION}" >> $GITHUB_OUTPUT
+
   rebar_format:
     name: rebar3 fmt
 
@@ -27,8 +44,8 @@ jobs:
       - uses: erlef/setup-beam@v1
         id: setupBEAM
         with:
-          otp-version: ${{ inputs.otpVersion }}
-          rebar3-version: ${{ inputs.rebarVersion }}
+          version-file: .tool-versions
+          version-type: strict
       - uses: actions/cache@v3
         with:
           path: _build
@@ -47,9 +64,8 @@ jobs:
       - uses: erlef/setup-beam@v1
         id: setupBEAM
         with:
-          otp-version: ${{ inputs.otpVersion }}
-          rebar3-version: ${{ inputs.rebarVersion }}
-          elixir-version: ${{ inputs.elixirVersion }}
+          version-file: .tool-versions
+          version-type: strict
       - uses: actions/cache@v3
         with:
           path: _build
@@ -66,16 +82,22 @@ jobs:
       - run: mix format --check-formatted
 
   eunit:
-    name: rebar3 eunit
+    name: rebar3 eunit (${{ matrix.otp }})
 
     runs-on: ubuntu-latest
+
+    needs: ["detectToolVersions"]
 
     strategy:
       fail-fast: false
       matrix:
         include:
-          - otp: "${{ inputs.otpVersion }}"
+          - otp: "26.0"
+            unstable: false
+          - otp: "26.1"
+            unstable: false
           - otp: "master"
+            unstable: true
 
     steps:
       - uses: actions/checkout@v4
@@ -83,77 +105,109 @@ jobs:
         id: setupBEAM
         with:
           otp-version: ${{ matrix.otp }}
-          rebar3-version: ${{ inputs.rebarVersion }}
+          rebar3-version: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
+          version-type: strict
       - uses: actions/cache@v3
         with:
           path: _build
           key: eunit-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
           restore-keys: |
             eunit-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
-      - run: rebar3 eunit --cover
+      - run: rebar3 eunit --cover --cover_export_name "eunit-${{ steps.setupBEAM.outputs.otp-version }}"
+        continue-on-error: ${{ matrix.unstable }}
       - uses: actions/upload-artifact@v3
         with:
           name: eunit-coverage
-          path: _build/test/cover/eunit.coverdata
+          path: "_build/test/cover/eunit-${{ steps.setupBEAM.outputs.otp-version }}.coverdata"
 
   conformance:
-    name: rebar3 ct
+    name: rebar3 ct (${{ matrix.otp }})
 
     runs-on: ubuntu-latest
+
+    needs: ["detectToolVersions"]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - otp: "26.0"
+            unstable: false
+          - otp: "26.1"
+            unstable: false
+          - otp: "master"
+            unstable: true
 
     steps:
       - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
         id: setupBEAM
         with:
-          otp-version: ${{ inputs.otpVersion }}
-          rebar3-version: ${{ inputs.rebarVersion }}
+          otp-version: ${{ matrix.otp }}
+          rebar3-version: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
+          version-type: strict
       - uses: actions/cache@v3
         with:
           path: _build
           key: ct-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
           restore-keys: |
             ct-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
-      - run: rebar3 ct --cover
+      - run: rebar3 ct --cover --cover_export_name "ct-${{ steps.setupBEAM.outputs.otp-version }}"
+        continue-on-error: ${{ matrix.unstable }}
       - uses: actions/upload-artifact@v3
         with:
           name: ct-coverage
-          path: _build/test/cover/ct.coverdata
+          path: _build/test/cover/ct-${{ steps.setupBEAM.outputs.otp-version }}.coverdata
 
   mix_test:
-    name: mix test
+    name: mix test (${{ matrix.elixir }})
 
     runs-on: ubuntu-latest
+
+    needs: ["detectToolVersions"]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - elixir: "1.15.0"
+            unstable: false
+          - elixir: "1.15.6"
+            unstable: false
+          - elixir: "main"
+            unstable: true
 
     steps:
       - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
         id: setupBEAM
         with:
-          otp-version: ${{ inputs.otpVersion }}
-          rebar3-version: ${{ inputs.rebarVersion }}
-          elixir-version: ${{ inputs.elixirVersion }}
+          otp-version: "${{ needs.detectToolVersions.outputs.otpVersion }}"
+          rebar3-version: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
+          elixir-version: "${{ matrix.elixir }}"
+          version-type: strict
       - uses: actions/cache@v3
         with:
           path: _build
-          key: mix_test-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
+          key: mix_test-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-${{ hashFiles('mix.exs') }}
           restore-keys: |
-            mix_test-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+            mix_test-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-
       - uses: actions/cache@v3
         with:
           path: deps
-          key: mix_test-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
+          key: mix_test-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-${{ hashFiles('mix.exs') }}
           restore-keys: |
-            mix_test-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+            mix_test-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-
       - run: mix deps.get
-      - run: mix test --cover --export-coverage mix_test
+      - run: mix test --cover --export-coverage "mix_test-${{ steps.setupBEAM.outputs.elixir-version }}"
+        continue-on-error: ${{ matrix.unstable }}
       - uses: actions/upload-artifact@v3
         with:
           name: mix_test-coverage
-          path: cover/mix_test.coverdata
+          path: cover/mix_test-${{ steps.setupBEAM.outputs.elixir-version }}.coverdata
 
   coverage:
-    name: rebar3 cover
+    name: mix test.coverage
 
     runs-on: ubuntu-latest
 
@@ -164,31 +218,38 @@ jobs:
       - uses: erlef/setup-beam@v1
         id: setupBEAM
         with:
-          otp-version: ${{ inputs.otpVersion }}
-          rebar3-version: ${{ inputs.rebarVersion }}
+          version-file: .tool-versions
+          version-type: strict
       - uses: actions/cache@v3
         with:
           path: _build
-          key: cover-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
+          key: mix_test_coverage-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-${{ hashFiles('mix.exs') }}
           restore-keys: |
-            cover-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
+            mix_test_coverage-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-
       - uses: actions/download-artifact@v3
         with:
           name: ct-coverage
-          path: _build/test/cover/
+          path: cover
       - uses: actions/download-artifact@v3
         with:
           name: eunit-coverage
-          path: _build/test/cover/
+          path: cover
       - uses: actions/download-artifact@v3
         with:
           name: mix_test-coverage
-          path: _build/test/cover/
-      - run: rebar3 cover
+          path: cover
+      - uses: actions/cache@v3
+        with:
+          path: deps
+          key: mix_test_coverage-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-${{ hashFiles('mix.exs') }}
+          restore-keys: |
+            mix_test_coverage-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-
+      - run: mix deps.get
+      - run: mix test.coverage
       - uses: actions/upload-artifact@v3
         with:
           name: coverage-report
-          path: _build/test/cover/
+          path: cover
 
   coveralls:
     name: rebar3 coveralls send
@@ -202,8 +263,8 @@ jobs:
       - uses: erlef/setup-beam@v1
         id: setupBEAM
         with:
-          otp-version: ${{ inputs.otpVersion }}
-          rebar3-version: ${{ inputs.rebarVersion }}
+          version-file: .tool-versions
+          version-type: strict
       - uses: actions/cache@v3
         with:
           path: _build
@@ -240,8 +301,8 @@ jobs:
       - uses: erlef/setup-beam@v1
         id: setupBEAM
         with:
-          otp-version: ${{ inputs.otpVersion }}
-          rebar3-version: ${{ inputs.rebarVersion }}
+          version-file: .tool-versions
+          version-type: strict
       - uses: actions/cache@v3
         with:
           path: _build
@@ -260,9 +321,8 @@ jobs:
       - uses: erlef/setup-beam@v1
         id: setupBEAM
         with:
-          otp-version: ${{ inputs.otpVersion }}
-          rebar3-version: ${{ inputs.rebarVersion }}
-          elixir-version: ${{ inputs.elixirVersion }}
+          version-file: .tool-versions
+          version-type: strict
       - uses: actions/cache@v3
         with:
           path: _build
@@ -288,9 +348,8 @@ jobs:
       - uses: erlef/setup-beam@v1
         id: setupBEAM
         with:
-          otp-version: ${{ inputs.otpVersion }}
-          rebar3-version: ${{ inputs.rebarVersion }}
-          elixir-version: ${{ inputs.elixirVersion }}
+          version-file: .tool-versions
+          version-type: strict
       - uses: actions/cache@v3
         with:
           path: _build
@@ -316,8 +375,8 @@ jobs:
       - uses: erlef/setup-beam@v1
         id: setupBEAM
         with:
-          otp-version: ${{ inputs.otpVersion }}
-          rebar3-version: ${{ inputs.rebarVersion }}
+          version-file: .tool-versions
+          version-type: strict
       - uses: actions/cache@v3
         with:
           path: _build
@@ -336,8 +395,8 @@ jobs:
       - uses: erlef/setup-beam@v1
         id: setupBEAM
         with:
-          otp-version: ${{ inputs.otpVersion }}
-          rebar3-version: ${{ inputs.rebarVersion }}
+          version-file: .tool-versions
+          version-type: strict
       - uses: actions/cache@v3
         with:
           path: _build

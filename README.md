@@ -244,7 +244,7 @@ for more details, see https://hexdocs.pm/oidcc/oidcc.html
 )
 
 # Load userinfo for token
-{:ok, Claims} = Oidcc.retrieve_userinfo(
+{:ok, claims} = Oidcc.retrieve_userinfo(
   token,
   Myapp.OidccConfigProvider,
   "client_id",

@@ -109,4 +109,13 @@ load_well_known_openid_introspections(_Config) ->
         )
     ),
 
+    %% Auth0
+    ?assertMatch(
+        {ok, {#oidcc_provider_configuration{}, _}},
+        oidcc_provider_configuration:load_configuration(
+            <<"https://dev-key.us.auth0.com/">>,
+            #{}
+        )
+    ),
+
     ok.

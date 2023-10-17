@@ -176,7 +176,9 @@ load_configuration(Issuer0, Opts) ->
     Issuer = binary:list_to_bin([Issuer0]),
     TelemetryOpts = #{topic => [oidcc, load_configuration], extra_meta => #{issuer => Issuer}},
     RequestOpts = maps:get(request_opts, Opts, #{}),
-    Request = {[Issuer, <<"/.well-known/openid-configuration">>], []},
+
+    RequestUrl = uri_string:resolve(".well-known/openid-configuration", Issuer),
+    Request = {RequestUrl, []},
 
     maybe
         {ok, {{json, ConfigurationMap}, Headers}} ?=

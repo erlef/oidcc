@@ -176,12 +176,28 @@ attempt_request_object(QueryParams, #oidcc_client_context{
     provider_configuration = #oidcc_provider_configuration{
         issuer = Issuer,
         request_parameter_supported = true,
-        request_object_signing_alg_values_supported = SigningAlgSupported,
-        request_object_encryption_alg_values_supported = EncryptionAlgSupported,
-        request_object_encryption_enc_values_supported = EncryptionEncSupported
+        request_object_signing_alg_values_supported = SigningAlgSupported0,
+        request_object_encryption_alg_values_supported = EncryptionAlgSupported0,
+        request_object_encryption_enc_values_supported = EncryptionEncSupported0
     },
     jwks = Jwks
 }) ->
+    SigningAlgSupported =
+        case SigningAlgSupported0 of
+            undefined -> [];
+            SigningAlgs -> SigningAlgs
+        end,
+    EncryptionAlgSupported =
+        case EncryptionAlgSupported0 of
+            undefined -> [];
+            EncryptionAlgs -> EncryptionAlgs
+        end,
+    EncryptionEncSupported =
+        case EncryptionEncSupported0 of
+            undefined -> [];
+            EncryptionEncs -> EncryptionEncs
+        end,
+
     JwksWithClientJwks =
         case ClientJwks of
             none -> Jwks;

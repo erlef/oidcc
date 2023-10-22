@@ -721,16 +721,18 @@ validate_id_token(IdToken, ClientContext, Nonce) ->
                 Bin when is_binary(Bin) ->
                     [{<<"nonce">>, Nonce} | ExpClaims0]
             end,
-        JwksInclOct = case ClientSecret of
-            unauthenticated -> Jwks;
-            Secret ->
-            case oidcc_jwt_util:client_secret_oct_keys(AllowAlgorithms, Secret) of
-                none ->
+        JwksInclOct =
+            case ClientSecret of
+                unauthenticated ->
                     Jwks;
-                OctJwk ->
-                    oidcc_jwt_util:merge_jwks(Jwks, OctJwk)
-            end
-        end,
+                Secret ->
+                    case oidcc_jwt_util:client_secret_oct_keys(AllowAlgorithms, Secret) of
+                        none ->
+                            Jwks;
+                        OctJwk ->
+                            oidcc_jwt_util:merge_jwks(Jwks, OctJwk)
+                    end
+            end,
         {ok, {#jose_jwt{fields = Claims}, Jws}} ?=
             oidcc_jwt_util:verify_signature(IdToken, AllowAlgorithms, JwksInclOct),
         ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),
@@ -941,7 +943,6 @@ add_authentication(
 ) ->
     NewHeader = [oidcc_http_util:basic_auth_header(ClientId, ClientSecret) | Header],
     {ok, {QsBodyList, NewHeader}};
-
 add_authentication(
     QsBodyList,
     Header,

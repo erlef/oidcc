@@ -208,15 +208,18 @@ validate_userinfo_token(UserinfoToken, ClientContext, Opts) ->
     } =
         Configuration,
     maybe
-        JwksInclOct = case ClientSecret of
-            unauthenticated -> Jwks;
-            Secret -> case oidcc_jwt_util:client_secret_oct_keys(AllowAlgorithms, Secret) of
-                none ->
+        JwksInclOct =
+            case ClientSecret of
+                unauthenticated ->
                     Jwks;
-                OctJwk ->
-                    oidcc_jwt_util:merge_jwks(Jwks, OctJwk)
-            end
-        end,
+                Secret ->
+                    case oidcc_jwt_util:client_secret_oct_keys(AllowAlgorithms, Secret) of
+                        none ->
+                            Jwks;
+                        OctJwk ->
+                            oidcc_jwt_util:merge_jwks(Jwks, OctJwk)
+                    end
+            end,
         {ok, {#jose_jwt{fields = Claims}, _Jws}} ?=
             oidcc_jwt_util:verify_signature(UserinfoToken, AllowAlgorithms, JwksInclOct),
         ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),

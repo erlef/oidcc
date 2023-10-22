@@ -173,11 +173,11 @@ defmodule Oidcc.ProviderConfiguration do
       ...>   Oidcc.ProviderConfiguration.decode_configuration(decoded_json)
   """
   @doc since: "3.0.0"
-  @spec decode_configuration(configuration :: map()) ::
+  @spec decode_configuration(configuration :: map(), opts :: :oidcc_provider_configuration.opts()) ::
           {:ok, t()} | {:error, :oidcc_provider_configuration.error()}
-  def decode_configuration(configuration) do
+  def decode_configuration(configuration, opts \\ %{}) do
     with {:ok, configuration} <-
-           :oidcc_provider_configuration.decode_configuration(configuration) do
+           :oidcc_provider_configuration.decode_configuration(configuration, opts) do
       {:ok, record_to_struct(configuration)}
     end
   end

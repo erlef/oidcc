@@ -553,6 +553,29 @@ check_validations_test() ->
 
     ok.
 
+allow_unsafe_http_quirk_test() ->
+    ?assertMatch(
+        {error, {invalid_config_property, {uri_https, userinfo_endpoint}}},
+        oidcc_provider_configuration:decode_configuration(
+            google_merge_json(#{
+                <<"userinfo_endpoint">> =>
+                    <<"http://example.com">>
+            })
+        )
+    ),
+    ?assertMatch(
+        {ok, _},
+        oidcc_provider_configuration:decode_configuration(
+            google_merge_json(#{
+                <<"userinfo_endpoint">> =>
+                    <<"http://example.com">>
+            }),
+            #{quirks => #{allow_unsafe_http => true}}
+        )
+    ),
+
+    ok.
+
 google_merge_json(Merge) ->
     PrivDir = code:priv_dir(oidcc),
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/google-metadata.json"),

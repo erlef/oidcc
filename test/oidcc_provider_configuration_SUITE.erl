@@ -7,7 +7,6 @@
 -export([load_well_known_openid_introspections/1]).
 -export([reads_configuration_expiry/1]).
 
--include_lib("common_test/include/ct.hrl").
 -include_lib("jose/include/jose_jwk.hrl").
 -include_lib("oidcc/include/oidcc_provider_configuration.hrl").
 -include_lib("stdlib/include/assert.hrl").
@@ -115,6 +114,22 @@ load_well_known_openid_introspections(_Config) ->
         oidcc_provider_configuration:load_configuration(
             <<"https://dev-key.us.auth0.com/">>,
             #{}
+        )
+    ),
+
+    %% Microsoft
+    ?assertMatch(
+        {error, {issuer_mismatch, _}},
+        oidcc_provider_configuration:load_configuration(
+            <<"https://login.microsoftonline.com/common/v2.0">>,
+            #{}
+        )
+    ),
+    ?assertMatch(
+        {ok, {#oidcc_provider_configuration{}, _}},
+        oidcc_provider_configuration:load_configuration(
+            <<"https://login.microsoftonline.com/common/v2.0">>,
+            #{quirks => #{allow_issuer_mismatch => true}}
         )
     ),
 

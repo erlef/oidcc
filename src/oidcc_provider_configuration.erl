@@ -22,16 +22,35 @@
 -include("oidcc_provider_configuration.hrl").
 
 -export([decode_configuration/1]).
+-export([decode_configuration/2]).
+-export([load_configuration/1]).
 -export([load_configuration/2]).
 -export([load_jwks/2]).
 
 -export_type([error/0]).
 -export_type([opts/0]).
+-export_type([quirks/0]).
 -export_type([t/0]).
+
+-type quirks() :: #{
+    allow_issuer_mismatch => boolean(),
+    allow_unsafe_http => boolean()
+}.
+%% Allow Specification Non-compliance
+%%
+%% <h2>Exceptions</h2>
+%%
+%% <ul>
+%%   <li>`allow_issuer_mismatch' - Allow issuer mismatch between config issuer
+%%     and function parameter</li>
+%%   <li>`allow_unsafe_http' - Allow unsafe HTTP. Use this for development
+%%     providers and <strong>never in production</strong>.</li>
+%% </ul>
 
 -type opts() :: #{
     fallback_expiry => timeout(),
-    request_opts => oidcc_http_util:request_opts()
+    request_opts => oidcc_http_util:request_opts(),
+    quirks => quirks()
 }.
 %% Configure configuration loading / parsing
 %%
@@ -180,21 +199,36 @@ load_configuration(Issuer0, Opts) ->
     RequestUrl = uri_string:resolve(".well-known/openid-configuration", Issuer),
     Request = {RequestUrl, []},
 
+    Quirks = maps:get(quirks, Opts, #{}),
+    AllowIssuerMismatch = maps:get(allow_issuer_mismatch, Quirks, false),
+
     maybe
         {ok, {{json, ConfigurationMap}, Headers}} ?=
             oidcc_http_util:request(get, Request, TelemetryOpts, RequestOpts),
         Expiry = headers_to_deadline(Headers, Opts),
-        {ok, #oidcc_provider_configuration{issuer = Issuer} = Configuration} ?=
-            decode_configuration(ConfigurationMap),
-        {ok, {Configuration, Expiry}}
+        {ok, #oidcc_provider_configuration{issuer = ConfigIssuer} = Configuration} ?=
+            decode_configuration(ConfigurationMap, #{quirks => Quirks}),
+        case ConfigIssuer of
+            Issuer ->
+                {ok, {Configuration, Expiry}};
+            _DifferentIssuer when AllowIssuerMismatch -> {ok, {Configuration, Expiry}};
+            DifferentIssuer when not AllowIssuerMismatch ->
+                {error, {issuer_mismatch, DifferentIssuer}}
+        end
     else
-        {ok, #oidcc_provider_configuration{issuer = DifferentIssuer}} ->
-            {error, {issuer_mismatch, DifferentIssuer}};
         {error, Reason} ->
             {error, Reason};
         {ok, {{_Format, _Body}, _Headers}} ->
             {error, invalid_content_type}
     end.
+
+%% @see load_configuration/2
+%% @since 3.1.0
+-spec load_configuration(Issuer) ->
+    {ok, {Configuration :: t(), Expiry :: pos_integer()}} | {error, error()}
+when
+    Issuer :: uri_string:uri_string().
+load_configuration(Issuer) -> load_configuration(Issuer, #{}).
 
 %% @doc Load JWKs into a {@link jose_jwk:key()} record
 %%
@@ -240,9 +274,13 @@ load_jwks(JwksUri, Opts) ->
 %%   oidcc_provider_configuration:decode_configuration(DecodedJson).
 %% '''
 %% @end
-%% @since 3.0.0
--spec decode_configuration(Configuration :: map()) -> {ok, t()} | {error, error()}.
-decode_configuration(Configuration) ->
+%% @since 3.1.0
+-spec decode_configuration(Configuration, Opts) -> {ok, t()} | {error, error()} when
+    Configuration :: map(), Opts :: opts().
+decode_configuration(Configuration, Opts) ->
+    Quirks = maps:get(quirks, Opts, #{}),
+    AllowUnsafeHttp = maps:get(allow_unsafe_http, Quirks, false),
+
     maybe
         {ok, {
             #{
@@ -309,7 +347,10 @@ decode_configuration(Configuration) ->
                     {optional, token_endpoint, undefined,
                         fun oidcc_decode_util:parse_setting_uri/2},
                     {optional, userinfo_endpoint, undefined,
-                        fun oidcc_decode_util:parse_setting_uri_https/2},
+                        case AllowUnsafeHttp of
+                            true -> fun oidcc_decode_util:parse_setting_uri/2;
+                            false -> fun oidcc_decode_util:parse_setting_uri_https/2
+                        end},
                     {required, jwks_uri, fun oidcc_decode_util:parse_setting_uri/2},
                     {optional, registration_endpoint, undefined,
                         fun oidcc_decode_util:parse_setting_uri/2},
@@ -383,7 +424,10 @@ decode_configuration(Configuration) ->
                     {optional, code_challenge_methods_supported, undefined,
                         fun oidcc_decode_util:parse_setting_binary_list/2},
                     {optional, end_session_endpoint, undefined,
-                        fun oidcc_decode_util:parse_setting_uri_https/2}
+                        case AllowUnsafeHttp of
+                            true -> fun oidcc_decode_util:parse_setting_uri/2;
+                            false -> fun oidcc_decode_util:parse_setting_uri_https/2
+                        end}
                 ],
                 #{}
             ),
@@ -452,6 +496,12 @@ decode_configuration(Configuration) ->
             extra_fields = ExtraFields
         }}
     end.
+
+%% @see decode_configuration/2
+%% @since 3.0.0
+-spec decode_configuration(Configuration) -> {ok, t()} | {error, error()} when
+    Configuration :: map().
+decode_configuration(Configuration) -> decode_configuration(Configuration, #{}).
 
 -spec headers_to_deadline(Headers, Opts) -> pos_integer() when
     Headers :: [{Header :: binary(), Value :: binary()}], Opts :: opts().

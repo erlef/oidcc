@@ -172,7 +172,7 @@ jobs:
         include:
           - elixir: "1.15.0"
             unstable: false
-          - elixir: "1.15.6"
+          - elixir: "1.15.7"
             unstable: false
           - elixir: "main"
             unstable: true

@@ -23,9 +23,11 @@ defmodule Oidcc.Mixfile do
     ]
   end
 
-  def application() do
-    [extra_applications: [:inets, :ssl]]
-  end
+  def application, do: [extra_applications: extra_applications(Mix.env())]
+
+  defp extra_applications(env)
+  defp extra_applications(:dev), do: [:inets, :ssl, :edoc, :xmerl]
+  defp extra_applications(_env), do: [:inets, :ssl]
 
   defp deps() do
     [
@@ -77,6 +79,15 @@ defmodule Oidcc.Mixfile do
   end
 
   defp rebar3_doc_chunks(_args) do
-    {_out, 0} = System.cmd("rebar3", ["edoc"], into: IO.stream())
+    base_path = Path.dirname(__ENV__.file)
+    doc_chunk_path = Application.app_dir(:oidcc, "doc")
+
+    :ok =
+      :edoc.application(:oidcc, String.to_charlist(base_path),
+        doclet: :edoc_doclet_chunks,
+        layout: :edoc_layout_chunks,
+        preprocess: true,
+        dir: String.to_charlist(doc_chunk_path)
+      )
   end
 end

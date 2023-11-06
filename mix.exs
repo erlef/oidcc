@@ -18,7 +18,7 @@ defmodule Oidcc.Mixfile do
       docs: &docs/0,
       description: to_string(@props[:description]),
       package: package(),
-      aliases: [docs: ["compile", &rebar3_doc_chunks/1, "docs"]],
+      aliases: [docs: ["compile", &edoc_chunks/1, "docs"]],
       test_coverage: [ignore_modules: [Oidcc.RecordStruct]]
     ]
   end
@@ -78,7 +78,7 @@ defmodule Oidcc.Mixfile do
     ]
   end
 
-  defp rebar3_doc_chunks(_args) do
+  defp edoc_chunks(_args) do
     base_path = Path.dirname(__ENV__.file)
     doc_chunk_path = Application.app_dir(:oidcc, "doc")
 

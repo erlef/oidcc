@@ -985,11 +985,12 @@ add_authentication(
     },
 
     maybe
-        #jose_jwk{} = OctJwk ?=
-            oidcc_jwt_util:client_secret_oct_keys(
-                AdjustedAllowAlgorithms,
-                ClientSecret
-            ),
+        #jose_jwk{} =
+            OctJwk ?=
+                oidcc_jwt_util:client_secret_oct_keys(
+                    AdjustedAllowAlgorithms,
+                    ClientSecret
+                ),
         {ok, ClientAssertion} ?=
             signed_client_assertion(
                 AdjustedClientContext,

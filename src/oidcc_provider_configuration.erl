@@ -196,7 +196,7 @@ load_configuration(Issuer0, Opts) ->
     TelemetryOpts = #{topic => [oidcc, load_configuration], extra_meta => #{issuer => Issuer}},
     RequestOpts = maps:get(request_opts, Opts, #{}),
 
-    RequestUrl = uri_string:resolve(".well-known/openid-configuration", Issuer),
+    RequestUrl = url_join(".well-known/openid-configuration", Issuer),
     Request = {RequestUrl, []},
 
     Quirks = maps:get(quirks, Opts, #{}),
@@ -609,3 +609,12 @@ parse_claim_types_supported(Setting, Field) ->
                 error
         end
     ).
+
+-spec url_join(RefURI :: uri_string:uri_string(), BaseURI :: uri_string:uri_string()) ->
+    uri_string:uri_string().
+url_join(RefURI, BaseURI) ->
+    BaseURIBinary = iolist_to_binary(BaseURI),
+    case binary_part(BaseURIBinary, byte_size(BaseURIBinary) - 1, 1) of
+        <<"/">> -> uri_string:resolve(RefURI, BaseURI);
+        _ -> uri_string:resolve(RefURI, [BaseURI, "/"])
+    end.

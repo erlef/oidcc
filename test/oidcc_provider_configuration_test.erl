@@ -576,6 +576,52 @@ allow_unsafe_http_quirk_test() ->
 
     ok.
 
+uri_concatenation_test() ->
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(get, {ReqEndpoint, _Header}, _HttpOpts, _Opts) ->
+            self() ! {req, ReqEndpoint},
+
+            {ok, {{"HTTP/1.1", 501, "Not Implemented"}, [], ""}}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    oidcc_provider_configuration:load_configuration("https://example.com"),
+
+    receive
+        {req, "https://example.com/.well-known/openid-configuration"} -> ok
+    after 0 ->
+        ct:fail(timeout_receive_attach_event_handlers)
+    end,
+
+    oidcc_provider_configuration:load_configuration("https://example.com/"),
+
+    receive
+        {req, "https://example.com/.well-known/openid-configuration"} -> ok
+    after 0 ->
+        ct:fail(timeout_receive_attach_event_handlers)
+    end,
+
+    oidcc_provider_configuration:load_configuration("https://example.com/realm"),
+
+    receive
+        {req, "https://example.com/realm/.well-known/openid-configuration"} -> ok
+    after 0 ->
+        ct:fail(timeout_receive_attach_event_handlers)
+    end,
+
+    oidcc_provider_configuration:load_configuration("https://example.com/realm/"),
+
+    receive
+        {req, "https://example.com/realm/.well-known/openid-configuration"} -> ok
+    after 0 ->
+        ct:fail(timeout_receive_attach_event_handlers)
+    end,
+
+    meck:unload(httpc),
+
+    ok.
+
 google_merge_json(Merge) ->
     PrivDir = code:priv_dir(oidcc),
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/google-metadata.json"),

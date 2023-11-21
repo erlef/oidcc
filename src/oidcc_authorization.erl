@@ -222,7 +222,7 @@ attempt_request_object(QueryParams, #oidcc_client_context{
     MaxClockSkew =
         case application:get_env(oidcc, max_clock_skew) of
             undefined -> 0;
-            ClockSkew -> ClockSkew
+            {ok, ClockSkew} -> ClockSkew
         end,
 
     Claims = maps:merge(

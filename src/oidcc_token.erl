@@ -775,7 +775,7 @@ verify_exp_claim(#{<<"exp">> := Expiry}) ->
     MaxClockSkew =
         case application:get_env(oidcc, max_clock_skew) of
             undefined -> 0;
-            ClockSkew -> ClockSkew
+            {ok, ClockSkew} -> ClockSkew
         end,
     case erlang:system_time(second) > Expiry + MaxClockSkew of
         true -> {error, token_expired};
@@ -787,7 +787,7 @@ verify_nbf_claim(#{<<"nbf">> := Expiry}) ->
     MaxClockSkew =
         case application:get_env(oidcc, max_clock_skew) of
             undefined -> 0;
-            ClockSkew -> ClockSkew
+            {ok, ClockSkew} -> ClockSkew
         end,
     case erlang:system_time(second) < Expiry - MaxClockSkew of
         true -> {error, token_not_yet_valid};
@@ -1071,7 +1071,7 @@ token_request_claims(#oidcc_client_context{
     MaxClockSkew =
         case application:get_env(oidcc, max_clock_skew) of
             undefined -> 0;
-            ClockSkew -> ClockSkew
+            {ok, ClockSkew} -> ClockSkew
         end,
 
     #{

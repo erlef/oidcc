@@ -1,6 +1,8 @@
 defmodule Oidcc.Token.Access do
   @moduledoc """
-  Access Token struct
+  Access Token struct.
+
+  See `t::oidcc_token.access/0`
   """
   @moduledoc since: "3.0.0"
 

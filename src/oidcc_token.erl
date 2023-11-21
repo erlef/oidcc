@@ -956,6 +956,24 @@ add_authentication(
     QsBodyList,
     Header,
     client_secret_jwt,
+    #oidcc_client_context{
+        provider_configuration =
+            #oidcc_provider_configuration{
+                token_endpoint_auth_signing_alg_values_supported = AlgValuesSupported
+            } = ProviderConfiguration
+    } = ClientContext
+) when AlgValuesSupported == []; AlgValuesSupported == undefined ->
+    %% https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
+    %% Servers SHOULD support RS256.
+    add_authentication(QsBodyList, Header, client_secret_jwt, ClientContext#oidcc_client_context{
+        provider_configuration = ProviderConfiguration#oidcc_provider_configuration{
+            token_endpoint_auth_signing_alg_values_supported = [<<"HS256">>]
+        }
+    });
+add_authentication(
+    QsBodyList,
+    Header,
+    client_secret_jwt,
     ClientContext
 ) ->
     #oidcc_client_context{
@@ -967,33 +985,16 @@ add_authentication(
         token_endpoint_auth_signing_alg_values_supported = AllowAlgorithms
     } = ProviderConfiguration,
 
-    %% At least one HS algorithmm must be present when using this method
-    AdjustedAllowAlgorithms =
-        case
-            lists:member(<<"HS256">>, AllowAlgorithms) or
-                lists:member(<<"HS384">>, AllowAlgorithms) or
-                lists:member(<<"HS512">>, AllowAlgorithms)
-        of
-            true -> AllowAlgorithms;
-            false -> [<<"HS256">> | AllowAlgorithms]
-        end,
-    AdjustedProviderConfiguration = ProviderConfiguration#oidcc_provider_configuration{
-        token_endpoint_auth_signing_alg_values_supported = AdjustedAllowAlgorithms
-    },
-    AdjustedClientContext = ClientContext#oidcc_client_context{
-        provider_configuration = AdjustedProviderConfiguration
-    },
-
     maybe
         #jose_jwk{} =
             OctJwk ?=
                 oidcc_jwt_util:client_secret_oct_keys(
-                    AdjustedAllowAlgorithms,
+                    AllowAlgorithms,
                     ClientSecret
                 ),
         {ok, ClientAssertion} ?=
             signed_client_assertion(
-                AdjustedClientContext,
+                ClientContext,
                 OctJwk
             ),
         {ok, {

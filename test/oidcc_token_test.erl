@@ -880,3 +880,68 @@ auth_method_private_key_jwt_test() ->
     meck:unload(httpc),
 
     ok.
+
+auth_method_client_secret_jwt_no_alg_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, _} = application:ensure_all_started(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ConfigurationBinary)
+    ),
+
+    #oidcc_provider_configuration{token_endpoint = TokenEndpoint} =
+        Configuration = Configuration0#oidcc_provider_configuration{
+            token_endpoint_auth_methods_supported = [
+                <<"client_secret_jwt">>
+            ],
+            token_endpoint_auth_signing_alg_values_supported = undefined
+        },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+    LocalEndpoint = <<"https://my.server/auth">>,
+    AuthCode = <<"1234567890">>,
+
+    Jwk = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+
+    ClientContext = oidcc_client_context:from_manual(Configuration, Jwk, ClientId, ClientSecret),
+
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(
+            post,
+            {ReqTokenEndpoint, _Header, "application/x-www-form-urlencoded", Body},
+            _HttpOpts,
+            _Opts
+        ) ->
+            TokenEndpoint = ReqTokenEndpoint,
+            BodyMap = maps:from_list(uri_string:dissect_query(Body)),
+
+            ClientAssertion = maps:get("client_assertion", BodyMap),
+
+            {true, _ClientAssertionJwt, ClientAssertionJws} = jose_jwt:verify(
+                jose_jwk:from_oct(ClientSecret), binary:list_to_bin(ClientAssertion)
+            ),
+
+            ?assertMatch({jose_jws_alg_hmac, 'HS256'}, ClientAssertionJws#jose_jws.alg),
+
+            {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], <<"{}">>}}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    ?assertMatch(
+        {ok, #oidcc_token{}},
+        oidcc_token:retrieve(
+            AuthCode,
+            ClientContext,
+            #{redirect_uri => LocalEndpoint}
+        )
+    ),
+
+    true = meck:validate(httpc),
+
+    meck:unload(httpc),
+
+    ok.

@@ -63,7 +63,7 @@
 %%
 %% <ul>
 %%   <li>`token' - The retrieved token</li>
-%%   <li>`expires' - Timestamp when token will expire</li>
+%%   <li>`expires' - Number of seconds the token is valid</li>
 %% </ul>
 
 -type refresh() :: #oidcc_token_refresh{token :: binary()}.

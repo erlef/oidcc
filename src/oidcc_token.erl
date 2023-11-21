@@ -98,6 +98,7 @@
         pkce_verifier => binary(),
         nonce => binary() | any,
         scope => oidcc_scope:scopes(),
+        preferred_auth_methods => [auth_method(), ...],
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
         redirect_uri := uri_string:uri_string(),
         request_opts => oidcc_http_util:request_opts()
@@ -834,8 +835,18 @@ retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext, Opts, TelemetryOpts, Aut
 
     MaybeAuthMethod =
         case AuthenticateClient of
-            true -> select_preferred_auth(SupportedAuthMethods);
-            false -> {ok, none}
+            true ->
+                [_ | _] =
+                    PreferredAuthMethods = maps:get(preferred_auth_methods, Opts, [
+                        private_key_jwt,
+                        client_secret_jwt,
+                        client_secret_post,
+                        client_secret_basic,
+                        none
+                    ]),
+                select_preferred_auth(PreferredAuthMethods, SupportedAuthMethods);
+            false ->
+                {ok, none}
         end,
 
     case MaybeAuthMethod of
@@ -872,39 +883,21 @@ retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext, Opts, TelemetryOpts, Aut
             {error, Reason}
     end.
 
--spec select_preferred_auth(AuthMethodsSupported) ->
+-spec select_preferred_auth(PreferredAuthMethods, AuthMethodsSupported) ->
     {ok, auth_method()} | {error, error()}
 when
+    PreferredAuthMethods :: [auth_method(), ...],
     AuthMethodsSupported :: [binary(), ...].
-select_preferred_auth(AuthMethodsSupported) ->
-    MethodPriority = #{
-        none => 0,
-        client_secret_basic => 1,
-        client_secret_post => 2,
-        client_secret_jwt => 3,
-        private_key_jwt => 4
-    },
-    KnownAuthMethods = lists:filtermap(
-        fun
-            (<<"none">>) -> {true, none};
-            (<<"client_secret_basic">>) -> {true, client_secret_basic};
-            (<<"client_secret_post">>) -> {true, client_secret_post};
-            (<<"client_secret_jwt">>) -> {true, client_secret_jwt};
-            (<<"private_key_jwt">>) -> {true, private_key_jwt};
-            (_Other) -> false
-        end,
-        AuthMethodsSupported
-    ),
-    SortedAuthMethods = lists:usort(
-        fun(A, B) ->
-            maps:get(A, MethodPriority) > maps:get(B, MethodPriority)
-        end,
-        KnownAuthMethods
-    ),
+select_preferred_auth(PreferredAuthMethods, AuthMethodsSupported) ->
+    PreferredAuthMethodSearchFun = fun(AuthMethod) ->
+        lists:member(atom_to_binary(AuthMethod), AuthMethodsSupported)
+    end,
 
-    case SortedAuthMethods of
-        [] -> {error, no_supported_auth_method};
-        [PriorityAuthMethod | _Rest] -> {ok, PriorityAuthMethod}
+    case lists:search(PreferredAuthMethodSearchFun, PreferredAuthMethods) of
+        {value, AuthMethod} ->
+            {ok, AuthMethod};
+        false ->
+            {error, no_supported_auth_method}
     end.
 
 -spec add_authentication(

@@ -252,6 +252,93 @@ create_redirect_url_with_request_object_test() ->
 
     ok.
 
+create_redirect_url_with_request_object_and_max_clock_skew_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    %% Enable none algorithm for test
+    jose:unsecured_signing(true),
+
+    {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, #oidcc_provider_configuration{} = Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ValidConfigString)
+    ),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        request_parameter_supported = true,
+        request_object_signing_alg_values_supported = [
+            <<"none">>,
+            <<"HS256">>,
+            <<"RS256">>,
+            <<"PS256">>,
+            <<"ES256">>,
+            <<"EdDSA">>
+        ],
+        request_object_encryption_alg_values_supported = [
+            <<"RSA1_5">>,
+            <<"RSA-OAEP">>,
+            <<"RSA-OAEP-256">>,
+            <<"RSA-OAEP-384">>,
+            <<"RSA-OAEP-512">>,
+            <<"ECDH-ES">>,
+            <<"ECDH-ES+A128KW">>,
+            <<"ECDH-ES+A192KW">>,
+            <<"ECDH-ES+A256KW">>,
+            <<"A128KW">>,
+            <<"A192KW">>,
+            <<"A256KW">>,
+            <<"A128GCMKW">>,
+            <<"A192GCMKW">>,
+            <<"A256GCMKW">>,
+            <<"dir">>
+        ],
+        request_object_encryption_enc_values_supported = [
+            <<"A128CBC-HS256">>,
+            <<"A192CBC-HS384">>,
+            <<"A256CBC-HS512">>,
+            <<"A128GCM">>,
+            <<"A192GCM">>,
+            <<"A256GCM">>
+        ]
+    },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"at_least_32_character_client_secret">>,
+
+    Jwks0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    Jwks = Jwks0#jose_jwk{fields = #{<<"use">> => <<"enc">>}},
+
+    RedirectUri = <<"https://my.server/return">>,
+
+    ClientContext =
+        oidcc_client_context:from_manual(Configuration, Jwks, ClientId, ClientSecret),
+
+    application:set_env(oidcc, max_clock_skew, 10),
+    {ok, Url} = oidcc_authorization:create_redirect_url(ClientContext, #{
+        redirect_uri => RedirectUri
+    }),
+    application:unset_env(oidcc, max_clock_skew),
+
+    #{query := QueryString} = uri_string:parse(Url),
+    QueryParams0 = uri_string:dissect_query(QueryString),
+    QueryParams1 = lists:map(
+        fun({Key, Value}) -> {list_to_binary(Key), list_to_binary(Value)} end, QueryParams0
+    ),
+    QueryParams = maps:from_list(QueryParams1),
+
+    {SignedToken, _} = jose_jwe:block_decrypt(Jwks, maps:get(<<"request">>, QueryParams)),
+
+    {true, Jwt, _} = jose_jwt:verify(jose_jwk:from_oct(ClientSecret), SignedToken),
+
+    #jose_jwt{
+        fields = #{
+            <<"nbf">> := ClientNbf
+        }
+    } = Jwt,
+
+    ?assert(ClientNbf < os:system_time(seconds) - 5),
+
+    ok.
+
 create_redirect_url_with_invalid_request_object_test() ->
     PrivDir = code:priv_dir(oidcc),
 

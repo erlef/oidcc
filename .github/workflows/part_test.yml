@@ -170,6 +170,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - elixir: "1.14.5"
+            unstable: false
           - elixir: "1.15.0"
             unstable: false
           - elixir: "1.15.7"

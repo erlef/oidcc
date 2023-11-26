@@ -734,8 +734,16 @@ validate_id_token(IdToken, ClientContext, Nonce) ->
                             oidcc_jwt_util:merge_jwks(Jwks, OctJwk)
                     end
             end,
+        MaybeVerified = oidcc_jwt_util:verify_signature(IdToken, AllowAlgorithms, JwksInclOct),
         {ok, {#jose_jwt{fields = Claims}, Jws}} ?=
-            oidcc_jwt_util:verify_signature(IdToken, AllowAlgorithms, JwksInclOct),
+            case MaybeVerified of
+                {ok, Valid} ->
+                    {ok, Valid};
+                {error, {none_alg_used, Jwt0, Jws0}} ->
+                    {ok, {Jwt0, Jws0}};
+                Other ->
+                    Other
+            end,
         ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),
         ok ?= verify_missing_required_claims(Claims),
         ok ?= verify_aud_claim(Claims, ClientId),

@@ -90,6 +90,8 @@ retrieve_none_test() ->
         end,
     ok = meck:expect(httpc, request, HttpFun),
 
+    jose:unsecured_signing(false),
+
     ?assertMatch(
         {error,
             {none_alg_used, #oidcc_token{

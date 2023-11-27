@@ -24,7 +24,11 @@
 -type refresh_jwks_for_unknown_kid_fun() ::
     fun((Jwks :: jose_jwk:key(), Kid :: binary()) -> {ok, jose_jwk:key()} | {error, term()}).
 
--type error() :: no_matching_key | invalid_jwt_token | {no_matching_key_with_kid, Kid :: binary()}.
+-type error() ::
+    no_matching_key
+    | invalid_jwt_token
+    | {no_matching_key_with_kid, Kid :: binary()}
+    | {none_alg_used, Jwt :: #jose_jwt{}, Jws :: #jose_jws{}}.
 
 -type claims() :: #{binary() => term()}.
 
@@ -74,7 +78,6 @@ verify_signature(Token, AllowAlgorithms, #jose_jwk{} = Jwks) ->
                 #jose_jws{} ->
                     none
             end,
-
         case Jwks of
             #jose_jwk{fields = #{<<"kid">> := CmpKid}} when CmpKid =/= Kid, Kid =/= none ->
                 {error, {no_matching_key_with_kid, Kid}};
@@ -82,6 +85,8 @@ verify_signature(Token, AllowAlgorithms, #jose_jwk{} = Jwks) ->
                 case jose_jwt:verify_strict(Jwks, AllowAlgorithms, Token) of
                     {true, Jwt, Jws} ->
                         {ok, {Jwt, Jws}};
+                    {false, Jwt, #jose_jws{alg = {jose_jws_alg_none, none}} = Jws} ->
+                        {error, {none_alg_used, Jwt, Jws}};
                     {false, _Jwt, _Jws} ->
                         {error, no_matching_key}
                 end

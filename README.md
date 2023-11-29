@@ -168,6 +168,8 @@ Supervisor.init([
   [`phoenix`](https://hex.pm/packages/phoenix)
 - [`phx_gen_oidcc`](https://hex.pm/packages/phx_gen_oidcc) - Setup Generator for
   [`phoenix`](https://hex.pm/packages/phoenix)
+- [`ueberauth_oidcc`](https://hex.pm/packages/ueberauth_oidcc) - Integration for
+  [`ueberauth`](https://hex.pm/packages/ueberauth)
 
 ### Erlang
 

@@ -185,9 +185,6 @@ sign(Jwt, Jwk, [Algorithm | RestAlgorithms]) ->
                 %% Some Keys crash if a public key is provided
                 error:function_clause -> error
             end;
-        (#jose_jwk{} = Key) when Algorithm == <<"none">> ->
-            {_Jws, Token} = jose_jws:compact(jose_jwt:sign(Key, Jws, Jwt)),
-            {ok, Token};
         (_Key) ->
             error
     end,

@@ -483,3 +483,95 @@ create_redirect_url_with_request_object_only_none_alg_test() ->
     ),
 
     ok.
+
+create_redirect_url_with_request_object_only_none_alg_unsecured_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    %% Enable none algorythm for test
+    jose:unsecured_signing(true),
+
+    {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ValidConfigString)
+    ),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        request_parameter_supported = true,
+        request_object_signing_alg_values_supported = [
+            <<"none">>
+        ],
+        request_object_encryption_alg_values_supported = [
+            <<"RSA1_5">>,
+            <<"RSA-OAEP">>,
+            <<"RSA-OAEP-256">>,
+            <<"RSA-OAEP-384">>,
+            <<"RSA-OAEP-512">>,
+            <<"ECDH-ES">>,
+            <<"ECDH-ES+A128KW">>,
+            <<"ECDH-ES+A192KW">>,
+            <<"ECDH-ES+A256KW">>,
+            <<"A128KW">>,
+            <<"A192KW">>,
+            <<"A256KW">>,
+            <<"A128GCMKW">>,
+            <<"A192GCMKW">>,
+            <<"A256GCMKW">>,
+            <<"dir">>
+        ],
+        request_object_encryption_enc_values_supported = [
+            <<"A128CBC-HS256">>,
+            <<"A192CBC-HS384">>,
+            <<"A256CBC-HS512">>,
+            <<"A128GCM">>,
+            <<"A192GCM">>,
+            <<"A256GCM">>
+        ]
+    },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"at_least_32_character_client_secret">>,
+
+    Jwks0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    Jwks = Jwks0#jose_jwk{fields = #{<<"use">> => <<"enc">>}},
+
+    RedirectUri = <<"https://my.server/return">>,
+
+    ClientContext =
+        oidcc_client_context:from_manual(Configuration, Jwks, ClientId, ClientSecret),
+
+    {ok, Url} = oidcc_authorization:create_redirect_url(ClientContext, #{
+        redirect_uri => RedirectUri
+    }),
+
+    #{query := QueryString} = uri_string:parse(Url),
+    QueryParams0 = uri_string:dissect_query(QueryString),
+    QueryParams1 = lists:map(
+        fun({Key, Value}) -> {list_to_binary(Key), list_to_binary(Value)} end, QueryParams0
+    ),
+    QueryParams = maps:from_list(QueryParams1),
+
+    {SignedToken, _} = jose_jwe:block_decrypt(Jwks, maps:get(<<"request">>, QueryParams)),
+
+    {true, Jwt, _} = jose_jwt:verify(jose_jwk:from_oct(ClientSecret), SignedToken),
+
+    ?assertMatch(
+        #jose_jwt{
+            fields = #{
+                <<"aud">> := _,
+                <<"client_id">> := ClientId,
+                <<"exp">> := _,
+                <<"iat">> := _,
+                <<"iss">> := ClientId,
+                <<"jti">> := _,
+                <<"nbf">> := _,
+                <<"redirect_uri">> := RedirectUri,
+                <<"response_type">> := <<"code">>,
+                <<"scope">> := <<"openid">>
+            }
+        },
+        Jwt
+    ),
+
+    jose:unsecured_signing(false),
+
+    ok.

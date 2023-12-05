@@ -100,6 +100,8 @@ The refactoring for `v3` and the certification is funded as an
 
 ## Setup
 
+**Please note that the minimum supported Erlang OTP version is OTP26.**
+
 ### Erlang
 
 **directly**

@@ -80,7 +80,8 @@ create_redirect_url(#oidcc_client_context{} = ClientContext, Opts) ->
 
     case lists:member(<<"authorization_code">>, GrantTypesSupported) of
         true ->
-            QueryParams = redirect_params(ClientContext, Opts),
+            QueryParams0 = redirect_params(ClientContext, Opts),
+            QueryParams = QueryParams0 ++ maps:get(url_extension, Opts, []),
             QueryString = uri_string:compose_query(QueryParams),
 
             {ok, [AuthEndpoint, <<"?">>, QueryString]};
@@ -97,7 +98,6 @@ redirect_params(#oidcc_client_context{client_id = ClientId} = ClientContext, Opt
             {<<"response_type">>, maps:get(response_type, Opts, <<"code">>)},
             {<<"client_id">>, ClientId},
             {<<"redirect_uri">>, maps:get(redirect_uri, Opts)}
-            | maps:get(url_extension, Opts, [])
         ],
     QueryParams1 = maybe_append(<<"state">>, maps:get(state, Opts, undefined), QueryParams),
     QueryParams2 = maybe_append(<<"nonce">>, maps:get(nonce, Opts, undefined), QueryParams1),

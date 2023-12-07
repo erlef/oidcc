@@ -261,9 +261,9 @@ create_redirect_url_with_request_object_and_max_clock_skew_test() ->
         request_parameter_supported = true,
         request_object_signing_alg_values_supported = [
             <<"none">>,
+            <<"PS256">>,
             <<"HS256">>,
             <<"RS256">>,
-            <<"PS256">>,
             <<"ES256">>,
             <<"EdDSA">>
         ],

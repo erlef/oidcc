@@ -273,14 +273,14 @@ essential_params(QueryParams) ->
 
 -spec deprioritize_none_alg(Algorithms :: [binary()]) -> [binary()].
 deprioritize_none_alg(Algorithms) ->
-    lists:usort(
+    {WithNone, WithoutNone} = lists:partition(
         fun
-            (<<"none">>, _B) -> false;
-            (_A, <<"none">>) -> true;
-            (_A, _B) -> true
+            (<<"none">>) -> true;
+            (_) -> false
         end,
         Algorithms
-    ).
+    ),
+    WithoutNone ++ WithNone.
 
 -spec random_string(Bytes :: pos_integer()) -> binary().
 random_string(Bytes) ->

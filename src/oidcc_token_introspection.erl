@@ -43,7 +43,10 @@
 %%
 %% See [https://datatracker.ietf.org/doc/html/rfc7662#section-2.2]
 
--type opts() :: #{request_opts => oidcc_http_util:request_opts()}.
+-type opts() :: #{
+    preferred_auth_methods => [oidcc_auth_util:auth_method(), ...],
+    request_opts => oidcc_http_util:request_opts()
+}.
 
 -type error() :: client_id_mismatch | introspection_not_supported | oidcc_http_util:error().
 
@@ -111,22 +114,18 @@ introspect(AccessToken, ClientContext, Opts) ->
         ClientContext,
     #oidcc_provider_configuration{
         introspection_endpoint = Endpoint,
-        issuer = Issuer
+        issuer = Issuer,
+        introspection_endpoint_auth_methods_supported = SupportedAuthMethods,
+        introspection_endpoint_auth_signing_alg_values_supported = AllowAlgorithms
     } = Configuration,
 
     case Endpoint of
         undefined ->
             {error, introspection_not_supported};
         _ ->
-            Header =
-                [
-                    {"accept", "application/json"},
-                    oidcc_http_util:basic_auth_header(ClientId, ClientSecret)
-                ],
-            Body = [{<<"token">>, AccessToken}],
-            Request =
-                {Endpoint, Header, "application/x-www-form-urlencoded",
-                    uri_string:compose_query(Body)},
+            Header0 = [{"accept", "application/json"}],
+            Body0 = [{<<"token">>, AccessToken}],
+
             RequestOpts = maps:get(request_opts, Opts, #{}),
             TelemetryOpts = #{
                 topic => [oidcc, introspect_token],
@@ -134,6 +133,13 @@ introspect(AccessToken, ClientContext, Opts) ->
             },
 
             maybe
+                {ok, {Body, Header}} ?=
+                    oidcc_auth_util:add_client_authentication(
+                        Body0, Header0, SupportedAuthMethods, AllowAlgorithms, Opts, ClientContext
+                    ),
+                Request =
+                    {Endpoint, Header, "application/x-www-form-urlencoded",
+                        uri_string:compose_query(Body)},
                 {ok, {{json, Token}, _Headers}} ?=
                     oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
                 extract_response(Token, ClientContext)

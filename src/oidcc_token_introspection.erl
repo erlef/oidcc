@@ -161,7 +161,14 @@ extract_response(TokenMap, #oidcc_client_context{client_id = ClientId}) ->
         end,
     Scope = maps:get(<<"scope">>, TokenMap, <<"">>),
     Username = maps:get(<<"username">>, TokenMap, undefined),
+    TokenType = maps:get(<<"token_type">>, TokenMap, undefined),
     Exp = maps:get(<<"exp">>, TokenMap, undefined),
+    Iat = maps:get(<<"iat">>, TokenMap, undefined),
+    Nbf = maps:get(<<"nbf">>, TokenMap, undefined),
+    Sub = maps:get(<<"sub">>, TokenMap, undefined),
+    Aud = maps:get(<<"aud">>, TokenMap, undefined),
+    Iss = maps:get(<<"iss">>, TokenMap, undefined),
+    Jti = maps:get(<<"jti">>, TokenMap, undefined),
     case maps:get(<<"client_id">>, TokenMap, undefined) of
         IntrospectionClientId when
             IntrospectionClientId == ClientId; IntrospectionClientId == undefined
@@ -171,7 +178,31 @@ extract_response(TokenMap, #oidcc_client_context{client_id = ClientId}) ->
                 scope = oidcc_scope:parse(Scope),
                 client_id = ClientId,
                 username = Username,
-                exp = Exp
+                exp = Exp,
+                token_type = TokenType,
+                iat = Iat,
+                nbf = Nbf,
+                sub = Sub,
+                aud = Aud,
+                iss = Iss,
+                jti = Jti,
+                extra = maps:without(
+                    [
+                        <<"scope">>,
+                        <<"active">>,
+                        <<"username">>,
+                        <<"exp">>,
+                        <<"client_id">>,
+                        <<"token_type">>,
+                        <<"iat">>,
+                        <<"nbf">>,
+                        <<"sub">>,
+                        <<"aud">>,
+                        <<"iss">>,
+                        <<"jti">>
+                    ],
+                    TokenMap
+                )
             }};
         _ ->
             {error, client_id_mismatch}

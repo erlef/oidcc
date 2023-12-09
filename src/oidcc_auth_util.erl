@@ -121,18 +121,6 @@ add_authentication(
     QsBodyList,
     Header,
     client_secret_jwt,
-    AlgValuesSupported,
-    ClientContext
-) when AlgValuesSupported == []; AlgValuesSupported == undefined ->
-    %% https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
-    %% Servers SHOULD support RS256.
-    add_authentication(
-        QsBodyList, Header, client_secret_jwt, [<<"RS256">>, <<"HS256">>], ClientContext
-    );
-add_authentication(
-    QsBodyList,
-    Header,
-    client_secret_jwt,
     AllowAlgorithms,
     ClientContext
 ) ->

@@ -887,13 +887,12 @@ auth_method_client_secret_jwt_no_alg_test() ->
         jose:decode(ConfigurationBinary)
     ),
 
-    #oidcc_provider_configuration{token_endpoint = TokenEndpoint} =
-        Configuration = Configuration0#oidcc_provider_configuration{
-            token_endpoint_auth_methods_supported = [
-                <<"client_secret_jwt">>
-            ],
-            token_endpoint_auth_signing_alg_values_supported = undefined
-        },
+    Configuration = Configuration0#oidcc_provider_configuration{
+        token_endpoint_auth_methods_supported = [
+            <<"client_secret_jwt">>
+        ],
+        token_endpoint_auth_signing_alg_values_supported = undefined
+    },
 
     ClientId = <<"client_id">>,
     ClientSecret = <<"client_secret">>,
@@ -904,41 +903,14 @@ auth_method_client_secret_jwt_no_alg_test() ->
 
     ClientContext = oidcc_client_context:from_manual(Configuration, Jwk, ClientId, ClientSecret),
 
-    ok = meck:new(httpc, [no_link]),
-    HttpFun =
-        fun(
-            post,
-            {ReqTokenEndpoint, _Header, "application/x-www-form-urlencoded", Body},
-            _HttpOpts,
-            _Opts
-        ) ->
-            TokenEndpoint = ReqTokenEndpoint,
-            BodyMap = maps:from_list(uri_string:dissect_query(Body)),
-
-            ClientAssertion = maps:get(<<"client_assertion">>, BodyMap),
-
-            {true, _ClientAssertionJwt, ClientAssertionJws} = jose_jwt:verify(
-                jose_jwk:from_oct(ClientSecret), ClientAssertion
-            ),
-
-            ?assertMatch({jose_jws_alg_hmac, 'HS256'}, ClientAssertionJws#jose_jws.alg),
-
-            {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], <<"{}">>}}
-        end,
-    ok = meck:expect(httpc, request, HttpFun),
-
     ?assertMatch(
-        {ok, #oidcc_token{}},
+        {error, no_supported_auth_method},
         oidcc_token:retrieve(
             AuthCode,
             ClientContext,
             #{redirect_uri => LocalEndpoint}
         )
     ),
-
-    true = meck:validate(httpc),
-
-    meck:unload(httpc),
 
     ok.
 

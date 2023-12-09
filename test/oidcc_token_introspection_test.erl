@@ -31,12 +31,20 @@ introspect_test() ->
             _RequestOpts
         ) ->
             IntrospectionEndpoint = ReqEndpoint,
-            {ok, {{json, #{<<"active">> => true, <<"client_id">> => ClientId}}, []}}
+            {ok,
+                {
+                    {json, #{
+                        <<"active">> => true,
+                        <<"client_id">> => ClientId,
+                        <<"extra">> => <<"value">>
+                    }},
+                    []
+                }}
         end,
     ok = meck:expect(oidcc_http_util, request, HttpFun),
 
     ?assertMatch(
-        {ok, #oidcc_token_introspection{active = true}},
+        {ok, #oidcc_token_introspection{active = true, extra = #{<<"extra">> := <<"value">>}}},
         oidcc_token_introspection:introspect(
             AccessToken,
             ClientContext,

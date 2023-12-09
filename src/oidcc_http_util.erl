@@ -16,7 +16,7 @@
 
 -type query_params() :: [{unicode:chardata(), unicode:chardata() | true}].
 %% See {@link uri_string:compose_query/1}
--type http_header() :: {Field :: [byte()], Value :: iodata()}.
+-type http_header() :: {Field :: [byte()] | binary(), Value :: iodata()}.
 %% See {@link httpc:request/5}
 -type error() ::
     {http_error, StatusCode :: pos_integer(), HttpBodyResult :: binary()}

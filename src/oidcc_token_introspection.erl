@@ -43,7 +43,10 @@
 %%
 %% See [https://datatracker.ietf.org/doc/html/rfc7662#section-2.2]
 
--type opts() :: #{request_opts => oidcc_http_util:request_opts()}.
+-type opts() :: #{
+    preferred_auth_methods => [oidcc_auth_util:auth_method(), ...],
+    request_opts => oidcc_http_util:request_opts()
+}.
 
 -type error() :: client_id_mismatch | introspection_not_supported | oidcc_http_util:error().
 
@@ -111,22 +114,18 @@ introspect(AccessToken, ClientContext, Opts) ->
         ClientContext,
     #oidcc_provider_configuration{
         introspection_endpoint = Endpoint,
-        issuer = Issuer
+        issuer = Issuer,
+        introspection_endpoint_auth_methods_supported = SupportedAuthMethods,
+        introspection_endpoint_auth_signing_alg_values_supported = AllowAlgorithms
     } = Configuration,
 
     case Endpoint of
         undefined ->
             {error, introspection_not_supported};
         _ ->
-            Header =
-                [
-                    {"accept", "application/json"},
-                    oidcc_http_util:basic_auth_header(ClientId, ClientSecret)
-                ],
-            Body = [{<<"token">>, AccessToken}],
-            Request =
-                {Endpoint, Header, "application/x-www-form-urlencoded",
-                    uri_string:compose_query(Body)},
+            Header0 = [{"accept", "application/json"}],
+            Body0 = [{<<"token">>, AccessToken}],
+
             RequestOpts = maps:get(request_opts, Opts, #{}),
             TelemetryOpts = #{
                 topic => [oidcc, introspect_token],
@@ -134,6 +133,13 @@ introspect(AccessToken, ClientContext, Opts) ->
             },
 
             maybe
+                {ok, {Body, Header}} ?=
+                    oidcc_auth_util:add_client_authentication(
+                        Body0, Header0, SupportedAuthMethods, AllowAlgorithms, Opts, ClientContext
+                    ),
+                Request =
+                    {Endpoint, Header, "application/x-www-form-urlencoded",
+                        uri_string:compose_query(Body)},
                 {ok, {{json, Token}, _Headers}} ?=
                     oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
                 extract_response(Token, ClientContext)
@@ -155,7 +161,14 @@ extract_response(TokenMap, #oidcc_client_context{client_id = ClientId}) ->
         end,
     Scope = maps:get(<<"scope">>, TokenMap, <<"">>),
     Username = maps:get(<<"username">>, TokenMap, undefined),
+    TokenType = maps:get(<<"token_type">>, TokenMap, undefined),
     Exp = maps:get(<<"exp">>, TokenMap, undefined),
+    Iat = maps:get(<<"iat">>, TokenMap, undefined),
+    Nbf = maps:get(<<"nbf">>, TokenMap, undefined),
+    Sub = maps:get(<<"sub">>, TokenMap, undefined),
+    Aud = maps:get(<<"aud">>, TokenMap, undefined),
+    Iss = maps:get(<<"iss">>, TokenMap, undefined),
+    Jti = maps:get(<<"jti">>, TokenMap, undefined),
     case maps:get(<<"client_id">>, TokenMap, undefined) of
         IntrospectionClientId when
             IntrospectionClientId == ClientId; IntrospectionClientId == undefined
@@ -165,7 +178,31 @@ extract_response(TokenMap, #oidcc_client_context{client_id = ClientId}) ->
                 scope = oidcc_scope:parse(Scope),
                 client_id = ClientId,
                 username = Username,
-                exp = Exp
+                exp = Exp,
+                token_type = TokenType,
+                iat = Iat,
+                nbf = Nbf,
+                sub = Sub,
+                aud = Aud,
+                iss = Iss,
+                jti = Jti,
+                extra = maps:without(
+                    [
+                        <<"scope">>,
+                        <<"active">>,
+                        <<"username">>,
+                        <<"exp">>,
+                        <<"client_id">>,
+                        <<"token_type">>,
+                        <<"iat">>,
+                        <<"nbf">>,
+                        <<"sub">>,
+                        <<"aud">>,
+                        <<"iss">>,
+                        <<"jti">>
+                    ],
+                    TokenMap
+                )
             }};
         _ ->
             {error, client_id_mismatch}

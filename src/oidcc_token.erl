@@ -98,7 +98,7 @@
         pkce_verifier => binary(),
         nonce => binary() | any,
         scope => oidcc_scope:scopes(),
-        preferred_auth_methods => [auth_method(), ...],
+        preferred_auth_methods => [oidcc_auth_util:auth_method(), ...],
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
         redirect_uri := uri_string:uri_string(),
         request_opts => oidcc_http_util:request_opts()
@@ -174,9 +174,6 @@
         authorization_code | refresh_token | jwt_bearer | client_credentials}
     | oidcc_jwt_util:error()
     | oidcc_http_util:error().
-
--type auth_method() ::
-    none | client_secret_basic | client_secret_post | client_secret_jwt | private_key_jwt.
 
 -telemetry_event(#{
     event => [oidcc, request_token, start],
@@ -829,11 +826,12 @@ when
     TelemetryOpts :: oidcc_http_util:telemetry_opts(),
     AuthenticateClient :: boolean().
 retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext, Opts, TelemetryOpts, AuthenticateClient) ->
-    #oidcc_client_context{provider_configuration = Configuration, client_jwks = ClientJwks} =
+    #oidcc_client_context{provider_configuration = Configuration} =
         ClientContext,
     #oidcc_provider_configuration{
         token_endpoint = TokenEndpoint,
-        token_endpoint_auth_methods_supported = SupportedAuthMethods
+        token_endpoint_auth_methods_supported = SupportedAuthMethods0,
+        token_endpoint_auth_signing_alg_values_supported = SigningAlgs
     } =
         Configuration,
 
@@ -841,206 +839,24 @@ retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext, Opts, TelemetryOpts, Aut
 
     Body0 = add_pkce_verifier(QsBodyIn, PkceVerifier),
 
-    MaybeAuthMethod =
+    SupportedAuthMethods =
         case AuthenticateClient of
-            true ->
-                [_ | _] =
-                    PreferredAuthMethods = maps:get(preferred_auth_methods, Opts, [
-                        private_key_jwt,
-                        client_secret_jwt,
-                        client_secret_post,
-                        client_secret_basic,
-                        none
-                    ]),
-                select_preferred_auth(PreferredAuthMethods, SupportedAuthMethods);
-            false ->
-                {ok, none}
+            true -> SupportedAuthMethods0;
+            false -> [<<"none">>]
         end,
 
-    case MaybeAuthMethod of
-        {ok, AuthMethod} ->
-            maybe
-                {ok, {Body, Header}} ?=
-                    add_authentication(Body0, Header0, AuthMethod, ClientContext),
-                Request =
-                    {TokenEndpoint, Header, "application/x-www-form-urlencoded",
-                        uri_string:compose_query(Body)},
-                RequestOpts = maps:get(request_opts, Opts, #{}),
-                {ok, {{json, TokenResponse}, _Headers}} ?=
-                    oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
-                {ok, TokenResponse}
-            else
-                {error, auth_method_not_possible} ->
-                    retrieve_a_token(
-                        QsBodyIn,
-                        PkceVerifier,
-                        ClientContext#oidcc_client_context{
-                            provider_configuration = Configuration#oidcc_provider_configuration{
-                                token_endpoint_auth_methods_supported =
-                                    SupportedAuthMethods -- [atom_to_binary(AuthMethod)]
-                            }
-                        },
-                        Opts,
-                        TelemetryOpts,
-                        AuthenticateClient
-                    );
-                {error, Reason} ->
-                    {error, Reason}
-            end;
-        {error, Reason} ->
-            {error, Reason}
-    end.
-
--spec select_preferred_auth(PreferredAuthMethods, AuthMethodsSupported) ->
-    {ok, auth_method()} | {error, error()}
-when
-    PreferredAuthMethods :: [auth_method(), ...],
-    AuthMethodsSupported :: [binary(), ...].
-select_preferred_auth(PreferredAuthMethods, AuthMethodsSupported) ->
-    PreferredAuthMethodSearchFun = fun(AuthMethod) ->
-        lists:member(atom_to_binary(AuthMethod), AuthMethodsSupported)
-    end,
-
-    case lists:search(PreferredAuthMethodSearchFun, PreferredAuthMethods) of
-        {value, AuthMethod} ->
-            {ok, AuthMethod};
-        false ->
-            {error, no_supported_auth_method}
-    end.
-
--spec add_authentication(
-    QueryList,
-    Header,
-    AuthMethod,
-    ClientContext
-) ->
-    {ok, {oidcc_http_util:query_params(), [oidcc_http_util:http_header()]}}
-    | {error, auth_method_not_possible}
-when
-    QueryList :: oidcc_http_util:query_params(),
-    Header :: [oidcc_http_util:http_header()],
-    AuthMethod :: auth_method(),
-    ClientContext :: oidcc_client_context:t().
-add_authentication(
-    QsBodyList,
-    Header,
-    none,
-    #oidcc_client_context{client_id = ClientId}
-) ->
-    NewBodyList = [{<<"client_id">>, ClientId} | QsBodyList],
-    {ok, {NewBodyList, Header}};
-add_authentication(
-    _QsBodyList,
-    _Header,
-    _Method,
-    #oidcc_client_context{client_secret = unauthenticated}
-) ->
-    {error, auth_method_not_possible};
-add_authentication(
-    QsBodyList,
-    Header,
-    client_secret_basic,
-    #oidcc_client_context{client_id = ClientId, client_secret = ClientSecret}
-) ->
-    NewHeader = [oidcc_http_util:basic_auth_header(ClientId, ClientSecret) | Header],
-    {ok, {QsBodyList, NewHeader}};
-add_authentication(
-    QsBodyList,
-    Header,
-    client_secret_post,
-    #oidcc_client_context{client_id = ClientId, client_secret = ClientSecret}
-) ->
-    NewBodyList =
-        [{<<"client_id">>, ClientId}, {<<"client_secret">>, ClientSecret} | QsBodyList],
-    {ok, {NewBodyList, Header}};
-add_authentication(
-    QsBodyList,
-    Header,
-    client_secret_jwt,
-    #oidcc_client_context{
-        provider_configuration =
-            #oidcc_provider_configuration{
-                token_endpoint_auth_signing_alg_values_supported = AlgValuesSupported
-            } = ProviderConfiguration
-    } = ClientContext
-) when AlgValuesSupported == []; AlgValuesSupported == undefined ->
-    %% https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
-    %% Servers SHOULD support RS256.
-    add_authentication(QsBodyList, Header, client_secret_jwt, ClientContext#oidcc_client_context{
-        provider_configuration = ProviderConfiguration#oidcc_provider_configuration{
-            token_endpoint_auth_signing_alg_values_supported = [<<"HS256">>]
-        }
-    });
-add_authentication(
-    QsBodyList,
-    Header,
-    client_secret_jwt,
-    ClientContext
-) ->
-    #oidcc_client_context{
-        provider_configuration = ProviderConfiguration,
-        client_id = ClientId,
-        client_secret = ClientSecret
-    } = ClientContext,
-    #oidcc_provider_configuration{
-        token_endpoint_auth_signing_alg_values_supported = AllowAlgorithms
-    } = ProviderConfiguration,
-
     maybe
-        #jose_jwk{} =
-            OctJwk ?=
-                oidcc_jwt_util:client_secret_oct_keys(
-                    AllowAlgorithms,
-                    ClientSecret
-                ),
-        {ok, ClientAssertion} ?=
-            signed_client_assertion(
-                ClientContext,
-                OctJwk
+        {ok, {Body, Header}} ?=
+            oidcc_auth_util:add_client_authentication(
+                Body0, Header0, SupportedAuthMethods, SigningAlgs, Opts, ClientContext
             ),
-        {ok, {
-            [
-                {"client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"},
-                {"client_assertion", ClientAssertion},
-                {"client_id", ClientId}
-                | QsBodyList
-            ],
-            Header
-        }}
-    else
-        none ->
-            {error, auth_method_not_possible};
-        {error, no_supported_alg_or_key} ->
-            {error, auth_method_not_possible}
-    end;
-add_authentication(
-    QsBodyList,
-    Header,
-    private_key_jwt,
-    ClientContext
-) ->
-    #oidcc_client_context{
-        client_id = ClientId,
-        client_jwks = ClientJwks
-    } = ClientContext,
-
-    maybe
-        #jose_jwk{} ?= ClientJwks,
-        {ok, ClientAssertion} ?= signed_client_assertion(ClientContext, ClientJwks),
-        {ok, {
-            [
-                {"client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"},
-                {"client_assertion", ClientAssertion},
-                {"client_id", ClientId}
-                | QsBodyList
-            ],
-            Header
-        }}
-    else
-        none ->
-            {error, auth_method_not_possible};
-        {error, no_supported_alg_or_key} ->
-            {error, auth_method_not_possible}
+        Request =
+            {TokenEndpoint, Header, "application/x-www-form-urlencoded",
+                uri_string:compose_query(Body)},
+        RequestOpts = maps:get(request_opts, Opts, #{}),
+        {ok, {{json, TokenResponse}, _Headers}} ?=
+            oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
+        {ok, TokenResponse}
     end.
 
 -spec add_pkce_verifier(QueryList, PkceVerifier) -> oidcc_http_util:query_params() when
@@ -1050,42 +866,3 @@ add_pkce_verifier(BodyQs, none) ->
     BodyQs;
 add_pkce_verifier(BodyQs, PkceVerifier) ->
     [{<<"code_verifier">>, PkceVerifier} | BodyQs].
-
--spec signed_client_assertion(ClientContext, Jwk) -> {ok, binary()} | {error, error()} when
-    Jwk :: jose_jwk:key(),
-    ClientContext :: oidcc_client_context:t().
-signed_client_assertion(ClientContext, Jwk) ->
-    #oidcc_client_context{provider_configuration = ProviderConfiguration} = ClientContext,
-    #oidcc_provider_configuration{
-        token_endpoint_auth_signing_alg_values_supported = AllowAlgorithms
-    } = ProviderConfiguration,
-
-    Jwt = jose_jwt:from(token_request_claims(ClientContext)),
-
-    oidcc_jwt_util:sign(Jwt, Jwk, AllowAlgorithms).
-
--spec token_request_claims(ClientContext) -> oidcc_jwt_util:claims() when
-    ClientContext :: oidcc_client_context:t().
-token_request_claims(#oidcc_client_context{
-    client_id = ClientId,
-    provider_configuration = #oidcc_provider_configuration{token_endpoint = TokenEndpoint}
-}) ->
-    MaxClockSkew =
-        case application:get_env(oidcc, max_clock_skew) of
-            undefined -> 0;
-            {ok, ClockSkew} -> ClockSkew
-        end,
-
-    #{
-        <<"iss">> => ClientId,
-        <<"sub">> => ClientId,
-        <<"aud">> => TokenEndpoint,
-        <<"jti">> => random_string(32),
-        <<"iat">> => os:system_time(seconds),
-        <<"exp">> => os:system_time(seconds) + 30,
-        <<"nbf">> => os:system_time(seconds) - MaxClockSkew
-    }.
-
--spec random_string(Bytes :: pos_integer()) -> binary().
-random_string(Bytes) ->
-    base64:encode(crypto:strong_rand_bytes(Bytes), #{mode => urlsafe, padding => false}).

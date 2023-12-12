@@ -34,7 +34,8 @@
 
 -type quirks() :: #{
     allow_issuer_mismatch => boolean(),
-    allow_unsafe_http => boolean()
+    allow_unsafe_http => boolean(),
+    document_overrides => map()
 }.
 %% Allow Specification Non-compliance
 %%
@@ -45,6 +46,8 @@
 %%     and function parameter</li>
 %%   <li>`allow_unsafe_http' - Allow unsafe HTTP. Use this for development
 %%     providers and <strong>never in production</strong>.</li>
+%%   <li>`document_overrides' - a map to merge with the real OIDD document,
+%%     in case the OP left out some values.</li>
 %% </ul>
 
 -type opts() :: #{
@@ -277,9 +280,12 @@ load_jwks(JwksUri, Opts) ->
 %% @since 3.1.0
 -spec decode_configuration(Configuration, Opts) -> {ok, t()} | {error, error()} when
     Configuration :: map(), Opts :: opts().
-decode_configuration(Configuration, Opts) ->
+decode_configuration(Configuration0, Opts) ->
     Quirks = maps:get(quirks, Opts, #{}),
     AllowUnsafeHttp = maps:get(allow_unsafe_http, Quirks, false),
+
+    DocumentOverrides = maps:get(document_overrides, Quirks, #{}),
+    Configuration = maps:merge(Configuration0, DocumentOverrides),
 
     maybe
         {ok, {

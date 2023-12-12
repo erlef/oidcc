@@ -798,7 +798,9 @@ auth_method_private_key_jwt_test() ->
         }),
 
     ClientJwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
-    ClientJwk = ClientJwk0#jose_jwk{fields = #{<<"use">> => <<"sig">>}},
+    ClientJwk = ClientJwk0#jose_jwk{
+        fields = #{<<"kid">> => <<"private_kid">>, <<"use">> => <<"sig">>}
+    },
 
     ClientContext = oidcc_client_context:from_manual(Configuration, Jwk, ClientId, ClientSecret, #{
         client_jwks => ClientJwk
@@ -836,6 +838,14 @@ auth_method_private_key_jwt_test() ->
 
             ?assertMatch(
                 #jose_jws{alg = {_, 'RS256'}}, ClientAssertionJws
+            ),
+
+            #jose_jws{fields = ClientAssertionJwsFields} = ClientAssertionJws,
+            ?assertMatch(
+                #{
+                    <<"kid">> := <<"private_kid">>
+                },
+                ClientAssertionJwsFields
             ),
 
             ?assertMatch(

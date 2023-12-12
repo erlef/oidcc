@@ -207,14 +207,14 @@ attempt_request_object(QueryParams, #oidcc_client_context{
     SigningJwks =
         case oidcc_jwt_util:client_secret_oct_keys(SigningAlgSupported, ClientSecret) of
             none ->
-                Jwks;
+                JwksWithClientJwks;
             SigningOctJwk ->
                 oidcc_jwt_util:merge_jwks(JwksWithClientJwks, SigningOctJwk)
         end,
     EncryptionJwks =
         case oidcc_jwt_util:client_secret_oct_keys(EncryptionAlgSupported, ClientSecret) of
             none ->
-                Jwks;
+                JwksWithClientJwks;
             EncryptionOctJwk ->
                 oidcc_jwt_util:merge_jwks(JwksWithClientJwks, EncryptionOctJwk)
         end,

@@ -4,6 +4,8 @@
 %%%-------------------------------------------------------------------
 -module(oidcc_jwt_util).
 
+-feature(maybe_expr, enable).
+
 -include_lib("jose/include/jose_jwk.hrl").
 -include_lib("jose/include/jose_jws.hrl").
 -include_lib("jose/include/jose_jwt.hrl").
@@ -173,32 +175,37 @@ merge_jwks(Left, Right) ->
 sign(_Jwt, _Jwk, []) ->
     {error, no_supported_alg_or_key};
 sign(Jwt, Jwk, [Algorithm | RestAlgorithms]) ->
-    Jws = jose_jws:from_map(#{<<"alg">> => Algorithm}),
-    SigningCallback = fun
-        (#jose_jwk{fields = #{<<"use">> := <<"sig">>}} = Key) ->
-            try
-                {_Jws, Token} = jose_jws:compact(jose_jwt:sign(Key, Jws, Jwt)),
-                {ok, Token}
-            catch
-                error:not_supported -> error;
-                error:{not_supported, _Alg} -> error;
-                %% Some Keys crash if a public key is provided
-                error:function_clause -> error
-            end;
-        (#jose_jwk{} = Key) when Algorithm == <<"none">> ->
-            try
-                {_Jws, Token} = jose_jws:compact(jose_jwt:sign(Key, Jws, Jwt)),
-                {ok, Token}
-            catch
-                error:not_supported -> error;
-                error:{not_supported, _Alg} -> error
-            end;
-        (_Key) ->
-            error
-    end,
-    case evaluate_for_all_keys(Jwk, SigningCallback) of
-        {ok, Token} -> {ok, Token};
-        error -> sign(Jwt, Jwk, RestAlgorithms)
+    maybe
+        #jose_jws{fields = JwsFields} = Jws0 ?= jose_jws:from_map(#{<<"alg">> => Algorithm}),
+        SigningCallback = fun
+            (#jose_jwk{fields = #{<<"use">> := <<"sig">>} = Fields} = Key) ->
+                %% add the kid field to the JWS signature if present
+                KidField = maps:with([<<"kid">>], Fields),
+                Jws = Jws0#jose_jws{fields = maps:merge(KidField, JwsFields)},
+                try
+                    {_Jws, Token} = jose_jws:compact(jose_jwt:sign(Key, Jws, Jwt)),
+                    {ok, Token}
+                catch
+                    error:not_supported -> error;
+                    error:{not_supported, _Alg} -> error;
+                    %% Some Keys crash if a public key is provided
+                    error:function_clause -> error
+                end;
+            (#jose_jwk{} = Key) when Algorithm == <<"none">> ->
+                try
+                    {_Jws, Token} = jose_jws:compact(jose_jwt:sign(Key, Jws0, Jwt)),
+                    {ok, Token}
+                catch
+                    error:not_supported -> error;
+                    error:{not_supported, _Alg} -> error
+                end;
+            (_Key) ->
+                error
+        end,
+        {ok, Token} ?= evaluate_for_all_keys(Jwk, SigningCallback),
+        {ok, Token}
+    else
+        _ -> sign(Jwt, Jwk, RestAlgorithms)
     end.
 
 %% @private

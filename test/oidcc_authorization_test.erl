@@ -334,6 +334,79 @@ create_redirect_url_with_request_object_and_max_clock_skew_test() ->
     ?assert(ClientNbf < os:system_time(seconds) - 5),
     ok.
 
+create_redirect_url_with_request_object_no_hmac_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, #oidcc_provider_configuration{} = Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ValidConfigString)
+    ),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        request_parameter_supported = true,
+        request_object_signing_alg_values_supported = [
+            <<"RS256">>
+        ],
+        request_object_encryption_alg_values_supported = [
+            <<"RSA1_5">>,
+            <<"RSA-OAEP">>,
+            <<"RSA-OAEP-256">>,
+            <<"RSA-OAEP-384">>,
+            <<"RSA-OAEP-512">>,
+            <<"ECDH-ES">>,
+            <<"ECDH-ES+A128KW">>,
+            <<"ECDH-ES+A192KW">>,
+            <<"ECDH-ES+A256KW">>,
+            <<"A128KW">>,
+            <<"A192KW">>,
+            <<"A256KW">>,
+            <<"A128GCMKW">>,
+            <<"A192GCMKW">>,
+            <<"A256GCMKW">>,
+            <<"dir">>
+        ],
+        request_object_encryption_enc_values_supported = [
+            <<"A128CBC-HS256">>,
+            <<"A192CBC-HS384">>,
+            <<"A256CBC-HS512">>,
+            <<"A128GCM">>,
+            <<"A192GCM">>,
+            <<"A256GCM">>
+        ]
+    },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"">>,
+
+    Jwks = jose_jwk:to_public(jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem")),
+
+    ClientJwks0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    ClientJwks = ClientJwks0#jose_jwk{fields = #{<<"use">> => <<"sig">>}},
+
+    RedirectUri = <<"https://my.server/return">>,
+
+    ClientContext =
+        oidcc_client_context:from_manual(Configuration, Jwks, ClientId, ClientSecret, #{
+            client_jwks => ClientJwks
+        }),
+
+    {ok, Url} = oidcc_authorization:create_redirect_url(ClientContext, #{
+        redirect_uri => RedirectUri
+    }),
+
+    #{query := QueryString} = uri_string:parse(Url),
+    QueryParams0 = uri_string:dissect_query(QueryString),
+    QueryParams1 = lists:map(
+        fun({Key, Value}) -> {list_to_binary(Key), list_to_binary(Value)} end, QueryParams0
+    ),
+    QueryParams = maps:from_list(QueryParams1),
+
+    SignedToken = maps:get(<<"request">>, QueryParams),
+
+    {true, _, _} = jose_jwt:verify(ClientJwks, SignedToken),
+
+    ok.
+
 create_redirect_url_with_invalid_request_object_test() ->
     PrivDir = code:priv_dir(oidcc),
 

@@ -1056,6 +1056,55 @@ create_redirect_url_with_par_client_secret_jwt_request_object_test() ->
     ok.
 
 create_redirect_url_private_key_jwt_test() ->
+    ClientContext = private_key_jwt_fixture(),
+    RedirectUri = <<"https://my.server/return">>,
+
+    Opts =
+        #{
+            redirect_uri => RedirectUri
+        },
+
+    {ok, Url} = oidcc_authorization:create_redirect_url(ClientContext, Opts),
+
+    ExpUrl =
+        <<"https://my.provider/auth?dpop_jkt=7jnO2y748F6HEP7WtfubjBQWOgKUuMBQoYLyyc1fe-Q&scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
+    ?assertEqual(ExpUrl, iolist_to_binary(Url)),
+
+    ok.
+
+create_redirect_url_response_mode_jwt_test() ->
+    ClientContext = private_key_jwt_fixture(),
+    RedirectUri = <<"https://my.server/return">>,
+
+    Opts =
+        #{
+            redirect_uri => RedirectUri
+        },
+
+    {ok, Url1} = oidcc_authorization:create_redirect_url(ClientContext, Opts#{
+        response_mode => <<"jwt">>
+    }),
+    {ok, Url2} = oidcc_authorization:create_redirect_url(ClientContext, Opts#{
+        response_mode => <<"query.jwt">>
+    }),
+
+    ?assertMatch(
+        #{
+            "response_mode" := "jwt"
+        },
+        parse_query_string(Url1)
+    ),
+
+    ?assertMatch(
+        #{
+            "response_mode" := "query.jwt"
+        },
+        parse_query_string(Url2)
+    ),
+
+    ok.
+
+private_key_jwt_fixture() ->
     PrivDir = code:priv_dir(oidcc),
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
@@ -1070,22 +1119,15 @@ create_redirect_url_private_key_jwt_test() ->
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 
     ClientId = <<"client_id">>,
-    RedirectUri = <<"https://my.server/return">>,
 
     ClientContext =
         oidcc_client_context:from_manual(Configuration, Jwks, ClientId, <<"client_secret">>, #{
             client_jwks => Jwks
         }),
 
-    Opts =
-        #{
-            redirect_uri => RedirectUri
-        },
+    ClientContext.
 
-    {ok, Url} = oidcc_authorization:create_redirect_url(ClientContext, Opts),
-
-    ExpUrl =
-        <<"https://my.provider/auth?dpop_jkt=7jnO2y748F6HEP7WtfubjBQWOgKUuMBQoYLyyc1fe-Q&scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
-    ?assertEqual(ExpUrl, iolist_to_binary(Url)),
-
-    ok.
+parse_query_string(UriString) ->
+    #{query := QueryStringBinary} = uri_string:parse(UriString),
+    QueryList = uri_string:dissect_query(QueryStringBinary),
+    maps:from_list(QueryList).

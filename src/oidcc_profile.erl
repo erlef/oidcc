@@ -64,16 +64,18 @@ apply_profiles(
     Opts = map_put_new(preferred_auth_methods, [private_key_jwt], Opts3),
     apply_profiles(ClientContext, Opts);
 apply_profiles(
-    #oidcc_client_context{} = ClientContext,
+    #oidcc_client_context{} = ClientContext0,
     #{profiles := [fapi2_message_signing | RestProfiles]} = Opts0
 ) ->
     %% FAPI2 Message Signing:
-    %% - https://openid.bitbucket.io/fapi/fapi-2_0-message- signing.html
+    %% - https://openid.bitbucket.io/fapi/fapi-2_0-message-signing.html
+
+    ClientContext = limit_response_modes(
+        [<<"jwt">>, <<"query.jwt">>, <<"form_post.jwt">>], ClientContext0
+    ),
 
     %% TODO force require_signed_request_object once the conformance suite can
     %% validate it (currently, the suite fails if this is enabled)
-    %% TODO limit response_mode_supported to [<<"jwt">>] once JARM is supported.
-    %% This is required by the spec, but not currently by the conformance suite.
     %% TODO require signed token introspection responses
 
     %% Also require everything from FAPI2 Security Profile
@@ -110,6 +112,19 @@ limit_response_types(Types, ClientContext0) ->
     } = ProviderConfiguration0,
     ProviderConfiguration = ProviderConfiguration0#oidcc_provider_configuration{
         response_types_supported = limit_values(Types, ResponseTypes)
+    },
+    ClientContext = ClientContext0#oidcc_client_context{
+        provider_configuration = ProviderConfiguration
+    },
+    ClientContext.
+
+limit_response_modes(Modes, ClientContext0) ->
+    #oidcc_client_context{provider_configuration = ProviderConfiguration0} = ClientContext0,
+    #oidcc_provider_configuration{
+        response_modes_supported = ResponseModes
+    } = ProviderConfiguration0,
+    ProviderConfiguration = ProviderConfiguration0#oidcc_provider_configuration{
+        response_modes_supported = limit_values(Modes, ResponseModes)
     },
     ClientContext = ClientContext0#oidcc_client_context{
         provider_configuration = ProviderConfiguration
@@ -170,12 +185,7 @@ limit_signing_alg_values(AlgSupported, ClientContext0) ->
 limit_values(_Limit, undefined) ->
     undefined;
 limit_values(Limit, Values) ->
-    case [V || V <- Values, lists:member(V, Limit)] of
-        [] ->
-            undefined;
-        Filtered ->
-            Filtered
-    end.
+    [V || V <- Values, lists:member(V, Limit)].
 
 map_put_new(Key, Value, Map) ->
     case Map of

@@ -104,6 +104,7 @@
         redirect_uri := uri_string:uri_string(),
         request_opts => oidcc_http_util:request_opts(),
         url_extension => oidcc_http_util:query_params(),
+        body_extension => oidcc_http_util:query_params(),
         quirks => quirks()
     }.
 %% Options for retrieving a token
@@ -129,6 +130,7 @@
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
         request_opts => oidcc_http_util:request_opts(),
         url_extension => oidcc_http_util:query_params(),
+        body_extension => oidcc_http_util:query_params(),
         quirks => quirks()
     }.
 %% See {@link refresh_opts_no_sub()}
@@ -140,6 +142,7 @@
         expected_subject := binary(),
         request_opts => oidcc_http_util:request_opts(),
         url_extension => oidcc_http_util:query_params(),
+        body_extension => oidcc_http_util:query_params(),
         quirks => quirks()
     }.
 %% Options for refreshing a token
@@ -161,6 +164,7 @@
     request_opts => oidcc_http_util:request_opts(),
     kid => binary(),
     url_extension => oidcc_http_util:query_params(),
+    body_extension => oidcc_http_util:query_params(),
     quirks => quirks()
 }.
 
@@ -169,6 +173,7 @@
     refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
     request_opts => oidcc_http_util:request_opts(),
     url_extension => oidcc_http_util:query_params(),
+    body_extension => oidcc_http_util:query_params(),
     quirks => quirks()
 }.
 
@@ -893,7 +898,8 @@ retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext, Opts, TelemetryOpts, Aut
 
     Header0 = [{"accept", "application/jwt, application/json"}],
 
-    Body0 = add_pkce_verifier(QsBodyIn, PkceVerifier),
+    QsBody0 = QsBodyIn ++ maps:get(body_extension, Opts, []),
+    QsBody = add_pkce_verifier(QsBody0, PkceVerifier),
 
     SupportedAuthMethods =
         case AuthenticateClient of
@@ -904,7 +910,7 @@ retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext, Opts, TelemetryOpts, Aut
     maybe
         {ok, {Body, Header}} ?=
             oidcc_auth_util:add_client_authentication(
-                Body0, Header0, SupportedAuthMethods, SigningAlgs, Opts, ClientContext
+                QsBody, Header0, SupportedAuthMethods, SigningAlgs, Opts, ClientContext
             ),
         Request =
             {Endpoint, Header, "application/x-www-form-urlencoded", uri_string:compose_query(Body)},

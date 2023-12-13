@@ -82,7 +82,8 @@ retrieve_none_test() ->
                 #{
                     <<"grant_type">> := <<"authorization_code">>,
                     <<"code">> := AuthCode,
-                    <<"redirect_uri">> := LocalEndpoint
+                    <<"redirect_uri">> := LocalEndpoint,
+                    <<"foo">> := <<"bar">>
                 },
                 maps:from_list(uri_string:dissect_query(Body))
             ),
@@ -103,7 +104,11 @@ retrieve_none_test() ->
         oidcc_token:retrieve(
             AuthCode,
             ClientContext,
-            #{redirect_uri => LocalEndpoint, url_extension => [{<<"foo">>, <<"bar">>}]}
+            #{
+                redirect_uri => LocalEndpoint,
+                url_extension => [{<<"foo">>, <<"bar">>}],
+                body_extension => [{<<"foo">>, <<"bar">>}]
+            }
         )
     ),
 

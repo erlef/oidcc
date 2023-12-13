@@ -138,6 +138,18 @@ unsupported_grant_type_test() ->
         oidcc_authorization:create_redirect_url(ClientContext, Opts)
     ),
 
+    QuirksOpts =
+        #{
+            redirect_uri => RedirectUri,
+            client_id => ClientId,
+            quirks => #{allow_unsupported_grant_types => true}
+        },
+
+    ?assertMatch(
+        {ok, _},
+        oidcc_authorization:create_redirect_url(ClientContext, QuirksOpts)
+    ),
+
     ok.
 
 create_redirect_url_with_request_object_test() ->

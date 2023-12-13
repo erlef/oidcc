@@ -101,7 +101,8 @@
         preferred_auth_methods => [oidcc_auth_util:auth_method(), ...],
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
         redirect_uri := uri_string:uri_string(),
-        request_opts => oidcc_http_util:request_opts()
+        request_opts => oidcc_http_util:request_opts(),
+        url_extension => oidcc_http_util:query_params()
     }.
 %% Options for retrieving a token
 %%
@@ -124,7 +125,8 @@
     #{
         scope => oidcc_scope:scopes(),
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
-        request_opts => oidcc_http_util:request_opts()
+        request_opts => oidcc_http_util:request_opts(),
+        url_extension => oidcc_http_util:query_params()
     }.
 %% See {@link refresh_opts_no_sub()}
 
@@ -133,7 +135,8 @@
         scope => oidcc_scope:scopes(),
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
         expected_subject := binary(),
-        request_opts => oidcc_http_util:request_opts()
+        request_opts => oidcc_http_util:request_opts(),
+        url_extension => oidcc_http_util:query_params()
     }.
 %% Options for refreshing a token
 %%
@@ -152,13 +155,15 @@
     scope => oidcc_scope:scopes(),
     refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
     request_opts => oidcc_http_util:request_opts(),
-    kid => binary()
+    kid => binary(),
+    url_extension => oidcc_http_util:query_params()
 }.
 
 -type client_credentials_opts() :: #{
     scope => oidcc_scope:scopes(),
     refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
-    request_opts => oidcc_http_util:request_opts()
+    request_opts => oidcc_http_util:request_opts(),
+    url_extension => oidcc_http_util:query_params()
 }.
 
 -type error() ::
@@ -835,6 +840,14 @@ retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext, Opts, TelemetryOpts, Aut
     } =
         Configuration,
 
+    QueryParams = maps:get(url_extension, Opts, []),
+
+    Endpoint =
+        case QueryParams of
+            [] -> TokenEndpoint;
+            _ -> [TokenEndpoint, <<"?">>, uri_string:compose_query(QueryParams)]
+        end,
+
     Header0 = [{"accept", "application/jwt, application/json"}],
 
     Body0 = add_pkce_verifier(QsBodyIn, PkceVerifier),
@@ -851,8 +864,7 @@ retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext, Opts, TelemetryOpts, Aut
                 Body0, Header0, SupportedAuthMethods, SigningAlgs, Opts, ClientContext
             ),
         Request =
-            {TokenEndpoint, Header, "application/x-www-form-urlencoded",
-                uri_string:compose_query(Body)},
+            {Endpoint, Header, "application/x-www-form-urlencoded", uri_string:compose_query(Body)},
         RequestOpts = maps:get(request_opts, Opts, #{}),
         {ok, {{json, TokenResponse}, _Headers}} ?=
             oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),

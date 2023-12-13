@@ -76,7 +76,7 @@ retrieve_none_test() ->
             _HttpOpts,
             _Opts
         ) ->
-            TokenEndpoint = ReqTokenEndpoint,
+            ?assertEqual(<<TokenEndpoint/binary, "?foo=bar">>, iolist_to_binary(ReqTokenEndpoint)),
             ?assertMatch({"authorization", _}, proplists:lookup("authorization", Header)),
             ?assertMatch(
                 #{
@@ -103,7 +103,7 @@ retrieve_none_test() ->
         oidcc_token:retrieve(
             AuthCode,
             ClientContext,
-            #{redirect_uri => LocalEndpoint}
+            #{redirect_uri => LocalEndpoint, url_extension => [{<<"foo">>, <<"bar">>}]}
         )
     ),
 

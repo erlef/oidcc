@@ -38,6 +38,7 @@
 -export_type([error/0]).
 -export_type([id/0]).
 -export_type([jwt_profile_opts/0]).
+-export_type([quirks/0]).
 -export_type([refresh/0]).
 -export_type([refresh_opts/0]).
 -export_type([refresh_opts_no_sub/0]).
@@ -102,7 +103,8 @@
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
         redirect_uri := uri_string:uri_string(),
         request_opts => oidcc_http_util:request_opts(),
-        url_extension => oidcc_http_util:query_params()
+        url_extension => oidcc_http_util:query_params(),
+        quirks => quirks()
     }.
 %% Options for retrieving a token
 %%
@@ -126,7 +128,8 @@
         scope => oidcc_scope:scopes(),
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
         request_opts => oidcc_http_util:request_opts(),
-        url_extension => oidcc_http_util:query_params()
+        url_extension => oidcc_http_util:query_params(),
+        quirks => quirks()
     }.
 %% See {@link refresh_opts_no_sub()}
 
@@ -136,7 +139,8 @@
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
         expected_subject := binary(),
         request_opts => oidcc_http_util:request_opts(),
-        url_extension => oidcc_http_util:query_params()
+        url_extension => oidcc_http_util:query_params(),
+        quirks => quirks()
     }.
 %% Options for refreshing a token
 %%
@@ -156,15 +160,27 @@
     refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
     request_opts => oidcc_http_util:request_opts(),
     kid => binary(),
-    url_extension => oidcc_http_util:query_params()
+    url_extension => oidcc_http_util:query_params(),
+    quirks => quirks()
 }.
 
 -type client_credentials_opts() :: #{
     scope => oidcc_scope:scopes(),
     refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
     request_opts => oidcc_http_util:request_opts(),
-    url_extension => oidcc_http_util:query_params()
+    url_extension => oidcc_http_util:query_params(),
+    quirks => quirks()
 }.
+
+-type quirks() :: #{allow_unsupported_grant_types => boolean()}.
+%% Allow Specification Non-compliance
+%%
+%% <h2>Exceptions</h2>
+%%
+%% <ul>
+%%   <li>`allow_unsupported_grant_types' - Allow to proceed with a grant type
+%%     that has not been registered in `grant_types_supported'</li>
+%% </ul>
 
 -type error() ::
     {missing_claim, MissingClaim :: binary(), Claims :: oidcc_jwt_util:claims()}
@@ -304,7 +320,14 @@ retrieve(AuthCode, ClientContext, Opts) ->
     #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} =
         Configuration,
 
-    case lists:member(<<"authorization_code">>, GrantTypesSupported) of
+    Quirks = maps:get(quirks, Opts, #{}),
+    AllowUnsupportedGrantTypes = maps:get(
+        allow_unsupported_grant_types, Quirks, false
+    ),
+
+    case
+        lists:member(<<"authorization_code">>, GrantTypesSupported) or AllowUnsupportedGrantTypes
+    of
         true ->
             PkceVerifier = maps:get(pkce_verifier, Opts, none),
             QsBody =
@@ -388,7 +411,12 @@ refresh(RefreshToken, ClientContext, Opts) ->
     #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} =
         Configuration,
 
-    case lists:member(<<"refresh_token">>, GrantTypesSupported) of
+    Quirks = maps:get(quirks, Opts, #{}),
+    AllowUnsupportedGrantTypes = maps:get(
+        allow_unsupported_grant_types, Quirks, false
+    ),
+
+    case lists:member(<<"refresh_token">>, GrantTypesSupported) or AllowUnsupportedGrantTypes of
         true ->
             ExpectedSub = maps:get(expected_subject, Opts),
             Scope = maps:get(scope, Opts, []),
@@ -456,7 +484,15 @@ jwt_profile(Subject, ClientContext, Jwk, Opts) ->
     #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} =
         Configuration,
 
-    case lists:member(<<"urn:ietf:params:oauth:grant-type:jwt-bearer">>, GrantTypesSupported) of
+    Quirks = maps:get(quirks, Opts, #{}),
+    AllowUnsupportedGrantTypes = maps:get(
+        allow_unsupported_grant_types, Quirks, false
+    ),
+
+    case
+        lists:member(<<"urn:ietf:params:oauth:grant-type:jwt-bearer">>, GrantTypesSupported) or
+            AllowUnsupportedGrantTypes
+    of
         true ->
             Iat = os:system_time(seconds),
             Exp = Iat + 60,
@@ -546,7 +582,14 @@ client_credentials(ClientContext, Opts) ->
     #oidcc_provider_configuration{issuer = Issuer, grant_types_supported = GrantTypesSupported} =
         Configuration,
 
-    case lists:member(<<"client_credentials">>, GrantTypesSupported) of
+    Quirks = maps:get(quirks, Opts, #{}),
+    AllowUnsupportedGrantTypes = maps:get(
+        allow_unsupported_grant_types, Quirks, false
+    ),
+
+    case
+        lists:member(<<"client_credentials">>, GrantTypesSupported) or AllowUnsupportedGrantTypes
+    of
         true ->
             Scope = maps:get(scope, Opts, []),
             QueryString = [{<<"grant_type">>, <<"client_credentials">>}],

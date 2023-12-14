@@ -33,7 +33,6 @@
 -export_type([t/0]).
 
 -type quirks() :: #{
-    allow_issuer_mismatch => boolean(),
     allow_unsafe_http => boolean(),
     document_overrides => map()
 }.
@@ -42,8 +41,6 @@
 %% <h2>Exceptions</h2>
 %%
 %% <ul>
-%%   <li>`allow_issuer_mismatch' - Allow issuer mismatch between config issuer
-%%     and function parameter</li>
 %%   <li>`allow_unsafe_http' - Allow unsafe HTTP. Use this for development
 %%     providers and <strong>never in production</strong>.</li>
 %%   <li>`document_overrides' - a map to merge with the real OIDD document,
@@ -203,6 +200,7 @@ load_configuration(Issuer0, Opts) ->
     Request = {RequestUrl, []},
 
     Quirks = maps:get(quirks, Opts, #{}),
+    % this quirk is deprecated, but we keep the support for backwards compatibility.
     AllowIssuerMismatch = maps:get(allow_issuer_mismatch, Quirks, false),
 
     maybe

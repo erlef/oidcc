@@ -107,51 +107,6 @@ create_redirect_url_test() ->
 
     ok.
 
-unsupported_grant_type_test() ->
-    PrivDir = code:priv_dir(oidcc),
-
-    {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
-    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
-    ),
-    Configuration = Configuration0#oidcc_provider_configuration{
-        grant_types_supported = []
-    },
-
-    Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
-
-    ClientId = <<"client_id">>,
-    RedirectUri = <<"https://my.server/return">>,
-
-    ClientContext =
-        oidcc_client_context:from_manual(Configuration, Jwks, ClientId, <<"client_secret">>),
-
-    Opts =
-        #{
-            redirect_uri => RedirectUri,
-            client_id => ClientId,
-            url_extension => [{<<"test">>, <<"id">>}]
-        },
-
-    ?assertMatch(
-        {error, {grant_type_not_supported, authorization_code}},
-        oidcc_authorization:create_redirect_url(ClientContext, Opts)
-    ),
-
-    QuirksOpts =
-        #{
-            redirect_uri => RedirectUri,
-            client_id => ClientId,
-            quirks => #{allow_unsupported_grant_types => true}
-        },
-
-    ?assertMatch(
-        {ok, _},
-        oidcc_authorization:create_redirect_url(ClientContext, QuirksOpts)
-    ),
-
-    ok.
-
 create_redirect_url_with_request_object_test() ->
     PrivDir = code:priv_dir(oidcc),
 

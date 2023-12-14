@@ -576,6 +576,20 @@ allow_unsafe_http_quirk_test() ->
 
     ok.
 
+document_overrides_quirk_test() ->
+    PrivDir = code:priv_dir(oidcc),
+    {ok, Configuration} = file:read_file(PrivDir ++ "/test/fixtures/google-metadata.json"),
+
+    ?assertMatch(
+        {ok, #oidcc_provider_configuration{
+            issuer = <<"https://example.com">>
+        }},
+        oidcc_provider_configuration:decode_configuration(jose:decode(Configuration), #{
+            quirks => #{document_overrides => #{<<"issuer">> => <<"https://example.com">>}}
+        })
+    ),
+    ok.
+
 uri_concatenation_test() ->
     ok = meck:new(httpc, [no_link]),
     HttpFun =

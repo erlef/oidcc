@@ -33,18 +33,18 @@
 -export_type([t/0]).
 
 -type quirks() :: #{
-    allow_issuer_mismatch => boolean(),
-    allow_unsafe_http => boolean()
+    allow_unsafe_http => boolean(),
+    document_overrides => map()
 }.
 %% Allow Specification Non-compliance
 %%
 %% <h2>Exceptions</h2>
 %%
 %% <ul>
-%%   <li>`allow_issuer_mismatch' - Allow issuer mismatch between config issuer
-%%     and function parameter</li>
 %%   <li>`allow_unsafe_http' - Allow unsafe HTTP. Use this for development
 %%     providers and <strong>never in production</strong>.</li>
+%%   <li>`document_overrides' - a map to merge with the real OIDD document,
+%%     in case the OP left out some values.</li>
 %% </ul>
 
 -type opts() :: #{
@@ -200,6 +200,7 @@ load_configuration(Issuer0, Opts) ->
     Request = {RequestUrl, []},
 
     Quirks = maps:get(quirks, Opts, #{}),
+    % this quirk is deprecated, but we keep the support for backwards compatibility.
     AllowIssuerMismatch = maps:get(allow_issuer_mismatch, Quirks, false),
 
     maybe
@@ -277,9 +278,12 @@ load_jwks(JwksUri, Opts) ->
 %% @since 3.1.0
 -spec decode_configuration(Configuration, Opts) -> {ok, t()} | {error, error()} when
     Configuration :: map(), Opts :: opts().
-decode_configuration(Configuration, Opts) ->
+decode_configuration(Configuration0, Opts) ->
     Quirks = maps:get(quirks, Opts, #{}),
     AllowUnsafeHttp = maps:get(allow_unsafe_http, Quirks, false),
+
+    DocumentOverrides = maps:get(document_overrides, Quirks, #{}),
+    Configuration = maps:merge(Configuration0, DocumentOverrides),
 
     maybe
         {ok, {

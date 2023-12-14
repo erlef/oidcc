@@ -16,17 +16,6 @@
 
 -export_type([error/0]).
 -export_type([opts/0]).
--export_type([quirks/0]).
-
--type quirks() :: #{allow_unsupported_grant_types => boolean()}.
-%% Allow Specification Non-compliance
-%%
-%% <h2>Exceptions</h2>
-%%
-%% <ul>
-%%   <li>`allow_unsupported_grant_types' - Allow to proceed with a grant type
-%%     that has not been registered in `grant_types_supported'</li>
-%% </ul>
 
 -type opts() ::
     #{
@@ -35,8 +24,7 @@
         nonce => binary(),
         pkce_verifier => binary(),
         redirect_uri := uri_string:uri_string(),
-        url_extension => oidcc_http_util:query_params(),
-        quirks => quirks()
+        url_extension => oidcc_http_util:query_params()
     }.
 %% Configure authorization redirect url
 %%
@@ -90,14 +78,7 @@ create_redirect_url(#oidcc_client_context{} = ClientContext, Opts) ->
     } =
         ProviderConfiguration,
 
-    Quirks = maps:get(quirks, Opts, #{}),
-    AllowUnsupportedGrantTypes = maps:get(
-        allow_unsupported_grant_types, Quirks, false
-    ),
-
-    case
-        lists:member(<<"authorization_code">>, GrantTypesSupported) or AllowUnsupportedGrantTypes
-    of
+    case lists:member(<<"authorization_code">>, GrantTypesSupported) of
         true ->
             QueryParams0 = redirect_params(ClientContext, Opts),
             QueryParams = QueryParams0 ++ maps:get(url_extension, Opts, []),

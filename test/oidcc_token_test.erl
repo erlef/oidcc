@@ -63,7 +63,8 @@ retrieve_none_test() ->
             <<"access_token">> => AccessToken,
             <<"token_type">> => <<"Bearer">>,
             <<"id_token">> => Token,
-            <<"scope">> => <<"profile openid">>
+            <<"scope">> => <<"profile openid">>,
+            <<"expires_in">> => <<"3600">>
         }),
 
     ClientContext = oidcc_client_context:from_manual(Configuration, JwkSet, ClientId, ClientSecret),
@@ -97,7 +98,7 @@ retrieve_none_test() ->
         {error,
             {none_alg_used, #oidcc_token{
                 id = #oidcc_token_id{token = Token, claims = Claims},
-                access = #oidcc_token_access{token = AccessToken},
+                access = #oidcc_token_access{token = AccessToken, expires = 3600},
                 refresh = none,
                 scope = [<<"profile">>, <<"openid">>]
             }}},

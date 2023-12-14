@@ -182,6 +182,9 @@
     | {missing_claim, ExpClaim :: {binary(), term()}, Claims :: oidcc_jwt_util:claims()}
     | {grant_type_not_supported,
         authorization_code | refresh_token | jwt_bearer | client_credentials}
+    | {invalid_property, {
+        Field :: id_token | refresh_token | access_token | expires_in | scopes, GivenValue :: term()
+    }}
     | oidcc_jwt_util:error()
     | oidcc_http_util:error().
 
@@ -601,63 +604,109 @@ when
     ClientContext :: oidcc_client_context:t(),
     Opts :: retrieve_opts().
 int_extract_response(TokenMap, ClientContext, Opts) ->
-    Nonce = maps:get(nonce, Opts, any),
-    Scopes = maps:get(scope, Opts, []),
-    IdToken = maps:get(<<"id_token">>, TokenMap, none),
-    AccessToken = maps:get(<<"access_token">>, TokenMap, none),
-    AccessExpire = maps:get(<<"expires_in">>, TokenMap, undefined),
-    RefreshToken = maps:get(<<"refresh_token">>, TokenMap, none),
-    Scope = maps:get(<<"scope">>, TokenMap, oidcc_scope:scopes_to_bin(Scopes)),
-    AccessTokenRecord =
-        case AccessToken of
-            none -> none;
-            _ -> #oidcc_token_access{token = AccessToken, expires = AccessExpire}
-        end,
-    RefreshTokenRecord =
-        case RefreshToken of
-            none ->
-                none;
-            _ ->
-                #oidcc_token_refresh{token = RefreshToken}
-        end,
-    case IdToken of
-        none ->
-            {ok, #oidcc_token{
-                id = none,
-                access = AccessTokenRecord,
-                refresh = RefreshTokenRecord,
-                scope = oidcc_scope:parse(Scope)
-            }};
-        _ ->
-            RescueNone =
-                case validate_id_token(IdToken, ClientContext, Nonce) of
-                    {ok, OkClaims} ->
-                        {ok, {OkClaims, false}};
-                    {error, {none_alg_used, NoneClaims}} ->
-                        {ok, {NoneClaims, true}};
-                    {error, Reason} ->
-                        {error, Reason}
-                end,
+    maybe
+        {ok, Scopes} ?= extract_scope(TokenMap, Opts),
+        {ok, AccessExpire} ?= extract_expiry(TokenMap),
+        {ok, AccessTokenRecord} ?= extract_access_token(TokenMap, AccessExpire),
+        {ok, RefreshTokenRecord} ?= extract_refresh_token(TokenMap),
+        {ok, {IdTokenRecord, NoneUsed}} ?= extract_id_token(TokenMap, ClientContext, Opts),
+        TokenRecord = #oidcc_token{
+            id = IdTokenRecord,
+            access = AccessTokenRecord,
+            refresh = RefreshTokenRecord,
+            scope = Scopes
+        },
+        ok ?= verify_access_token_map_hash(TokenRecord),
+        %% If none alg was used, continue with checks to allow the user to decide
+        %% if he wants to use the result
+        case NoneUsed of
+            true ->
+                {error, {none_alg_used, TokenRecord}};
+            false ->
+                {ok, TokenRecord}
+        end
+    end.
 
-            maybe
-                {ok, {Claims, NoneUsed}} ?= RescueNone,
-                IdTokenRecord = #oidcc_token_id{token = IdToken, claims = Claims},
-                TokenRecord = #oidcc_token{
-                    id = IdTokenRecord,
-                    access = AccessTokenRecord,
-                    refresh = RefreshTokenRecord,
-                    scope = oidcc_scope:parse(Scope)
-                },
-                ok ?= verify_access_token_map_hash(TokenRecord),
-                %% If none alg was used, continue with checks to allow the user to decide
-                %% if he wants to use the result
-                case NoneUsed of
-                    true ->
-                        {error, {none_alg_used, TokenRecord}};
-                    false ->
-                        {ok, TokenRecord}
-                end
-            end
+-spec extract_scope(TokenMap, Opts) -> {ok, oidcc_scope:scopes()} | {error, error()} when
+    TokenMap :: map(), Opts :: retrieve_opts().
+extract_scope(TokenMap, Opts) ->
+    Scopes = maps:get(scope, Opts, []),
+    case maps:get(<<"scope">>, TokenMap, oidcc_scope:scopes_to_bin(Scopes)) of
+        ScopeBinary when is_binary(ScopeBinary) ->
+            {ok, oidcc_scope:parse(ScopeBinary)};
+        ScopeOther ->
+            {error, {invalid_property, {scope, ScopeOther}}}
+    end.
+
+-spec extract_expiry(TokenMap) -> {ok, undefined | integer()} | {error, error()} when
+    TokenMap :: map().
+extract_expiry(TokenMap) ->
+    case maps:get(<<"expires_in">>, TokenMap, undefined) of
+        undefined ->
+            {ok, undefined};
+        ExpiresInNum when is_integer(ExpiresInNum) ->
+            {ok, ExpiresInNum};
+        ExpiresInBinary when is_binary(ExpiresInBinary) ->
+            try
+                {ok, binary_to_integer(ExpiresInBinary)}
+            catch
+                error:badarg ->
+                    {error, {invalid_property, {expires_in, ExpiresInBinary}}}
+            end;
+        ExpiresInOther ->
+            {error, {invalid_property, {expires_in, ExpiresInOther}}}
+    end.
+
+-spec extract_access_token(TokenMap, Expiry) -> {ok, access()} | {error, error()} when
+    TokenMap :: map(),
+    Expiry :: integer().
+extract_access_token(TokenMap, Expiry) ->
+    case maps:get(<<"access_token">>, TokenMap, none) of
+        none ->
+            {ok, none};
+        Token when is_binary(Token) ->
+            {ok, #oidcc_token_access{token = Token, expires = Expiry}};
+        Other ->
+            {error, {invalid_property, {access_token, Other}}}
+    end.
+
+-spec extract_refresh_token(TokenMap) -> {ok, refresh()} | {error, error()} when
+    TokenMap :: map().
+extract_refresh_token(TokenMap) ->
+    case maps:get(<<"refresh_token">>, TokenMap, none) of
+        none ->
+            {ok, none};
+        Token when is_binary(Token) ->
+            {ok, #oidcc_token_refresh{token = Token}};
+        Other ->
+            {error, {invalid_property, {refresh_token, Other}}}
+    end.
+
+-spec extract_id_token(TokenMap, ClientContext, Opts) ->
+    {ok, {TokenRecord, NoneUsed}} | {error, error()}
+when
+    TokenMap :: map(),
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: retrieve_opts(),
+    TokenRecord :: id(),
+    NoneUsed :: boolean().
+extract_id_token(TokenMap, ClientContext, Opts) ->
+    Nonce = maps:get(nonce, Opts, any),
+
+    case maps:get(<<"id_token">>, TokenMap, none) of
+        none ->
+            {ok, {none, false}};
+        Token when is_binary(Token) ->
+            case validate_id_token(Token, ClientContext, Nonce) of
+                {ok, OkClaims} ->
+                    {ok, {#oidcc_token_id{token = Token, claims = OkClaims}, false}};
+                {error, {none_alg_used, NoneClaims}} ->
+                    {ok, {#oidcc_token_id{token = Token, claims = NoneClaims}, true}};
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+        Other ->
+            {error, {invalid_property, {id_token, Other}}}
     end.
 
 -spec verify_access_token_map_hash(TokenRecord :: t()) ->

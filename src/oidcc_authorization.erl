@@ -110,8 +110,9 @@ redirect_params(#oidcc_client_context{client_id = ClientId} = ClientContext, Opt
     QueryParams4 = oidcc_scope:query_append_scope(
         maps:get(scopes, Opts, [openid]), QueryParams3
     ),
-    QueryParams5 = attempt_request_object(QueryParams4, ClientContext),
-    attempt_par(QueryParams5, ClientContext, Opts).
+    QueryParams5 = maybe_append_dpop_jkt(QueryParams4, ClientContext),
+    QueryParams6 = attempt_request_object(QueryParams5, ClientContext),
+    attempt_par(QueryParams6, ClientContext, Opts).
 
 -spec append_code_challenge(PkceVerifier, QueryParams, ClientContext) ->
     oidcc_http_util:query_params()
@@ -163,6 +164,26 @@ maybe_append(_Key, undefined, QueryParams) ->
     QueryParams;
 maybe_append(Key, Value, QueryParams) ->
     [{Key, Value} | QueryParams].
+
+-spec maybe_append_dpop_jkt(QueryParams, ClientContext) ->
+    QueryParams
+when
+    ClientContext :: oidcc_client_context:t(),
+    QueryParams :: oidcc_http_util:query_params().
+maybe_append_dpop_jkt(
+    QueryParams,
+    #oidcc_client_context{
+        client_jwks = #jose_jwk{},
+        provider_configuration = #oidcc_provider_configuration{
+            dpop_signing_alg_values_supported = [_ | _]
+        }
+    } = ClientContext
+) ->
+    #oidcc_client_context{client_jwks = ClientJwks} = ClientContext,
+    Thumbprint = jose_jwk:thumbprint(ClientJwks),
+    [{"dpop_jkt", Thumbprint} | QueryParams];
+maybe_append_dpop_jkt(QueryParams, _ClientContext) ->
+    QueryParams.
 
 -spec attempt_request_object(QueryParams, ClientContext) -> QueryParams when
     QueryParams :: oidcc_http_util:query_params(),

@@ -32,6 +32,8 @@
 -export([refresh/3]).
 -export([retrieve/3]).
 -export([validate_id_token/3]).
+-export([authorization_headers/4]).
+-export([authorization_headers/5]).
 
 -export_type([access/0]).
 -export_type([client_credentials_opts/0]).
@@ -103,7 +105,8 @@
         redirect_uri := uri_string:uri_string(),
         request_opts => oidcc_http_util:request_opts(),
         url_extension => oidcc_http_util:query_params(),
-        body_extension => oidcc_http_util:query_params()
+        body_extension => oidcc_http_util:query_params(),
+        dpop_nonce => binary()
     }.
 %% Options for retrieving a token
 %%
@@ -120,6 +123,8 @@
 %%   <li>`refresh_jwks' - How to handle tokens with an unknown `kid'.
 %%     See {@link oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun()}</li>
 %%   <li>`redirect_uri' - Redirect uri given to {@link oidcc_authorization:create_redirect_url/2}</li>
+%%   <li>`dpop_nonce' - if using DPoP, the `nonce' value to use in the
+%%     proof claim</li>
 %% </ul>
 
 -type refresh_opts_no_sub() ::
@@ -733,7 +738,7 @@ verify_access_token_map_hash(#oidcc_token{}) ->
 %% @doc Validate ID Token
 %%
 %% Usually the id token is validated using {@link retrieve/3}.
-%% If you gget the token passed from somewhere else, this function can validate it.
+%% If you get the token passed from somewhere else, this function can validate it.
 %%
 %% <h2>Examples</h2>
 %%
@@ -815,15 +820,65 @@ validate_id_token(IdToken, ClientContext, Nonce) ->
         end
     end.
 
+%% @doc Authorization headers
+%%
+%%   Generate a map of authorization headers to use when using the given
+%%   access token to access an API endpoint.
+%%
+%% <h2>Examples</h2>
+%%
+%% ```
+%% {ok, ClientContext} =
+%%   oidcc_client_context:from_configuration_worker(provider_name,
+%%                                                  <<"client_id">>,
+%%                                                  <<"client_secret">>),
+%%
+%% %% Get Access Token record from somewhere
+%%
+%% Headers =
+%%   oidcc:authorization_headers(AccessTokenRecord, :get, Url, ClientContext).
+%% '''
+%% @end
+%% @since 3.2.0
+-spec authorization_headers(AccessTokenRecord, Method, Endpoint, ClientContext) -> HeaderMap when
+    AccessTokenRecord :: access(),
+    Method :: post | get,
+    Endpoint :: uri_string:uri_string(),
+    ClientContext :: oidcc_client_context:t(),
+    HeaderMap :: #{binary() => binary()}.
+-spec authorization_headers(AccessTokenRecord, Method, Endpoint, ClientContext, Opts) ->
+    HeaderMap
+when
+    AccessTokenRecord :: access(),
+    Method :: post | get,
+    Endpoint :: uri_string:uri_string(),
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: #{dpop_nonce => binary()},
+    HeaderMap :: #{binary() => binary()}.
+authorization_headers(AccessTokenRecord, Method, Endpoint, ClientContext) ->
+    authorization_headers(AccessTokenRecord, Method, Endpoint, ClientContext, #{}).
+
+authorization_headers(
+    #oidcc_token_access{} = AccessTokenRecord,
+    Method,
+    Endpoint,
+    #oidcc_client_context{} = ClientContext,
+    Opts
+) ->
+    #oidcc_token_access{token = AccessToken, type = AccessTokenType} = AccessTokenRecord,
+    Header = oidcc_auth_util:add_authorization_header(
+        AccessToken, AccessTokenType, Method, Endpoint, Opts, ClientContext
+    ),
+    maps:from_list([{list_to_binary(Key), list_to_binary([Value])} || {Key, Value} <- Header]).
+
 -spec verify_aud_claim(Claims, ClientId) -> ok | {error, error()} when
     Claims :: oidcc_jwt_util:claims(), ClientId :: binary().
-verify_aud_claim(#{<<"aud">> := Audience} = Claims, ClientId) when is_list(Audience) ->
-    case lists:member(ClientId, Audience) of
-        true -> ok;
-        false -> {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}
+verify_aud_claim(#{<<"aud">> := Audience} = Claims, ClientId) ->
+    case Audience of
+        ClientId -> ok;
+        [ClientId] -> ok;
+        _ -> {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}
     end;
-verify_aud_claim(#{<<"aud">> := ClientId}, ClientId) ->
-    ok;
 verify_aud_claim(Claims, ClientId) ->
     {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}.
 
@@ -832,7 +887,7 @@ verify_aud_claim(Claims, ClientId) ->
 verify_azp_claim(#{<<"azp">> := ClientId}, ClientId) ->
     ok;
 verify_azp_claim(#{<<"azp">> := _Azp} = Claims, ClientId) ->
-    {missing_claim, {<<"azp">>, ClientId}, Claims};
+    {error, {missing_claim, {<<"azp">>, ClientId}, Claims}};
 verify_azp_claim(_Claims, _ClientId) ->
     ok.
 
@@ -846,7 +901,9 @@ verify_exp_claim(#{<<"exp">> := Expiry}) ->
     case erlang:system_time(second) > Expiry + MaxClockSkew of
         true -> {error, token_expired};
         false -> ok
-    end.
+    end;
+verify_exp_claim(Claims) ->
+    {error, {missing_claim, <<"exp">>, Claims}}.
 
 -spec verify_nbf_claim(Claims) -> ok | {error, error()} when Claims :: oidcc_jwt_util:claims().
 verify_nbf_claim(#{<<"nbf">> := Expiry}) ->
@@ -914,17 +971,41 @@ retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext, Opts, TelemetryOpts, Aut
             false -> [<<"none">>]
         end,
 
+    DpopOpts =
+        case Opts of
+            #{dpop_nonce := DpopNonce} ->
+                #{nonce => DpopNonce};
+            _ ->
+                #{}
+        end,
     maybe
-        {ok, {Body, Header}} ?=
+        {ok, {Body, Header1}} ?=
             oidcc_auth_util:add_client_authentication(
                 QsBody, Header0, SupportedAuthMethods, SigningAlgs, Opts, ClientContext
             ),
+        Header = oidcc_auth_util:add_dpop_proof_header(
+            Header1, post, Endpoint, DpopOpts, ClientContext
+        ),
         Request =
             {Endpoint, Header, "application/x-www-form-urlencoded", uri_string:compose_query(Body)},
         RequestOpts = maps:get(request_opts, Opts, #{}),
         {ok, {{json, TokenResponse}, _Headers}} ?=
             oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
         {ok, TokenResponse}
+    else
+        {error, {use_dpop_nonce, NewDpopNonce, _}} when DpopOpts =:= #{} ->
+            %% only retry automatically if we didn't use a nonce the first time
+            %% (to avoid infinite loops)
+            retrieve_a_token(
+                QsBodyIn,
+                PkceVerifier,
+                ClientContext,
+                Opts#{dpop_nonce => NewDpopNonce},
+                TelemetryOpts,
+                AuthenticateClient
+            );
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 -spec add_pkce_verifier(QueryList, PkceVerifier) -> oidcc_http_util:query_params() when

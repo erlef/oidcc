@@ -67,6 +67,8 @@
     post_logout_redirect_uris = undefined :: [uri_string:uri_string()] | undefined,
     %% OAuth 2.0 Pushed Authorization Requests
     require_pushed_authorization_requests = false :: boolean(),
+    %% OAuth 2.0 Demonstrating Proof of Possession (DPoP)
+    dpop_bound_access_tokens = false :: boolean(),
     %% Unknown Fields
     extra_fields = #{} :: #{binary() => term()}
 }).

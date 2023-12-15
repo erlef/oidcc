@@ -16,6 +16,7 @@
 -export([merge_jwks/2]).
 -export([refresh_jwks_fun/1]).
 -export([sign/3]).
+-export([sign/4]).
 -export([verify_claims/2]).
 -export([verify_signature/3]).
 
@@ -172,11 +173,20 @@ merge_jwks(Left, Right) ->
 %% @private
 -spec sign(Jwt :: #jose_jwt{}, Jwk :: jose_jwk:key(), SupportedAlgorithms :: [binary()]) ->
     {ok, binary()} | {error, no_supported_alg_or_key}.
-sign(_Jwt, _Jwk, []) ->
+sign(Jwt, Jwk, SupportedAlgorithms) ->
+    sign(Jwt, Jwk, SupportedAlgorithms, #{}).
+
+%% @private
+-spec sign(
+    Jwt :: #jose_jwt{}, Jwk :: jose_jwk:key(), SupportedAlgorithms :: [binary()], JwsFields :: map()
+) ->
+    {ok, binary()} | {error, no_supported_alg_or_key}.
+sign(_Jwt, _Jwk, [], _JwsFields) ->
     {error, no_supported_alg_or_key};
-sign(Jwt, Jwk, [Algorithm | RestAlgorithms]) ->
+sign(Jwt, Jwk, [Algorithm | RestAlgorithms], JwsFields0) ->
     maybe
-        #jose_jws{fields = JwsFields} = Jws0 ?= jose_jws:from_map(#{<<"alg">> => Algorithm}),
+        #jose_jws{fields = JwsFields} =
+            Jws0 ?= jose_jws:from_map(JwsFields0#{<<"alg">> => Algorithm}),
         SigningCallback = fun
             (#jose_jwk{fields = #{<<"use">> := <<"sig">>} = Fields} = Key) ->
                 %% add the kid field to the JWS signature if present
@@ -205,7 +215,7 @@ sign(Jwt, Jwk, [Algorithm | RestAlgorithms]) ->
         {ok, Token} ?= evaluate_for_all_keys(Jwk, SigningCallback),
         {ok, Token}
     else
-        _ -> sign(Jwt, Jwk, RestAlgorithms)
+        _ -> sign(Jwt, Jwk, RestAlgorithms, JwsFields0)
     end.
 
 %% @private

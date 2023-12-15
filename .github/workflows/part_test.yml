@@ -115,7 +115,7 @@ jobs:
             eunit-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
       - run: rebar3 eunit --cover --cover_export_name "eunit-${{ steps.setupBEAM.outputs.otp-version }}"
         continue-on-error: ${{ matrix.unstable }}
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: eunit-coverage
           path: "_build/test/cover/eunit-${{ steps.setupBEAM.outputs.otp-version }}.coverdata"
@@ -154,7 +154,7 @@ jobs:
             ct-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
       - run: rebar3 ct --cover --cover_export_name "ct-${{ steps.setupBEAM.outputs.otp-version }}"
         continue-on-error: ${{ matrix.unstable }}
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: ct-coverage
           path: _build/test/cover/ct-${{ steps.setupBEAM.outputs.otp-version }}.coverdata
@@ -203,7 +203,7 @@ jobs:
       - run: mix deps.get
       - run: mix test --cover --export-coverage "mix_test-${{ steps.setupBEAM.outputs.elixir-version }}"
         continue-on-error: ${{ matrix.unstable }}
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: mix_test-coverage
           path: cover/mix_test-${{ steps.setupBEAM.outputs.elixir-version }}.coverdata
@@ -248,7 +248,7 @@ jobs:
             mix_test_coverage-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-
       - run: mix deps.get
       - run: mix test.coverage
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: cover
@@ -285,7 +285,7 @@ jobs:
         with:
           name: mix_test-coverage
           path: _build/test/cover/
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: _build/test/cover/

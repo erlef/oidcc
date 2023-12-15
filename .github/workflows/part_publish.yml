@@ -68,7 +68,7 @@ jobs:
             mix_hex_build-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
       - run: mix deps.get
       - run: mix hex.build --output package.tar
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: package
           path: package.tar

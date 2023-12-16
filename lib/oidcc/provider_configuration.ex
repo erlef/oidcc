@@ -110,6 +110,13 @@ defmodule Oidcc.ProviderConfiguration do
           introspection_endpoint_auth_signing_alg_values_supported: [String.t()] | :undefined,
           code_challenge_methods_supported: [String.t()] | :undefined,
           end_session_endpoint: :uri_string.uri_string() | :undefined,
+          require_pushed_authorization_requests: boolean(),
+          pushed_authorization_request_endpoint: :uri_string.uri_string() | :undefined,
+          authorization_response_iss_parameter_supported: boolean(),
+          authorization_signing_alg_values_supported: [String.t()] | :undefined,
+          authorization_encryption_alg_values_supported: [String.t()] | :undefined,
+          authorization_encryption_enc_values_supported: [String.t()] | :undefined,
+          dpop_signing_alg_values_supported: [String.t()] | :undefined,
           extra_fields: %{String.t() => term()}
         }
 

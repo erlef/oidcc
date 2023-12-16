@@ -93,6 +93,20 @@
         code_challenge_methods_supported = undefined :: [binary()] | undefined,
         %% OpenID Connect RP-Initiated Logout 1.0
         end_session_endpoint = undefined :: uri_string:uri_string() | undefined,
+        %% OAuth 2.0 Pushed Authorization Requests
+        require_pushed_authorization_requests = false :: boolean(),
+        %% OAuth 2.0 Pushed Authorization Requests
+        pushed_authorization_request_endpoint = undefined :: uri_string:uri_string() | undefined,
+        %% JWT Secured Authorization Response Mode for OAuth 2.0 (JARM)
+        authorization_signing_alg_values_supported = undefined :: [binary()] | undefined,
+        %% JWT Secured Authorization Response Mode for OAuth 2.0 (JARM)
+        authorization_encryption_alg_values_supported = undefined :: [binary()] | undefined,
+        %% JWT Secured Authorization Response Mode for OAuth 2.0 (JARM)
+        authorization_encryption_enc_values_supported = undefined :: [binary()] | undefined,
+        %% OAuth 2.0 Authorization Server Issuer Identification (RFC9207)
+        authorization_response_iss_parameter_supported = false :: boolean(),
+        %% OAuth 2.0 Demonstrating Proof of Possession (DPoP)
+        dpop_signing_alg_values_supported = undefined :: [binary()] | undefined,
         %% Unknown Fields
         extra_fields = #{} :: #{binary() => term()}
     }

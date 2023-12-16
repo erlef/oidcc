@@ -116,6 +116,13 @@
             [binary()] | undefined,
         code_challenge_methods_supported :: [binary()] | undefined,
         end_session_endpoint :: uri_string:uri_string() | undefined,
+        require_pushed_authorization_requests :: boolean(),
+        pushed_authorization_request_endpoint :: uri_string:uri_string() | undefined,
+        authorization_signing_alg_values_supported :: [binary()] | undefined,
+        authorization_encryption_alg_values_supported :: [binary()] | undefined,
+        authorization_encryption_enc_values_supported :: [binary()] | undefined,
+        authorization_response_iss_parameter_supported :: boolean(),
+        dpop_signing_alg_values_supported :: [binary()] | undefined,
         extra_fields :: #{binary() => term()}
     }.
 %% Record containing OpenID and OAuth 2.0 Configuration
@@ -339,7 +346,18 @@ decode_configuration(Configuration0, Opts) ->
                 introspection_endpoint_auth_signing_alg_values_supported :=
                     IntrospectionEndpointAuthSigningAlgValuesSupported,
                 code_challenge_methods_supported := CodeChallengeMethodsSupported,
-                end_session_endpoint := EndSessionEndpoint
+                end_session_endpoint := EndSessionEndpoint,
+                require_pushed_authorization_requests := RequirePushedAuthorizationRequests,
+                pushed_authorization_request_endpoint := PushedAuthorizationRequestEndpoint,
+                authorization_signing_alg_values_supported :=
+                    AuthorizationSigningAlgValuesSupported,
+                authorization_encryption_alg_values_supported :=
+                    AuthorizationEncryptionAlgValuesSupported,
+                authorization_encryption_enc_values_supported :=
+                    AuthorizationEncryptionEncValuesSupported,
+                authorization_response_iss_parameter_supported :=
+                    AuthorizationResponseIssParameterSupported,
+                dpop_signing_alg_values_supported := DpopSigningAlgValuesSupported
             },
             ExtraFields
         }} ?=
@@ -431,7 +449,24 @@ decode_configuration(Configuration0, Opts) ->
                         case AllowUnsafeHttp of
                             true -> fun oidcc_decode_util:parse_setting_uri/2;
                             false -> fun oidcc_decode_util:parse_setting_uri_https/2
-                        end}
+                        end},
+                    {optional, require_pushed_authorization_requests, false,
+                        fun oidcc_decode_util:parse_setting_boolean/2},
+                    {optional, pushed_authorization_request_endpoint, undefined,
+                        case AllowUnsafeHttp of
+                            true -> fun oidcc_decode_util:parse_setting_uri/2;
+                            false -> fun oidcc_decode_util:parse_setting_uri_https/2
+                        end},
+                    {optional, authorization_signing_alg_values_supported, undefined,
+                        fun parse_token_signing_alg_values_no_none/2},
+                    {optional, authorization_encryption_alg_values_supported, undefined,
+                        fun oidcc_decode_util:parse_setting_binary_list/2},
+                    {optional, authorization_encryption_enc_values_supported, undefined,
+                        fun oidcc_decode_util:parse_setting_binary_list/2},
+                    {optional, authorization_response_iss_parameter_supported, false,
+                        fun oidcc_decode_util:parse_setting_boolean/2},
+                    {optional, dpop_signing_alg_values_supported, undefined,
+                        fun parse_token_signing_alg_values_no_none/2}
                 ],
                 #{}
             ),
@@ -497,6 +532,16 @@ decode_configuration(Configuration0, Opts) ->
             code_challenge_methods_supported =
                 CodeChallengeMethodsSupported,
             end_session_endpoint = EndSessionEndpoint,
+            require_pushed_authorization_requests = RequirePushedAuthorizationRequests,
+            pushed_authorization_request_endpoint = PushedAuthorizationRequestEndpoint,
+            authorization_signing_alg_values_supported = AuthorizationSigningAlgValuesSupported,
+            authorization_encryption_alg_values_supported =
+                AuthorizationEncryptionAlgValuesSupported,
+            authorization_encryption_enc_values_supported =
+                AuthorizationEncryptionEncValuesSupported,
+            authorization_response_iss_parameter_supported =
+                AuthorizationResponseIssParameterSupported,
+            dpop_signing_alg_values_supported = DpopSigningAlgValuesSupported,
             extra_fields = ExtraFields
         }}
     end.

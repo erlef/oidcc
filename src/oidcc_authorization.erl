@@ -136,14 +136,14 @@ append_code_challenge(CodeVerifier, QueryParams, ClientContext) ->
                         mode => urlsafe, padding => false
                     }),
                     [
-                        {"code_challenge", CodeChallenge},
-                        {"code_challenge_method", <<"S256">>}
+                        {<<"code_challenge">>, CodeChallenge},
+                        {<<"code_challenge_method">>, <<"S256">>}
                         | QueryParams
                     ];
                 {false, true} ->
                     [
-                        {"code_challenge", CodeVerifier},
-                        {"code_challenge_method", <<"plain">>}
+                        {<<"code_challenge">>, CodeVerifier},
+                        {<<"code_challenge_method">>, <<"plain">>}
                         | QueryParams
                     ];
                 {false, false} ->

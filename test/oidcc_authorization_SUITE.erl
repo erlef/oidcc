@@ -1,5 +1,8 @@
 -module(oidcc_authorization_SUITE).
 
+-include("oidcc_client_context.hrl").
+-include("oidcc_provider_configuration.hrl").
+
 -export([all/0]).
 -export([create_redirect_url_inl_gov/1]).
 
@@ -14,10 +17,15 @@ create_redirect_url_inl_gov(_Config) ->
             issuer => <<"https://identity-preview.inl.gov">>
         }),
 
-    {ok, ClientContext} = oidcc_client_context:from_configuration_worker(
+    {ok, #oidcc_client_context{provider_configuration = ProviderConfiguration} = ClientContext0} = oidcc_client_context:from_configuration_worker(
         InlGovPid, <<"client_id">>, <<"client_secret">>
     ),
-
+    %% we only want to test the URL generation, not the PAR request
+    ClientContext = ClientContext0#oidcc_client_context{
+        provider_configuration = ProviderConfiguration#oidcc_provider_configuration{
+            pushed_authorization_request_endpoint = undefined
+        }
+    },
     {ok, Url} = oidcc_authorization:create_redirect_url(ClientContext, #{
         redirect_uri => <<"https://my.server/return">>
     }),

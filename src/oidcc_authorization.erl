@@ -42,7 +42,8 @@
 %%   <li>`url_extension' - add custom query parameters to the authorization url</li>
 %% </ul>
 
--type error() :: {grant_type_not_supported, authorization_code}.
+-type error() ::
+    {grant_type_not_supported, authorization_code} | par_required | oidcc_http_util:error().
 
 %% @doc
 %% Create Auth Redirect URL
@@ -78,18 +79,20 @@ create_redirect_url(#oidcc_client_context{} = ClientContext, Opts) ->
     } =
         ProviderConfiguration,
 
-    case lists:member(<<"authorization_code">>, GrantTypesSupported) of
-        true ->
-            QueryParams0 = redirect_params(ClientContext, Opts),
-            QueryParams = QueryParams0 ++ maps:get(url_extension, Opts, []),
-            QueryString = uri_string:compose_query(QueryParams),
-
-            {ok, [AuthEndpoint, <<"?">>, QueryString]};
+    maybe
+        true ?= lists:member(<<"authorization_code">>, GrantTypesSupported),
+        {ok, QueryParams0} ?= redirect_params(ClientContext, Opts),
+        QueryParams = QueryParams0 ++ maps:get(url_extension, Opts, []),
+        QueryString = uri_string:compose_query(QueryParams),
+        {ok, [AuthEndpoint, <<"?">>, QueryString]}
+    else
+        {error, Reason} ->
+            {error, Reason};
         false ->
             {error, {grant_type_not_supported, authorization_code}}
     end.
 
--spec redirect_params(ClientContext, Opts) -> oidcc_http_util:query_params() when
+-spec redirect_params(ClientContext, Opts) -> {ok, oidcc_http_util:query_params()} when
     ClientContext :: oidcc_client_context:t(),
     Opts :: opts().
 redirect_params(#oidcc_client_context{client_id = ClientId} = ClientContext, Opts) ->
@@ -107,7 +110,8 @@ redirect_params(#oidcc_client_context{client_id = ClientId} = ClientContext, Opt
     QueryParams4 = oidcc_scope:query_append_scope(
         maps:get(scopes, Opts, [openid]), QueryParams3
     ),
-    attempt_request_object(QueryParams4, ClientContext).
+    QueryParams5 = attempt_request_object(QueryParams4, ClientContext),
+    attempt_par(QueryParams5, ClientContext, Opts).
 
 -spec append_code_challenge(PkceVerifier, QueryParams, ClientContext) ->
     oidcc_http_util:query_params()
@@ -255,6 +259,81 @@ attempt_request_object(QueryParams, #oidcc_client_context{
                 {error, no_supported_alg_or_key} ->
                     [{<<"request">>, SignedRequestObject} | essential_params(QueryParams)]
             end
+    end.
+
+-spec attempt_par(QueryParams, ClientContext, Opts) ->
+    {ok, QueryParams} | {error, error()}
+when
+    QueryParams :: oidcc_http_util:query_params(),
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: opts().
+attempt_par(
+    _QueryParams,
+    #oidcc_client_context{
+        provider_configuration = #oidcc_provider_configuration{
+            require_pushed_authorization_requests = true,
+            pushed_authorization_request_endpoint = undefined
+        }
+    },
+    _Opts
+) ->
+    {error, par_required};
+attempt_par(
+    QueryParams,
+    #oidcc_client_context{
+        provider_configuration = #oidcc_provider_configuration{
+            pushed_authorization_request_endpoint = undefined
+        }
+    },
+    _Opts
+) ->
+    {ok, QueryParams};
+attempt_par(
+    QueryParams,
+    #oidcc_client_context{
+        client_id = ClientId,
+        provider_configuration =
+            #oidcc_provider_configuration{
+                issuer = Issuer,
+                token_endpoint_auth_methods_supported = SupportedAuthMethods,
+                token_endpoint_auth_signing_alg_values_supported = SigningAlgs,
+                pushed_authorization_request_endpoint = PushedAuthorizationRequestEndpoint
+            }
+    } = ClientContext,
+    Opts
+) ->
+    Header0 = [{"accept", "application/json"}],
+
+    TelemetryOpts = #{
+        topic => [oidcc, par_request], extra_meta => #{issuer => Issuer, client_id => ClientId}
+    },
+
+    RequestOpts = maps:get(request_opts, Opts, #{}),
+    %% https://datatracker.ietf.org/doc/html/rfc9126#section-2
+    %% > To address that ambiguity, the issuer identifier URL of the authorization
+    %% > server according to [RFC8414] SHOULD be used as the value of the audience.
+    AuthenticationOpts = #{audience => Issuer},
+
+    maybe
+        {ok, {Body, Header}} ?=
+            oidcc_auth_util:add_client_authentication(
+                QueryParams,
+                Header0,
+                SupportedAuthMethods,
+                SigningAlgs,
+                AuthenticationOpts,
+                ClientContext
+            ),
+        Request =
+            {PushedAuthorizationRequestEndpoint, Header, "application/x-www-form-urlencoded",
+                uri_string:compose_query(Body)},
+        {ok, {{json, ParResponse}, _Headers}} ?=
+            oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
+        #{<<"request_uri">> := ParRequestUri} ?= ParResponse,
+        {ok, [{<<"request_uri">>, ParRequestUri}, {<<"client_id">>, ClientId}]}
+    else
+        {error, Reason} -> {error, Reason};
+        #{} = JsonResponse -> {error, {http_error, 201, JsonResponse}}
     end.
 
 -spec essential_params(QueryParams :: oidcc_http_util:query_params()) ->

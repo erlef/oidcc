@@ -617,3 +617,388 @@ create_redirect_url_with_request_object_only_none_alg_unsecured_test() ->
     jose:unsecured_signing(false),
 
     ok.
+
+create_redirect_url_with_par_required_no_url_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ValidConfigString)
+    ),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        require_pushed_authorization_requests = true
+    },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"at_least_32_character_client_secret">>,
+
+    Jwks0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    Jwks = Jwks0#jose_jwk{fields = #{<<"use">> => <<"enc">>}},
+
+    RedirectUri = <<"https://my.server/return">>,
+
+    ClientContext =
+        oidcc_client_context:from_manual(Configuration, Jwks, ClientId, ClientSecret),
+
+    ?assertMatch(
+        {error, par_required},
+        oidcc_authorization:create_redirect_url(ClientContext, #{
+            redirect_uri => RedirectUri
+        })
+    ),
+
+    ok.
+
+create_redirect_url_with_par_url_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, _} = application:ensure_all_started(oidcc),
+
+    {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ValidConfigString)
+    ),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        pushed_authorization_request_endpoint = <<"https://my.server/par">>
+    },
+
+    ParResponseData =
+        jsx:encode(#{
+            <<"request_uri">> => <<"urn:ietf:params:oauth:request_uri:par_response">>,
+            <<"expires_in">> => 60
+        }),
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"at_least_32_character_client_secret">>,
+
+    Jwks0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    Jwks = Jwks0#jose_jwk{fields = #{<<"use">> => <<"enc">>}},
+
+    RedirectUri = <<"https://my.server/return">>,
+    PkceVerifier = <<"pkce_verifier">>,
+    State = <<"state">>,
+    Nonce = <<"nonce">>,
+
+    ClientContext =
+        oidcc_client_context:from_manual(Configuration, Jwks, ClientId, ClientSecret),
+
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(
+            post,
+            {ReqParEndpoint, Header, "application/x-www-form-urlencoded", Body},
+            _HttpOpts,
+            _Opts
+        ) ->
+            ?assertMatch(<<"https://my.server/par">>, ReqParEndpoint),
+            ?assertMatch(none, proplists:lookup("authorization", Header)),
+            ?assertMatch({"accept", "application/json"}, proplists:lookup("accept", Header)),
+            BodyMap = maps:from_list(uri_string:dissect_query(Body)),
+
+            ?assertMatch(
+                #{
+                    <<"response_type">> := <<"code">>,
+                    <<"client_id">> := ClientId,
+                    <<"client_secret">> := ClientSecret,
+                    <<"scope">> := <<"openid">>,
+                    <<"redirect_uri">> := RedirectUri,
+                    <<"code_challenge">> := _,
+                    <<"code_challenge_method">> := <<"S256">>,
+                    <<"state">> := State,
+                    <<"nonce">> := Nonce
+                },
+                BodyMap
+            ),
+
+            {ok, {{"HTTP/1.1", 201, "OK"}, [{"content-type", "application/json"}], ParResponseData}}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    RedirectUrlResponse = oidcc_authorization:create_redirect_url(ClientContext, #{
+        redirect_uri => RedirectUri,
+        pkce_verifier => PkceVerifier,
+        state => State,
+        nonce => Nonce
+    }),
+
+    true = meck:validate(httpc),
+
+    meck:unload(httpc),
+
+    ?assertMatch(
+        {ok, _},
+        RedirectUrlResponse
+    ),
+
+    {ok, Url} =
+        RedirectUrlResponse,
+    #{
+        query := QueryString
+    } = uri_string:parse(Url),
+    QueryParams0 = uri_string:dissect_query(QueryString),
+    QueryParams1 = lists:map(
+        fun({Key, Value}) -> {list_to_binary(Key), list_to_binary(Value)} end, QueryParams0
+    ),
+    QueryParams = maps:from_list(QueryParams1),
+    ?assertEqual(
+        #{
+            <<"request_uri">> => <<"urn:ietf:params:oauth:request_uri:par_response">>,
+            <<"client_id">> => ClientId
+        },
+        QueryParams
+    ),
+
+    ok.
+
+create_redirect_url_with_par_error_when_required_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, _} = application:ensure_all_started(oidcc),
+
+    {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ValidConfigString)
+    ),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        require_pushed_authorization_requests = true,
+        pushed_authorization_request_endpoint = <<"https://my.server/par">>
+    },
+
+    ParResponseData =
+        jsx:encode(#{
+            <<"error">> => <<"invalid_request">>
+        }),
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"at_least_32_character_client_secret">>,
+
+    Jwks0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    Jwks = Jwks0#jose_jwk{fields = #{<<"use">> => <<"enc">>}},
+
+    RedirectUri = <<"https://my.server/return">>,
+
+    ClientContext =
+        oidcc_client_context:from_manual(Configuration, Jwks, ClientId, ClientSecret),
+
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(
+            post,
+            {_Endpoint, _Header, _ContentType, _Body},
+            _HttpOpts,
+            _Opts
+        ) ->
+            {ok, {{"HTTP/1.1", 400, "OK"}, [{"content-type", "application/json"}], ParResponseData}}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    ?assertMatch(
+        {error, {http_error, 400, _}},
+        oidcc_authorization:create_redirect_url(ClientContext, #{
+            redirect_uri => RedirectUri
+        })
+    ),
+
+    true = meck:validate(httpc),
+
+    meck:unload(httpc),
+
+    ok.
+
+create_redirect_url_with_par_invalid_response_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, _} = application:ensure_all_started(oidcc),
+
+    {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ValidConfigString)
+    ),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        require_pushed_authorization_requests = false,
+        pushed_authorization_request_endpoint = <<"https://my.server/par">>
+    },
+
+    %% no request_uri
+    ParResponseData = jsx:encode(#{}),
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"at_least_32_character_client_secret">>,
+
+    Jwks0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    Jwks = Jwks0#jose_jwk{fields = #{<<"use">> => <<"enc">>}},
+
+    RedirectUri = <<"https://my.server/return">>,
+
+    ClientContext =
+        oidcc_client_context:from_manual(Configuration, Jwks, ClientId, ClientSecret),
+
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(
+            post,
+            {_Endpoint, _Header, _ContentType, _Body},
+            _HttpOpts,
+            _Opts
+        ) ->
+            {ok, {{"HTTP/1.1", 201, "OK"}, [{"content-type", "application/json"}], ParResponseData}}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    ?assertMatch(
+        {error, {http_error, 201, _}},
+        oidcc_authorization:create_redirect_url(ClientContext, #{
+            redirect_uri => RedirectUri
+        })
+    ),
+
+    true = meck:validate(httpc),
+
+    meck:unload(httpc),
+
+    ok.
+
+create_redirect_url_with_par_client_secret_jwt_request_object_test() ->
+    %% https://datatracker.ietf.org/doc/html/rfc9126#section-2
+    %% > To address that ambiguity, the issuer identifier URL of the authorization
+    %% > server according to [RFC8414] SHOULD be used as the value of the audience.
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, #oidcc_provider_configuration{issuer = Issuer} = Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ValidConfigString)
+    ),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        pushed_authorization_request_endpoint = <<"https://my.server/par">>,
+        token_endpoint_auth_methods_supported = [<<"client_secret_jwt">>],
+        token_endpoint_auth_signing_alg_values_supported = [<<"HS256">>],
+        request_parameter_supported = true,
+        request_object_signing_alg_values_supported = [
+            <<"HS256">>
+        ],
+        request_object_encryption_alg_values_supported = [<<"RSA-OAEP-256">>],
+        request_object_encryption_enc_values_supported = [<<"A256GCM">>]
+    },
+
+    ParResponseData =
+        jsx:encode(#{
+            <<"request_uri">> => <<"urn:ietf:params:oauth:request_uri:par_response">>,
+            <<"expires_in">> => 60
+        }),
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"at_least_32_character_client_secret">>,
+
+    Jwks0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    Jwks = Jwks0#jose_jwk{fields = #{<<"use">> => <<"enc">>}},
+
+    RedirectUri = <<"https://my.server/return">>,
+
+    ClientContext =
+        oidcc_client_context:from_manual(Configuration, Jwks, ClientId, ClientSecret),
+
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(
+            post,
+            {_Endpoint, _Header, "application/x-www-form-urlencoded", Body},
+            _HttpOpts,
+            _Opts
+        ) ->
+            BodyMap = maps:from_list(uri_string:dissect_query(Body)),
+
+            ?assertMatch(
+                #{
+                    <<"client_id">> := ClientId,
+                    <<"client_assertion_type">> :=
+                        <<"urn:ietf:params:oauth:client-assertion-type:jwt-bearer">>,
+                    <<"client_assertion">> := _,
+                    <<"request">> := _
+                },
+                BodyMap
+            ),
+
+            ClientAssertion = maps:get(<<"client_assertion">>, BodyMap),
+
+            {true, ClientAssertionJwt, ClientAssertionJws} = jose_jwt:verify(
+                jose_jwk:from_oct(ClientSecret), ClientAssertion
+            ),
+
+            ?assertMatch(#jose_jws{alg = {jose_jws_alg_hmac, 'HS256'}}, ClientAssertionJws),
+
+            ?assertMatch(
+                #jose_jwt{
+                    fields = #{
+                        <<"aud">> := Issuer,
+                        <<"exp">> := _,
+                        <<"iat">> := _,
+                        <<"iss">> := ClientId,
+                        <<"jti">> := _,
+                        <<"nbf">> := _,
+                        <<"sub">> := ClientId
+                    }
+                },
+                ClientAssertionJwt
+            ),
+
+            {SignedToken, Jwe} = jose_jwe:block_decrypt(Jwks, maps:get(<<"request">>, BodyMap)),
+
+            ?assertMatch(#jose_jwe{alg = {jose_jwe_alg_rsa, _}}, Jwe),
+
+            {true, Jwt, Jws} = jose_jwt:verify(jose_jwk:from_oct(ClientSecret), SignedToken),
+
+            ?assertMatch(#jose_jws{alg = {jose_jws_alg_hmac, 'HS256'}}, Jws),
+
+            ?assertMatch(
+                #jose_jwt{
+                    fields = #{
+                        <<"aud">> := Issuer,
+                        <<"client_id">> := ClientId,
+                        <<"exp">> := _,
+                        <<"iat">> := _,
+                        <<"iss">> := ClientId,
+                        <<"jti">> := _,
+                        <<"nbf">> := _,
+                        <<"redirect_uri">> := RedirectUri,
+                        <<"response_type">> := <<"code">>,
+                        <<"scope">> := <<"openid">>
+                    }
+                },
+                Jwt
+            ),
+
+            {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], ParResponseData}}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    {ok, Url} = oidcc_authorization:create_redirect_url(ClientContext, #{
+        redirect_uri => RedirectUri
+    }),
+
+    true = meck:validate(httpc),
+
+    meck:unload(httpc),
+
+    ?assertMatch(<<"https://my.provider/auth?request_uri=", _/binary>>, iolist_to_binary(Url)),
+
+    #{query := QueryString} = uri_string:parse(Url),
+    QueryParams0 = uri_string:dissect_query(QueryString),
+    QueryParams1 = lists:map(
+        fun({Key, Value}) -> {list_to_binary(Key), list_to_binary(Value)} end, QueryParams0
+    ),
+    QueryParams = maps:from_list(QueryParams1),
+
+    ?assertMatch(
+        #{
+            <<"client_id">> := <<"client_id">>,
+            <<"request_uri">> := <<"urn:ietf:params:oauth:request_uri:par_response">>
+        },
+        QueryParams
+    ),
+
+    ok.

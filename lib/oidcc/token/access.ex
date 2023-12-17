@@ -16,6 +16,7 @@ defmodule Oidcc.Token.Access do
   @typedoc since: "3.0.0"
   @type t() :: %__MODULE__{
           token: String.t(),
-          expires: pos_integer() | :undefined
+          expires: pos_integer() | :undefined,
+          type: String.t()
         }
 end

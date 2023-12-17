@@ -1,7 +1,11 @@
 -ifndef(OIDCC_TOKEN_HRL).
 
 -record(oidcc_token_id, {token :: binary(), claims :: oidcc_jwt_util:claims()}).
--record(oidcc_token_access, {token :: binary(), expires = undefined :: pos_integer() | undefined}).
+-record(oidcc_token_access, {
+    token :: binary(),
+    expires = undefined :: pos_integer() | undefined,
+    type = <<"Bearer">> :: binary()
+}).
 -record(oidcc_token_refresh, {token :: binary()}).
 -record(oidcc_token, {
     id :: oidcc_token:id() | none,

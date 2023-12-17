@@ -537,7 +537,7 @@ auth_method_client_secret_jwt_test() ->
     ?assertMatch(
         {ok, #oidcc_token{
             id = #oidcc_token_id{token = Token, claims = Claims},
-            access = #oidcc_token_access{token = AccessToken},
+            access = #oidcc_token_access{token = AccessToken, type = <<"Bearer">>},
             refresh = #oidcc_token_refresh{token = RefreshToken},
             scope = [<<"profile">>, <<"openid">>]
         }},

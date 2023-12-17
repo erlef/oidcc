@@ -56,7 +56,7 @@
 %% </ul>
 
 -type access() ::
-    #oidcc_token_access{token :: binary(), expires :: pos_integer() | undefined}.
+    #oidcc_token_access{token :: binary(), expires :: pos_integer() | undefined, type :: binary()}.
 %% Access Token Wrapper
 %%
 %% <h2>Fields</h2>
@@ -665,7 +665,8 @@ extract_access_token(TokenMap, Expiry) ->
         none ->
             {ok, none};
         Token when is_binary(Token) ->
-            {ok, #oidcc_token_access{token = Token, expires = Expiry}};
+            TokenType = maps:get(<<"token_type">>, TokenMap, <<"Bearer">>),
+            {ok, #oidcc_token_access{token = Token, expires = Expiry, type = TokenType}};
         Other ->
             {error, {invalid_property, {access_token, Other}}}
     end.

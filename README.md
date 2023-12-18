@@ -85,6 +85,7 @@ The refactoring for `v3` and the certification is funded as an
 * Authorization (Code Flow)
   * [Request Object](https://openid.net/specs/openid-connect-core-1_0.html#RequestObject)
   * [PKCE](https://oauth.net/2/pkce/)
+  * [Pushed Authorization Requests](https://datatracker.ietf.org/doc/html/rfc9126)
 * Token
   * Authorization: `client_secret_basic`, `client_secret_post`,
     `client_secret_jwt`, and `private_key_jwt`

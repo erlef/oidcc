@@ -48,7 +48,9 @@ add_client_authentication(
     case select_preferred_auth(PreferredAuthMethods, SupportedAuthMethods) of
         {ok, AuthMethod} ->
             case
-                add_authentication(QueryList0, Header0, AuthMethod, AllowAlgorithms, ClientContext)
+                add_authentication(
+                    QueryList0, Header0, AuthMethod, AllowAlgorithms, Opts, ClientContext
+                )
             of
                 {ok, {QueryList, Header}} ->
                     {ok, {QueryList, Header}};
@@ -71,6 +73,7 @@ add_client_authentication(
     Header,
     AuthMethod,
     AllowAlgorithms,
+    Opts,
     ClientContext
 ) ->
     {ok, {oidcc_http_util:query_params(), [oidcc_http_util:http_header()]}}
@@ -80,12 +83,14 @@ when
     Header :: [oidcc_http_util:http_header()],
     AuthMethod :: auth_method(),
     AllowAlgorithms :: [binary()] | undefined,
+    Opts :: map(),
     ClientContext :: oidcc_client_context:t().
 add_authentication(
     QsBodyList,
     Header,
     none,
     _AllowArgs,
+    _Opts,
     #oidcc_client_context{client_id = ClientId}
 ) ->
     NewBodyList = [{<<"client_id">>, ClientId} | QsBodyList],
@@ -95,6 +100,7 @@ add_authentication(
     _Header,
     _Method,
     _AllowAlgs,
+    _Opts,
     #oidcc_client_context{client_secret = unauthenticated}
 ) ->
     {error, auth_method_not_possible};
@@ -103,6 +109,7 @@ add_authentication(
     Header,
     client_secret_basic,
     _AllowAlgs,
+    _Opts,
     #oidcc_client_context{client_id = ClientId, client_secret = ClientSecret}
 ) ->
     NewHeader = [oidcc_http_util:basic_auth_header(ClientId, ClientSecret) | Header],
@@ -112,6 +119,7 @@ add_authentication(
     Header,
     client_secret_post,
     _AllowAlgs,
+    _Opts,
     #oidcc_client_context{client_id = ClientId, client_secret = ClientSecret}
 ) ->
     NewBodyList =
@@ -122,6 +130,7 @@ add_authentication(
     Header,
     client_secret_jwt,
     AllowAlgorithms,
+    Opts,
     ClientContext
 ) ->
     #oidcc_client_context{
@@ -139,6 +148,7 @@ add_authentication(
         {ok, ClientAssertion} ?=
             signed_client_assertion(
                 AllowAlgorithms,
+                Opts,
                 ClientContext,
                 OctJwk
             ),
@@ -152,6 +162,7 @@ add_authentication(
     Header,
     private_key_jwt,
     AllowAlgorithms,
+    Opts,
     ClientContext
 ) ->
     #oidcc_client_context{
@@ -162,7 +173,7 @@ add_authentication(
         [_ | _] ?= AllowAlgorithms,
         #jose_jwk{} ?= ClientJwks,
         {ok, ClientAssertion} ?=
-            signed_client_assertion(AllowAlgorithms, ClientContext, ClientJwks),
+            signed_client_assertion(AllowAlgorithms, Opts, ClientContext, ClientJwks),
         {ok, add_jwt_bearer_assertion(ClientAssertion, QsBodyList, Header, ClientContext)}
     else
         _ ->
@@ -186,23 +197,26 @@ select_preferred_auth(PreferredAuthMethods, AuthMethodsSupported) ->
             {error, no_supported_auth_method}
     end.
 
--spec signed_client_assertion(AllowAlgorithms, ClientContext, Jwk) ->
+-spec signed_client_assertion(AllowAlgorithms, Opts, ClientContext, Jwk) ->
     {ok, binary()} | {error, term()}
 when
     AllowAlgorithms :: [binary()],
     Jwk :: jose_jwk:key(),
+    Opts :: map(),
     ClientContext :: oidcc_client_context:t().
-signed_client_assertion(AllowAlgorithms, ClientContext, Jwk) ->
-    Jwt = jose_jwt:from(token_request_claims(ClientContext)),
+signed_client_assertion(AllowAlgorithms, Opts, ClientContext, Jwk) ->
+    Jwt = jose_jwt:from(token_request_claims(Opts, ClientContext)),
 
     oidcc_jwt_util:sign(Jwt, Jwk, AllowAlgorithms).
 
--spec token_request_claims(ClientContext) -> oidcc_jwt_util:claims() when
+-spec token_request_claims(Opts, ClientContext) -> oidcc_jwt_util:claims() when
+    Opts :: map(),
     ClientContext :: oidcc_client_context:t().
-token_request_claims(#oidcc_client_context{
+token_request_claims(Opts, #oidcc_client_context{
     client_id = ClientId,
     provider_configuration = #oidcc_provider_configuration{token_endpoint = TokenEndpoint}
 }) ->
+    Audience = maps:get(audience, Opts, TokenEndpoint),
     MaxClockSkew =
         case application:get_env(oidcc, max_clock_skew) of
             undefined -> 0;
@@ -212,7 +226,7 @@ token_request_claims(#oidcc_client_context{
     #{
         <<"iss">> => ClientId,
         <<"sub">> => ClientId,
-        <<"aud">> => TokenEndpoint,
+        <<"aud">> => Audience,
         <<"jti">> => random_string(32),
         <<"iat">> => os:system_time(seconds),
         <<"exp">> => os:system_time(seconds) + 30,

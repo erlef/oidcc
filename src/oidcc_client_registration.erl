@@ -108,6 +108,8 @@
         request_uris :: [uri_string:uri_string()] | undefined,
         %% OpenID Connect RP-Initiated Logout 1.0
         post_logout_redirect_uris :: [uri_string:uri_string()] | undefined,
+        %% OAuth 2.0 Pushed Authorization Requests
+        require_pushed_authorization_requests :: boolean(),
         %% Unknown Fields
         extra_fields :: #{binary() => term()}
     }.
@@ -293,6 +295,7 @@ encode(#oidcc_client_registration{
     initiate_login_uri = InitiateLoginUri,
     request_uris = RequestUris,
     post_logout_redirect_uris = PostLogoutRedirectUris,
+    require_pushed_authorization_requests = RequirePushedAuthorizationRequests,
     extra_fields = ExtraFields
 }) ->
     Map0 = #{
@@ -332,7 +335,8 @@ encode(#oidcc_client_registration{
         default_acr_values => DefaultAcrValues,
         initiate_login_uri => InitiateLoginUri,
         request_uris => RequestUris,
-        post_logout_redirect_uris => PostLogoutRedirectUris
+        post_logout_redirect_uris => PostLogoutRedirectUris,
+        require_pushed_authorization_requests => RequirePushedAuthorizationRequests
     },
     Map1 = maps:merge(Map0, ExtraFields),
     Map = maps:filter(

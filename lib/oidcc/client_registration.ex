@@ -80,6 +80,7 @@ defmodule Oidcc.ClientRegistration do
           initiate_login_uri: :uri_string.uri_string() | :undefined,
           request_uris: [:uri_string.uri_string()] | :undefined,
           post_logout_redirect_uris: [:uri_string.uri_string()] | :undefined,
+          require_pushed_authorization_requests: boolean(),
           extra_fields: %{String.t() => term()}
         }
 

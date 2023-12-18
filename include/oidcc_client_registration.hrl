@@ -65,6 +65,8 @@
     request_uris = undefined :: [uri_string:uri_string()] | undefined,
     %% OpenID Connect RP-Initiated Logout 1.0
     post_logout_redirect_uris = undefined :: [uri_string:uri_string()] | undefined,
+    %% OAuth 2.0 Pushed Authorization Requests
+    require_pushed_authorization_requests = false :: boolean(),
     %% Unknown Fields
     extra_fields = #{} :: #{binary() => term()}
 }).

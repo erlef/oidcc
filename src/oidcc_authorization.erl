@@ -315,7 +315,7 @@ attempt_par(
     AuthenticationOpts = #{audience => Issuer},
 
     maybe
-        {ok, {Body, Header}} ?=
+        {ok, {Body0, Header}} ?=
             oidcc_auth_util:add_client_authentication(
                 QueryParams,
                 Header0,
@@ -324,6 +324,8 @@ attempt_par(
                 AuthenticationOpts,
                 ClientContext
             ),
+        %% ensure no duplicate parameters (such as client_id)
+        Body = lists:ukeysort(1, Body0),
         Request =
             {PushedAuthorizationRequestEndpoint, Header, "application/x-www-form-urlencoded",
                 uri_string:compose_query(Body)},

@@ -910,7 +910,11 @@ create_redirect_url_with_par_client_secret_jwt_request_object_test() ->
             _HttpOpts,
             _Opts
         ) ->
-            BodyMap = maps:from_list(uri_string:dissect_query(Body)),
+            BodyParsed = uri_string:dissect_query(Body),
+            BodyMap = maps:from_list(BodyParsed),
+
+            %% no duplicate parameters
+            ?assertEqual(length(BodyParsed), map_size(BodyMap)),
 
             ?assertMatch(
                 #{

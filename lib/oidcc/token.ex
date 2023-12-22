@@ -355,7 +355,7 @@ defmodule Oidcc.Token do
 
   @doc """
   Generate a map of authorization headers to use when using the given
-  `%Oidcc.Token.Access{}` to access an API endpoint.
+  `Oidcc.Token.Access` struct to access an API endpoint.
   """
   @doc since: "3.2.0"
   @spec authorization_headers(

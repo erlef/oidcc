@@ -113,8 +113,11 @@
         Token :: oidcc_token:access() | binary(),
         ClientContext :: oidcc_client_context:t(),
         Opts :: retrieve_opts().
-retrieve(#oidcc_token{} = Token, ClientContext, Opts) ->
-    #oidcc_token{access = AccessTokenRecord, id = IdTokenRecord} = Token,
+retrieve(
+    #oidcc_token{access = #oidcc_token_access{} = AccessTokenRecord, id = IdTokenRecord},
+    ClientContext,
+    Opts
+) ->
     #oidcc_token_id{claims = #{<<"sub">> := ExpectedSubject}} = IdTokenRecord,
     retrieve(
         AccessTokenRecord,

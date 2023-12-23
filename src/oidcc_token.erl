@@ -878,6 +878,8 @@ verify_aud_claim(#{<<"aud">> := Audience} = Claims, ClientId) when is_list(Audie
         true -> ok;
         false -> {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}
     end;
+verify_aud_claim(#{<<"aud">> := ClientId}, ClientId) ->
+    ok;
 verify_aud_claim(Claims, ClientId) ->
     {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}.
 

@@ -6,6 +6,8 @@ defmodule Oidcc.Token.Access do
   """
   @moduledoc since: "3.0.0"
 
+  alias Oidcc.ClientContext
+
   use Oidcc.RecordStruct,
     internal_name: :token,
     record_name: :oidcc_token_access,
@@ -19,4 +21,29 @@ defmodule Oidcc.Token.Access do
           expires: pos_integer() | :undefined,
           type: String.t()
         }
+
+  @doc """
+  Generate a map of authorization headers to use when using the given
+  `Oidcc.Token.Access` struct to access an API endpoint.
+  """
+  @doc since: "3.2.0"
+  @spec authorization_headers(
+          access_token :: t(),
+          method :: :get | :post,
+          endpoint :: String.t(),
+          client_context :: ClientContext.t()
+        ) :: %{String.t() => String.t()}
+  def authorization_headers(
+        access_token,
+        method,
+        endpoint,
+        client_context
+      ),
+      do:
+        :oidcc_token.authorization_headers(
+          struct_to_record(access_token),
+          method,
+          endpoint,
+          ClientContext.struct_to_record(client_context)
+        )
 end

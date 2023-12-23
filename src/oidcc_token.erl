@@ -873,11 +873,10 @@ authorization_headers(
 
 -spec verify_aud_claim(Claims, ClientId) -> ok | {error, error()} when
     Claims :: oidcc_jwt_util:claims(), ClientId :: binary().
-verify_aud_claim(#{<<"aud">> := Audience} = Claims, ClientId) ->
-    case Audience of
-        ClientId -> ok;
-        [ClientId] -> ok;
-        _ -> {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}
+verify_aud_claim(#{<<"aud">> := Audience} = Claims, ClientId) when is_list(Audience) ->
+    case lists:member(ClientId, Audience) of
+        true -> ok;
+        false -> {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}
     end;
 verify_aud_claim(Claims, ClientId) ->
     {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}.

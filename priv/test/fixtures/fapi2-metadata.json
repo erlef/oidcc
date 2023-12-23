@@ -1,0 +1,106 @@
+{
+  "issuer": "https://my.provider",
+  "authorization_endpoint": "https://my.provider/auth",
+  "registration_endpoint": "https://my.provider/register",
+  "device_authorization_endpoint": "https://my.provider/device/code",
+  "token_endpoint": "https://my.provider/token",
+  "introspection_endpoint": "https://my.provider/introspection",
+  "userinfo_endpoint": "https://my.provider/userinfo",
+  "revocation_endpoint": "https://my.provider/revoke",
+  "jwks_uri": "https://my.provider/jwks",
+  "response_types_supported": [
+    "code",
+    "token",
+    "id_token",
+    "code token",
+    "code id_token",
+    "token id_token",
+    "code token id_token",
+    "none"
+  ],
+  "subject_types_supported": [
+    "public"
+  ],
+  "id_token_signing_alg_values_supported": [
+    "none",
+    "HS256",
+    "RS256",
+    "EdDSA"
+  ],
+  "scopes_supported": [
+    "openid",
+    "email",
+    "profile"
+  ],
+  "token_endpoint_auth_methods_supported": [
+    "client_secret_post",
+    "client_secret_basic",
+    "private_key_jwt",
+    "unsupporeted_auth"
+  ],
+  "claims_supported": [
+    "aud",
+    "email",
+    "email_verified",
+    "exp",
+    "family_name",
+    "given_name",
+    "iat",
+    "iss",
+    "locale",
+    "name",
+    "picture",
+    "sub"
+  ],
+  "code_challenge_methods_supported": [
+    "plain",
+    "S256"
+  ],
+  "grant_types_supported": [
+    "authorization_code",
+    "refresh_token",
+    "urn:ietf:params:oauth:grant-type:device_code",
+    "urn:ietf:params:oauth:grant-type:jwt-bearer"
+  ],
+  "userinfo_signing_alg_values_supported": [
+    "none",
+    "HS256",
+    "RS256",
+    "RS384",
+    "RS512",
+    "PS256",
+    "PS384",
+    "PS512",
+    "ES256",
+    "ES256K",
+    "ES384",
+    "ES512",
+    "EdDSA"
+  ],
+  "userinfo_encryption_alg_values_supported": [
+    "RSA1_5",
+    "RSA-OAEP",
+    "RSA-OAEP-256",
+    "RSA-OAEP-384",
+    "RSA-OAEP-512",
+    "ECDH-ES",
+    "ECDH-ES+A128KW",
+    "ECDH-ES+A192KW",
+    "ECDH-ES+A256KW",
+    "A128KW",
+    "A192KW",
+    "A256KW",
+    "A128GCMKW",
+    "A192GCMKW",
+    "A256GCMKW",
+    "dir"
+  ],
+  "userinfo_encryption_enc_values_supported": [
+    "A128CBC-HS256",
+    "A192CBC-HS384",
+    "A256CBC-HS512",
+    "A128GCM",
+    "A192GCM",
+    "A256GCM"
+  ]
+}

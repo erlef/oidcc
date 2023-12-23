@@ -98,15 +98,17 @@
 -type retrieve_opts() ::
     #{
         pkce_verifier => binary(),
+        require_pkce => boolean(),
         nonce => binary() | any,
         scope => oidcc_scope:scopes(),
         preferred_auth_methods => [oidcc_auth_util:auth_method(), ...],
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
-        redirect_uri := uri_string:uri_string(),
+        redirect_uri => uri_string:uri_string(),
         request_opts => oidcc_http_util:request_opts(),
         url_extension => oidcc_http_util:query_params(),
         body_extension => oidcc_http_util:query_params(),
-        dpop_nonce => binary()
+        dpop_nonce => binary(),
+        trusted_audiences => [binary()] | any
     }.
 %% Options for retrieving a token
 %%
@@ -118,6 +120,7 @@
 %%   <li>`pkce_verifier' - pkce verifier (random string previously given to
 %%     `oidcc_authorization'), see
 %%     [https://datatracker.ietf.org/doc/html/rfc7636#section-4.1]</li>
+%%   <li>`require_pkce' - whether to require PKCE when getting the token</li>
 %%   <li>`nonce' - Nonce to check</li>
 %%   <li>`scope' - Scope to store with the token</li>
 %%   <li>`refresh_jwks' - How to handle tokens with an unknown `kid'.
@@ -125,6 +128,8 @@
 %%   <li>`redirect_uri' - Redirect uri given to {@link oidcc_authorization:create_redirect_url/2}</li>
 %%   <li>`dpop_nonce' - if using DPoP, the `nonce' value to use in the
 %%     proof claim</li>
+%%   <li>`trusted_audiences' - if present, a list of additional audience values to
+%%     accept. Defaults to `any' which allows any additional values</li>
 %% </ul>
 
 -type refresh_opts_no_sub() ::
@@ -178,6 +183,7 @@
 
 -type error() ::
     {missing_claim, MissingClaim :: binary(), Claims :: oidcc_jwt_util:claims()}
+    | pkce_verifier_required
     | no_supported_auth_method
     | bad_access_token_hash
     | sub_invalid
@@ -697,13 +703,11 @@ when
     TokenRecord :: id(),
     NoneUsed :: boolean().
 extract_id_token(TokenMap, ClientContext, Opts) ->
-    Nonce = maps:get(nonce, Opts, any),
-
     case maps:get(<<"id_token">>, TokenMap, none) of
         none ->
             {ok, {none, false}};
         Token when is_binary(Token) ->
-            case validate_id_token(Token, ClientContext, Nonce) of
+            case validate_id_token(Token, ClientContext, Opts) of
                 {ok, OkClaims} ->
                     {ok, {#oidcc_token_id{token = Token, claims = OkClaims}, false}};
                 {error, {none_alg_used, NoneClaims}} ->
@@ -755,14 +759,19 @@ verify_access_token_map_hash(#oidcc_token{}) ->
 %% '''
 %% @end
 %% @since 3.0.0
--spec validate_id_token(IdToken, ClientContext, Nonce) ->
+-spec validate_id_token(IdToken, ClientContext, NonceOrOpts) ->
     {ok, Claims} | {error, error()}
 when
     IdToken :: binary(),
     ClientContext :: oidcc_client_context:t(),
+    NonceOrOpts :: Nonce | retrieve_opts(),
     Nonce :: binary() | any,
     Claims :: oidcc_jwt_util:claims().
-validate_id_token(IdToken, ClientContext, Nonce) ->
+validate_id_token(IdToken, ClientContext, Nonce) when is_binary(Nonce) ->
+    validate_id_token(IdToken, ClientContext, #{nonce => Nonce});
+validate_id_token(IdToken, ClientContext, any) ->
+    validate_id_token(IdToken, ClientContext, #{nonce => any});
+validate_id_token(IdToken, ClientContext, Opts) when is_map(Opts) ->
     #oidcc_client_context{
         provider_configuration = Configuration,
         jwks = #jose_jwk{} = Jwks,
@@ -775,6 +784,10 @@ validate_id_token(IdToken, ClientContext, Nonce) ->
         issuer = Issuer
     } =
         Configuration,
+
+    Nonce = maps:get(nonce, Opts, any),
+    TrustedAudience = maps:get(trusted_audiences, Opts, any),
+
     maybe
         ExpClaims0 = [{<<"iss">>, Issuer}],
         ExpClaims =
@@ -808,7 +821,7 @@ validate_id_token(IdToken, ClientContext, Nonce) ->
             end,
         ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),
         ok ?= verify_missing_required_claims(Claims),
-        ok ?= verify_aud_claim(Claims, ClientId),
+        ok ?= verify_aud_claim(Claims, ClientId, TrustedAudience),
         ok ?= verify_azp_claim(Claims, ClientId),
         ok ?= verify_exp_claim(Claims),
         ok ?= verify_nbf_claim(Claims),
@@ -871,16 +884,27 @@ authorization_headers(
     ),
     maps:from_list([{list_to_binary(Key), list_to_binary([Value])} || {Key, Value} <- Header]).
 
--spec verify_aud_claim(Claims, ClientId) -> ok | {error, error()} when
-    Claims :: oidcc_jwt_util:claims(), ClientId :: binary().
-verify_aud_claim(#{<<"aud">> := Audience} = Claims, ClientId) when is_list(Audience) ->
+-spec verify_aud_claim(Claims, ClientId, TrustedAudience) -> ok | {error, error()} when
+    Claims :: oidcc_jwt_util:claims(), ClientId :: binary(), TrustedAudience :: [binary()] | any.
+verify_aud_claim(#{<<"aud">> := ClientId}, ClientId, _TrustedAudience) ->
+    ok;
+verify_aud_claim(#{<<"aud">> := Audience} = Claims, ClientId, any) when is_list(Audience) ->
     case lists:member(ClientId, Audience) of
         true -> ok;
         false -> {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}
     end;
-verify_aud_claim(#{<<"aud">> := ClientId}, ClientId) ->
-    ok;
-verify_aud_claim(Claims, ClientId) ->
+verify_aud_claim(#{<<"aud">> := Audience} = Claims, ClientId, TrustedAudience0) when
+    is_list(Audience)
+->
+    TrustedAudience = [ClientId | TrustedAudience0],
+    maybe
+        true ?= lists:member(ClientId, Audience),
+        [] ?= [A || A <- Audience, not lists:member(A, TrustedAudience)],
+        ok
+    else
+        _ -> {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}
+    end;
+verify_aud_claim(Claims, ClientId, _TrustedAudience) ->
     {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}.
 
 -spec verify_azp_claim(Claims, ClientId) -> ok | {error, error()} when
@@ -943,6 +967,10 @@ when
     Opts :: retrieve_opts() | refresh_opts(),
     TelemetryOpts :: oidcc_http_util:telemetry_opts(),
     AuthenticateClient :: boolean().
+retrieve_a_token(
+    _QsBodyIn, none, _ClientContext, #{require_pkce := true}, _TelemetryOpts, _AuthenticateClient
+) ->
+    {error, pkce_verifier_required};
 retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext, Opts, TelemetryOpts, AuthenticateClient) ->
     #oidcc_client_context{provider_configuration = Configuration} =
         ClientContext,

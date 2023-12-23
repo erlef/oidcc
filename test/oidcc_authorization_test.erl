@@ -63,6 +63,8 @@ create_redirect_url_test() ->
             }
         ),
     Opts5 = maps:merge(BaseOpts, #{pkce_verifier => <<"foo">>}),
+    Opts6 = maps:merge(Opts5, #{require_pkce => true}),
+    Opts7 = maps:merge(BaseOpts, #{require_pkce => true}),
 
     {ok, Url1} = oidcc_authorization:create_redirect_url(ClientContext, BaseOpts),
     {ok, Url2} = oidcc_authorization:create_redirect_url(ClientContext, Opts1),
@@ -72,6 +74,7 @@ create_redirect_url_test() ->
     {ok, Url6} = oidcc_authorization:create_redirect_url(ClientContext, Opts5),
     {ok, Url7} = oidcc_authorization:create_redirect_url(PkcePlainClientContext, Opts5),
     {ok, Url8} = oidcc_authorization:create_redirect_url(NoPkceClientContext, Opts5),
+    {ok, Url9} = oidcc_authorization:create_redirect_url(PkcePlainClientContext, Opts6),
 
     ExpUrl1 =
         <<"https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
@@ -104,6 +107,18 @@ create_redirect_url_test() ->
     ExpUrl8 =
         <<"https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
     ?assertEqual(ExpUrl8, iolist_to_binary(Url8)),
+
+    ?assertEqual(iolist_to_binary(Url9), iolist_to_binary(Url7)),
+
+    ?assertEqual(
+        {error, no_supported_code_challenge},
+        oidcc_authorization:create_redirect_url(NoPkceClientContext, Opts6)
+    ),
+
+    ?assertEqual(
+        {error, pkce_verifier_required},
+        oidcc_authorization:create_redirect_url(ClientContext, Opts7)
+    ),
 
     ok.
 

@@ -139,6 +139,44 @@ defmodule Oidcc.ClientContext do
     |> record_to_struct()
   end
 
+  @doc """
+  Apply OpenID Connect / OAuth2 Profiles to the context
+
+  See `:oidcc_client_context.apply_profiles/2` for more.
+
+  ## Examples
+
+      iex> {:ok, _pid} =
+      ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
+      ...>   issuer: "https://accounts.google.com",
+      ...>   name: __MODULE__.GoogleConfigProvider
+      ...> })
+      ...>
+      ...> {:ok, client_context} =
+      ...>   Oidcc.ClientContext.from_configuration_worker(
+      ...>     __MODULE__.GoogleConfigProvider,
+      ...>     "client_id",
+      ...>     "client_Secret"
+      ...>   )
+      ...>
+      ...> {:ok, %Oidcc.ClientContext{}, %{}} =
+      ...>   Oidcc.ClientContext.apply_profiles(
+      ...>     client_context,
+      ...>     %{profiles: [:fapi2]}
+      ...>   )
+  """
+  @doc since: "3.2.0"
+  @spec apply_profiles(t(), map()) :: {:ok, t(), map()} | {:error, :oidcc_client_context.error()}
+  def apply_profiles(client_context, opts) do
+    case :oidcc_client_context.apply_profiles(struct_to_record(client_context), opts) do
+      {:ok, context_record, opts} ->
+        {:ok, record_to_struct(context_record), opts}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   @impl Oidcc.RecordStruct
   def record_to_struct(record) do
     record

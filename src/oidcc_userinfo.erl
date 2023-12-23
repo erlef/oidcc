@@ -116,16 +116,13 @@
 retrieve(#oidcc_token{} = Token, ClientContext, Opts) ->
     #oidcc_token{access = AccessTokenRecord, id = IdTokenRecord} = Token,
     #oidcc_token_id{claims = #{<<"sub">> := ExpectedSubject}} = IdTokenRecord,
-    case AccessTokenRecord of
-        #oidcc_token_access{} ->
-            retrieve(
-                AccessTokenRecord,
-                ClientContext,
-                maps:put(expected_subject, ExpectedSubject, Opts)
-            );
-        none ->
-            {error, no_access_token}
-    end;
+    retrieve(
+        AccessTokenRecord,
+        ClientContext,
+        maps:put(expected_subject, ExpectedSubject, Opts)
+    );
+retrieve(#oidcc_token{access = none}, #oidcc_client_context{}, _Opts) ->
+    {error, no_access_token};
 retrieve(#oidcc_token_access{} = AccessTokenRecord, #oidcc_client_context{} = ClientContext, Opts) ->
     #oidcc_client_context{
         provider_configuration = Configuration,

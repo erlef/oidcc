@@ -2,6 +2,8 @@
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("jose/include/jose_jwk.hrl").
+-include_lib("jose/include/jose_jws.hrl").
+-include_lib("jose/include/jose_jwt.hrl").
 -include_lib("oidcc/include/oidcc_provider_configuration.hrl").
 -include_lib("oidcc/include/oidcc_token.hrl").
 
@@ -34,7 +36,7 @@ json_test() ->
     AccessToken = <<"opensesame">>,
     GoodToken =
         #oidcc_token{
-            access = #oidcc_token_access{token = AccessToken},
+            access = AccessTokenRecord = #oidcc_token_access{token = AccessToken},
             id =
                 #oidcc_token_id{
                     token = "id_token",
@@ -54,6 +56,12 @@ json_test() ->
     ?assertMatch(
         {ok, #{<<"name">> := <<"joe">>}},
         oidcc_userinfo:retrieve(GoodToken, ClientContext, #{})
+    ),
+    ?assertMatch(
+        {ok, #{<<"name">> := <<"joe">>}},
+        oidcc_userinfo:retrieve(AccessTokenRecord, ClientContext, #{
+            expected_subject => GoodSub
+        })
     ),
     ?assertMatch(
         {ok, #{<<"name">> := <<"joe">>}},
@@ -531,5 +539,388 @@ distributed_claims_invalid_source_mapping_test() ->
 
     true = meck:validate(oidcc_http_util),
     meck:unload(oidcc_http_util),
+
+    ok.
+
+dpop_proof_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, #oidcc_provider_configuration{userinfo_endpoint = UserInfoEndpoint} = Configuration0} =
+        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        dpop_signing_alg_values_supported = [<<"RS256">>]
+    },
+    Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+
+    ClientJwk = Jwks#jose_jwk{
+        fields = #{<<"kid">> => <<"private_kid">>, <<"use">> => <<"sig">>}
+    },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+
+    ClientContext = oidcc_client_context:from_manual(
+        Configuration, Jwks, ClientId, ClientSecret, #{client_jwks => ClientJwk}
+    ),
+
+    HttpBody = <<"{\"name\":\"joe\", \"sub\":\"123456\"}">>,
+    Sub = <<"123456">>,
+    AccessToken = <<"opensesame">>,
+    AccessTokenHash = base64:encode(
+        crypto:hash(sha256, AccessToken),
+        #{mode => urlsafe, padding => false}
+    ),
+
+    HttpFun =
+        fun(get, {Url, Header}, _HttpOpts, _Opts) ->
+            Url = UserInfoEndpoint,
+            {_, Authorization} =
+                proplists:lookup("authorization", Header),
+            ?assertEqual(
+                list_to_binary(Authorization),
+                list_to_binary([<<"DPoP ">>, AccessToken])
+            ),
+            {_, DpopProof} = proplists:lookup("dpop", Header),
+            {true, DpopJwt, DpopJws} = jose_jwt:verify(
+                ClientJwk, DpopProof
+            ),
+
+            ?assertMatch(
+                #jose_jws{alg = {_, 'RS256'}}, DpopJws
+            ),
+
+            #jose_jws{fields = DpopJwsFields} = DpopJws,
+            ?assertMatch(
+                #{
+                    <<"kid">> := <<"private_kid">>,
+                    <<"typ">> := <<"dpop+jwt">>,
+                    <<"jwk">> := _
+                },
+                DpopJwsFields
+            ),
+
+            #{<<"jwk">> := DpopPublicKeyMap} = DpopJwsFields,
+            ?assertEqual(
+                DpopPublicKeyMap,
+                element(2, jose_jwk:to_public_map(ClientJwk))
+            ),
+
+            ?assertMatch(
+                #jose_jwt{
+                    fields = #{
+                        <<"exp">> := _,
+                        <<"iat">> := _,
+                        <<"jti">> := _,
+                        <<"htm">> := <<"GET">>,
+                        <<"htu">> := UserInfoEndpoint,
+                        <<"ath">> := AccessTokenHash
+                    }
+                },
+                DpopJwt
+            ),
+
+            {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], HttpBody}}
+        end,
+    ok = meck:new(httpc),
+    ok = meck:expect(httpc, request, HttpFun),
+
+    Token =
+        #oidcc_token{
+            access =
+                #oidcc_token_access{token = AccessToken, type = <<"DPoP">>},
+            id =
+                #oidcc_token_id{
+                    token = "id_token",
+                    claims = #{<<"sub">> => Sub}
+                }
+        },
+
+    ?assertMatch(
+        {ok, #{<<"name">> := <<"joe">>}},
+        oidcc_userinfo:retrieve(Token, ClientContext, #{})
+    ),
+
+    true = meck:validate(httpc),
+    meck:unload(httpc),
+
+    ok.
+
+dpop_proof_case_insensitive_token_type_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, #oidcc_provider_configuration{userinfo_endpoint = UserInfoEndpoint} = Configuration0} =
+        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        dpop_signing_alg_values_supported = [<<"RS256">>]
+    },
+    Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+
+    ClientJwk = Jwks#jose_jwk{
+        fields = #{<<"kid">> => <<"private_kid">>, <<"use">> => <<"sig">>}
+    },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+
+    ClientContext = oidcc_client_context:from_manual(
+        Configuration, Jwks, ClientId, ClientSecret, #{client_jwks => ClientJwk}
+    ),
+
+    HttpBody = <<"{\"name\":\"joe\", \"sub\":\"123456\"}">>,
+    Sub = <<"123456">>,
+    AccessToken = <<"opensesame">>,
+
+    HttpFun =
+        fun(get, {Url, Header}, _HttpOpts, _Opts) ->
+            Url = UserInfoEndpoint,
+            {_, Authorization} =
+                proplists:lookup("authorization", Header),
+            ?assertEqual(
+                list_to_binary(Authorization),
+                list_to_binary([<<"dpOp ">>, AccessToken])
+            ),
+            ?assertMatch({_, _}, proplists:lookup("dpop", Header)),
+
+            {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], HttpBody}}
+        end,
+    ok = meck:new(httpc),
+    ok = meck:expect(httpc, request, HttpFun),
+
+    Token =
+        #oidcc_token{
+            access =
+                #oidcc_token_access{token = AccessToken, type = <<"dpOp">>},
+            id =
+                #oidcc_token_id{
+                    token = "id_token",
+                    claims = #{<<"sub">> => Sub}
+                }
+        },
+
+    ?assertMatch(
+        {ok, #{<<"name">> := <<"joe">>}},
+        oidcc_userinfo:retrieve(Token, ClientContext, #{})
+    ),
+
+    true = meck:validate(httpc),
+    meck:unload(httpc),
+
+    ok.
+
+dpop_proof_with_nonce_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, #oidcc_provider_configuration{userinfo_endpoint = UserInfoEndpoint} = Configuration0} =
+        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        dpop_signing_alg_values_supported = [<<"RS256">>]
+    },
+    Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+
+    ClientJwk = Jwks#jose_jwk{
+        fields = #{<<"kid">> => <<"private_kid">>, <<"use">> => <<"sig">>}
+    },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+
+    ClientContext = oidcc_client_context:from_manual(
+        Configuration, Jwks, ClientId, ClientSecret, #{client_jwks => ClientJwk}
+    ),
+
+    HttpBody = <<"{\"name\":\"joe\", \"sub\":\"123456\"}">>,
+    Sub = <<"123456">>,
+    AccessToken = <<"opensesame">>,
+    AccessTokenHash = base64:encode(
+        crypto:hash(sha256, AccessToken),
+        #{mode => urlsafe, padding => false}
+    ),
+    DpopNonce = <<"dpop_nonce">>,
+    DpopNonceError = jsx:encode(#{
+        <<"error">> => <<"use_dpop_nonce">>,
+        <<"error_description">> =>
+            <<"Authorization server requires nonce in DPoP proof">>
+    }),
+
+    HttpFun =
+        fun(get, {Url, Header}, _HttpOpts, _Opts) ->
+            Url = UserInfoEndpoint,
+            {_, Authorization} =
+                proplists:lookup("authorization", Header),
+            ?assertEqual(
+                list_to_binary(Authorization),
+                list_to_binary([<<"DPoP ">>, AccessToken])
+            ),
+            {_, DpopProof} = proplists:lookup("dpop", Header),
+            {true, DpopJwt, DpopJws} = jose_jwt:verify(
+                ClientJwk, DpopProof
+            ),
+
+            ?assertMatch(
+                #jose_jws{alg = {_, 'RS256'}}, DpopJws
+            ),
+
+            #jose_jws{fields = DpopJwsFields} = DpopJws,
+            ?assertMatch(
+                #{
+                    <<"kid">> := <<"private_kid">>,
+                    <<"typ">> := <<"dpop+jwt">>,
+                    <<"jwk">> := _
+                },
+                DpopJwsFields
+            ),
+
+            #{<<"jwk">> := DpopPublicKeyMap} = DpopJwsFields,
+            ?assertEqual(
+                DpopPublicKeyMap,
+                element(2, jose_jwk:to_public_map(ClientJwk))
+            ),
+
+            ?assertMatch(
+                #jose_jwt{
+                    fields = #{
+                        <<"exp">> := _,
+                        <<"iat">> := _,
+                        <<"jti">> := _,
+                        <<"htm">> := <<"GET">>,
+                        <<"htu">> := UserInfoEndpoint,
+                        <<"ath">> := AccessTokenHash
+                    }
+                },
+                DpopJwt
+            ),
+
+            case DpopJwt of
+                #jose_jwt{fields = #{<<"nonce">> := DpopNonce}} ->
+                    {ok, {
+                        {"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], HttpBody
+                    }};
+                _ ->
+                    {ok, {
+                        {"HTTP/1.1", 400, "Bad Request"},
+                        [{"content-type", "application/json"}, {"dpop-nonce", DpopNonce}],
+                        DpopNonceError
+                    }}
+            end
+        end,
+    ok = meck:new(httpc),
+    ok = meck:expect(httpc, request, HttpFun),
+
+    Token =
+        #oidcc_token{
+            access =
+                #oidcc_token_access{token = AccessToken, type = <<"DPoP">>},
+            id =
+                #oidcc_token_id{
+                    token = "id_token",
+                    claims = #{<<"sub">> => Sub}
+                }
+        },
+
+    ?assertMatch(
+        {ok, #{<<"name">> := <<"joe">>}},
+        oidcc_userinfo:retrieve(Token, ClientContext, #{})
+    ),
+
+    true = meck:validate(httpc),
+    meck:unload(httpc),
+
+    ok.
+
+dpop_proof_with_invalid_nonce_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} =
+        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        dpop_signing_alg_values_supported = [<<"RS256">>]
+    },
+    Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+
+    ClientJwk = Jwks#jose_jwk{
+        fields = #{<<"kid">> => <<"private_kid">>, <<"use">> => <<"sig">>}
+    },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+
+    ClientContext = oidcc_client_context:from_manual(
+        Configuration, Jwks, ClientId, ClientSecret, #{client_jwks => ClientJwk}
+    ),
+
+    Sub = <<"123456">>,
+    AccessToken = <<"opensesame">>,
+    DpopNonce = <<"dpop_nonce">>,
+    DpopNonceError = jsx:encode(#{
+        <<"error">> => <<"use_dpop_nonce">>,
+        <<"error_description">> =>
+            <<"Authorization server requires nonce in DPoP proof">>
+    }),
+
+    HttpFun =
+        fun(get, _UrlHeader, _HttpOpts, _Opts) ->
+            {ok, {
+                {"HTTP/1.1", 400, "Bad Request"},
+                [{"content-type", "application/json"}, {"dpop-nonce", DpopNonce}],
+                DpopNonceError
+            }}
+        end,
+    ok = meck:new(httpc),
+    ok = meck:expect(httpc, request, HttpFun),
+
+    Token =
+        #oidcc_token{
+            access =
+                #oidcc_token_access{token = AccessToken, type = <<"DPoP">>},
+            id =
+                #oidcc_token_id{
+                    token = "id_token",
+                    claims = #{<<"sub">> => Sub}
+                }
+        },
+
+    ?assertMatch(
+        {error, _},
+        oidcc_userinfo:retrieve(Token, ClientContext, #{dpop_nonce => <<"invalid_nonce">>})
+    ),
+
+    true = meck:validate(httpc),
+    meck:unload(httpc),
+
+    ok.
+
+retrieve_no_access_token_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration} =
+        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+
+    Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+
+    ClientContext = oidcc_client_context:from_manual(
+        Configuration, Jwks, ClientId, ClientSecret
+    ),
+
+    Token = #oidcc_token{
+        access = none,
+        id = #oidcc_token_id{}
+    },
+
+    ?assertMatch(
+        {error, no_access_token},
+        oidcc_userinfo:retrieve(Token, ClientContext, #{})
+    ),
 
     ok.

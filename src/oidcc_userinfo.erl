@@ -27,13 +27,17 @@
 -export_type([retrieve_opts_no_sub/0]).
 
 -type retrieve_opts_no_sub() ::
-    #{refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun()}.
+    #{
+        refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
+        dpop_nonce => binary()
+    }.
 %% See {@link retrieve_opts()}
 
 -type retrieve_opts() ::
     #{
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
-        expected_subject := binary() | any
+        expected_subject => binary() | any,
+        dpop_nonce => binary()
     }.
 %% Configure userinfo request
 %%
@@ -46,10 +50,13 @@
 %%     See {@link oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun()}</li>
 %%   <li>`expected_subject' - expected subject for the userinfo
 %%     (`sub' from id token)</li>
+%%   <li>`dpop_nonce' - if using DPoP, the `nonce' value to use in the
+%%     proof claim</li>
 %% </ul>
 
 -type error() ::
     {distributed_claim_not_found, {ClaimSource :: binary(), ClaimName :: binary()}}
+    | no_access_token
     | invalid_content_type
     | bad_subject
     | oidcc_jwt_util:error()
@@ -103,19 +110,23 @@
         ClientContext :: oidcc_client_context:t(),
         Opts :: retrieve_opts_no_sub();
     (Token, ClientContext, Opts) -> {ok, oidcc_jwt_util:claims()} | {error, error()} when
-        Token :: binary(),
+        Token :: oidcc_token:access() | binary(),
         ClientContext :: oidcc_client_context:t(),
         Opts :: retrieve_opts().
-retrieve(#oidcc_token{} = Token, ClientContext, Opts) ->
-    #oidcc_token{access = AccessTokenRecord, id = IdTokenRecord} = Token,
-    #oidcc_token_access{token = AccessToken} = AccessTokenRecord,
+retrieve(
+    #oidcc_token{access = #oidcc_token_access{} = AccessTokenRecord, id = IdTokenRecord},
+    ClientContext,
+    Opts
+) ->
     #oidcc_token_id{claims = #{<<"sub">> := ExpectedSubject}} = IdTokenRecord,
     retrieve(
-        AccessToken,
+        AccessTokenRecord,
         ClientContext,
         maps:put(expected_subject, ExpectedSubject, Opts)
     );
-retrieve(AccessToken, ClientContext, Opts) when is_binary(AccessToken) ->
+retrieve(#oidcc_token{access = none}, #oidcc_client_context{}, _Opts) ->
+    {error, no_access_token};
+retrieve(#oidcc_token_access{} = AccessTokenRecord, #oidcc_client_context{} = ClientContext, Opts) ->
     #oidcc_client_context{
         provider_configuration = Configuration,
         client_id = ClientId
@@ -124,8 +135,16 @@ retrieve(AccessToken, ClientContext, Opts) when is_binary(AccessToken) ->
         userinfo_endpoint = Endpoint,
         issuer = Issuer
     } = Configuration,
+    #oidcc_token_access{token = AccessToken, type = AccessTokenType} = AccessTokenRecord,
 
-    Header = [oidcc_http_util:bearer_auth_header(AccessToken)],
+    %% Dialyzer gets confused about the type of Opts here (thinking that it
+    %% loses the expected_subject key), so we perform a no-op map operation to
+    %% separate the two.
+    %%
+    AuthorizationOpts = Opts#{},
+    Header = oidcc_auth_util:add_authorization_header(
+        AccessToken, AccessTokenType, get, Endpoint, AuthorizationOpts, ClientContext
+    ),
 
     Request = {Endpoint, Header},
     RequestOpts = maps:get(request_opts, Opts, #{}),
@@ -134,23 +153,32 @@ retrieve(AccessToken, ClientContext, Opts) when is_binary(AccessToken) ->
         extra_meta => #{issuer => Issuer, client_id => ClientId}
     },
 
+    HasDpopNonce = maps:is_key(dpop_nonce, AuthorizationOpts),
+
     maybe
         {ok, {UserinfoResponse, _Headers}} ?=
             oidcc_http_util:request(get, Request, TelemetryOpts, RequestOpts),
         {ok, Claims} ?= validate_userinfo_body(UserinfoResponse, ClientContext, Opts),
         lookup_distributed_claims(Claims, ClientContext, Opts)
-    end.
+    else
+        {error, {use_dpop_nonce, DpopNonce, _}} when
+            HasDpopNonce =:= false
+        ->
+            %% retry once if we didn't provide a nonce the first time
+            retrieve(AccessTokenRecord, ClientContext, Opts#{dpop_nonce => DpopNonce});
+        {error, Reason} ->
+            {error, Reason}
+    end;
+retrieve(AccessToken, #oidcc_client_context{} = ClientContext, Opts) when is_binary(AccessToken) ->
+    AccessTokenRecord = #oidcc_token_access{token = AccessToken},
+    retrieve(AccessTokenRecord, ClientContext, Opts).
 
 -spec validate_userinfo_body(Body, ClientContext, Opts) ->
     {ok, Claims} | {error, error()}
 when
     Body :: {json, map()} | {jwt, binary()},
     ClientContext :: oidcc_client_context:t(),
-    Opts ::
-        #{
-            refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
-            expected_subject := binary()
-        },
+    Opts :: retrieve_opts(),
     Claims :: oidcc_jwt_util:claims().
 validate_userinfo_body({json, Userinfo}, _ClientContext, Opts) ->
     ExpectedSubject = maps:get(expected_subject, Opts),
@@ -188,7 +216,7 @@ when
     Opts ::
         #{
             refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
-            expected_subject := binary(),
+            expected_subject => binary(),
             expected_claims => [{binary(), term()}]
         },
     Claims :: oidcc_jwt_util:claims().

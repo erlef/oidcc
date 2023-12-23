@@ -19,7 +19,8 @@
 -type http_header() :: {Field :: [byte()] | binary(), Value :: iodata()}.
 %% See {@link httpc:request/5}
 -type error() ::
-    {http_error, StatusCode :: pos_integer(), HttpBodyResult :: binary()}
+    {http_error, StatusCode :: pos_integer(), HttpBodyResult :: binary() | map()}
+    | {use_dpop_nonce, Nonce :: binary(), HttpBodyResult :: binary() | map()}
     | invalid_content_type
     | httpc_error().
 -type httpc_error() :: term().
@@ -147,7 +148,12 @@ extract_successful_response({{_HttpVersion, StatusCode, _HttpStatusName}, Header
             unknown ->
                 HttpBodyResult
         end,
-    {error, {http_error, StatusCode, Body}}.
+    case proplists:lookup("dpop-nonce", Headers) of
+        {"dpop-nonce", DpopNonce} ->
+            {error, {use_dpop_nonce, DpopNonce, Body}};
+        _ ->
+            {error, {http_error, StatusCode, Body}}
+    end.
 
 -spec fetch_content_type(Headers) -> json | jwt | unknown when Headers :: [http_header()].
 fetch_content_type(Headers) ->

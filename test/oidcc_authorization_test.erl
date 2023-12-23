@@ -1006,3 +1006,38 @@ create_redirect_url_with_par_client_secret_jwt_request_object_test() ->
     ),
 
     ok.
+
+create_redirect_url_private_key_jwt_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ValidConfigString)
+    ),
+    Configuration = Configuration0#oidcc_provider_configuration{
+        token_endpoint_auth_methods_supported = [<<"private_key_jwt">>],
+        dpop_signing_alg_values_supported = [<<"RS256">>]
+    },
+
+    Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+
+    ClientId = <<"client_id">>,
+    RedirectUri = <<"https://my.server/return">>,
+
+    ClientContext =
+        oidcc_client_context:from_manual(Configuration, Jwks, ClientId, <<"client_secret">>, #{
+            client_jwks => Jwks
+        }),
+
+    Opts =
+        #{
+            redirect_uri => RedirectUri
+        },
+
+    {ok, Url} = oidcc_authorization:create_redirect_url(ClientContext, Opts),
+
+    ExpUrl =
+        <<"https://my.provider/auth?dpop_jkt=7jnO2y748F6HEP7WtfubjBQWOgKUuMBQoYLyyc1fe-Q&scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn">>,
+    ?assertEqual(ExpUrl, iolist_to_binary(Url)),
+
+    ok.

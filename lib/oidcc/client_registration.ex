@@ -81,6 +81,7 @@ defmodule Oidcc.ClientRegistration do
           request_uris: [:uri_string.uri_string()] | :undefined,
           post_logout_redirect_uris: [:uri_string.uri_string()] | :undefined,
           require_pushed_authorization_requests: boolean(),
+          dpop_bound_access_tokens: boolean(),
           extra_fields: %{String.t() => term()}
         }
 

@@ -45,7 +45,8 @@
 
 -type opts() :: #{
     preferred_auth_methods => [oidcc_auth_util:auth_method(), ...],
-    request_opts => oidcc_http_util:request_opts()
+    request_opts => oidcc_http_util:request_opts(),
+    dpop_nonce => binary()
 }.
 
 -type error() :: client_id_mismatch | introspection_not_supported | oidcc_http_util:error().
@@ -131,18 +132,40 @@ introspect(AccessToken, ClientContext, Opts) ->
                 topic => [oidcc, introspect_token],
                 extra_meta => #{issuer => Issuer, client_id => ClientId}
             },
-
+            DpopOpts =
+                case Opts of
+                    #{dpop_nonce := DpopNonce} ->
+                        #{nonce => DpopNonce};
+                    _ ->
+                        #{}
+                end,
             maybe
-                {ok, {Body, Header}} ?=
+                {ok, {Body, Header1}} ?=
                     oidcc_auth_util:add_client_authentication(
                         Body0, Header0, SupportedAuthMethods, AllowAlgorithms, Opts, ClientContext
                     ),
+                Header = oidcc_auth_util:add_dpop_proof_header(
+                    Header1, post, Endpoint, DpopOpts, ClientContext
+                ),
                 Request =
                     {Endpoint, Header, "application/x-www-form-urlencoded",
                         uri_string:compose_query(Body)},
                 {ok, {{json, Token}, _Headers}} ?=
                     oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
                 extract_response(Token, ClientContext)
+            else
+                {error, {use_dpop_nonce, NewDpopNonce, _}} when
+                    DpopOpts =:= #{}
+                ->
+                    %% only retry automatically if we didn't use a nonce the first time
+                    %% (to avoid infinite loops)
+                    introspect(
+                        AccessToken,
+                        ClientContext,
+                        Opts#{dpop_nonce => NewDpopNonce}
+                    );
+                {error, Reason} ->
+                    {error, Reason}
             end
     end.
 

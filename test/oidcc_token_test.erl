@@ -537,7 +537,7 @@ auth_method_client_secret_jwt_test() ->
     ?assertMatch(
         {ok, #oidcc_token{
             id = #oidcc_token_id{token = Token, claims = Claims},
-            access = #oidcc_token_access{token = AccessToken},
+            access = #oidcc_token_access{token = AccessToken, type = <<"Bearer">>},
             refresh = #oidcc_token_refresh{token = RefreshToken},
             scope = [<<"profile">>, <<"openid">>]
         }},
@@ -893,6 +893,460 @@ auth_method_private_key_jwt_test() ->
 
     ok.
 
+auth_method_private_key_jwt_with_dpop_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, _} = application:ensure_all_started(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ConfigurationBinary)
+    ),
+
+    #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
+        Configuration = Configuration0#oidcc_provider_configuration{
+            token_endpoint_auth_methods_supported = [<<"private_key_jwt">>],
+            token_endpoint_auth_signing_alg_values_supported = [<<"RS256">>],
+            dpop_signing_alg_values_supported = [<<"RS256">>]
+        },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+    LocalEndpoint = <<"https://my.server/auth">>,
+    AuthCode = <<"1234567890">>,
+    AccessToken = <<"access_token">>,
+    RefreshToken = <<"refresh_token">>,
+    Claims =
+        #{
+            <<"iss">> => Issuer,
+            <<"sub">> => <<"sub">>,
+            <<"aud">> => ClientId,
+            <<"iat">> => erlang:system_time(second),
+            <<"exp">> => erlang:system_time(second) + 10,
+            <<"at_hash">> => <<"hrOQHuo3oE6FR82RIiX1SA">>
+        },
+
+    Jwk = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+
+    Jwt = jose_jwt:from(Claims),
+    Jws = #{<<"alg">> => <<"RS256">>},
+    {_Jws, Token} =
+        jose_jws:compact(
+            jose_jwt:sign(Jwk, Jws, Jwt)
+        ),
+
+    TokenData =
+        jsx:encode(#{
+            <<"access_token">> => AccessToken,
+            <<"token_type">> => <<"Bearer">>,
+            <<"id_token">> => Token,
+            <<"scope">> => <<"profile openid">>,
+            <<"refresh_token">> => RefreshToken
+        }),
+
+    ClientJwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    ClientJwk = ClientJwk0#jose_jwk{
+        fields = #{<<"kid">> => <<"private_kid">>, <<"use">> => <<"sig">>}
+    },
+
+    ClientContext = oidcc_client_context:from_manual(Configuration, Jwk, ClientId, ClientSecret, #{
+        client_jwks => ClientJwk
+    }),
+
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(
+            post,
+            {ReqTokenEndpoint, Header, "application/x-www-form-urlencoded", Body},
+            _HttpOpts,
+            _Opts
+        ) ->
+            TokenEndpoint = ReqTokenEndpoint,
+            ?assertMatch(none, proplists:lookup("authorization", Header)),
+            BodyMap = maps:from_list(uri_string:dissect_query(Body)),
+
+            ?assertMatch(
+                #{
+                    <<"grant_type">> := <<"authorization_code">>,
+                    <<"code">> := AuthCode,
+                    <<"client_id">> := ClientId,
+                    <<"client_assertion_type">> :=
+                        <<"urn:ietf:params:oauth:client-assertion-type:jwt-bearer">>,
+                    <<"client_assertion">> := _
+                },
+                BodyMap
+            ),
+
+            ClientAssertion = maps:get(<<"client_assertion">>, BodyMap),
+
+            {true, ClientAssertionJwt, ClientAssertionJws} = jose_jwt:verify(
+                ClientJwk, ClientAssertion
+            ),
+
+            ?assertMatch(
+                #jose_jws{alg = {_, 'RS256'}}, ClientAssertionJws
+            ),
+
+            #jose_jws{fields = ClientAssertionJwsFields} = ClientAssertionJws,
+            ?assertMatch(
+                #{
+                    <<"kid">> := <<"private_kid">>
+                },
+                ClientAssertionJwsFields
+            ),
+
+            ?assertMatch(
+                #jose_jwt{
+                    fields = #{
+                        <<"aud">> := TokenEndpoint,
+                        <<"exp">> := _,
+                        <<"iat">> := _,
+                        <<"iss">> := ClientId,
+                        <<"jti">> := _,
+                        <<"nbf">> := _,
+                        <<"sub">> := ClientId
+                    }
+                },
+                ClientAssertionJwt
+            ),
+
+            {_, DpopProof} = proplists:lookup("dpop", Header),
+
+            {true, DpopJwt, DpopJws} = jose_jwt:verify(
+                ClientJwk, DpopProof
+            ),
+
+            ?assertMatch(
+                #jose_jws{alg = {_, 'RS256'}}, DpopJws
+            ),
+
+            #jose_jws{fields = DpopJwsFields} = DpopJws,
+            ?assertMatch(
+                #{
+                    <<"kid">> := <<"private_kid">>,
+                    <<"typ">> := <<"dpop+jwt">>,
+                    <<"jwk">> := _
+                },
+                DpopJwsFields
+            ),
+
+            #{<<"jwk">> := DpopPublicKeyMap} = DpopJwsFields,
+            ?assertEqual(
+                DpopPublicKeyMap,
+                element(2, jose_jwk:to_public_map(ClientJwk))
+            ),
+
+            ?assertMatch(
+                #jose_jwt{
+                    fields = #{
+                        <<"exp">> := _,
+                        <<"iat">> := _,
+                        <<"jti">> := _,
+                        <<"htm">> := <<"POST">>,
+                        <<"htu">> := TokenEndpoint
+                    }
+                },
+                DpopJwt
+            ),
+
+            {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], TokenData}}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    ?assertMatch(
+        {ok, #oidcc_token{
+            id = #oidcc_token_id{token = Token, claims = Claims},
+            access = #oidcc_token_access{token = AccessToken},
+            refresh = #oidcc_token_refresh{token = RefreshToken},
+            scope = [<<"profile">>, <<"openid">>]
+        }},
+        oidcc_token:retrieve(
+            AuthCode,
+            ClientContext,
+            #{redirect_uri => LocalEndpoint}
+        )
+    ),
+
+    true = meck:validate(httpc),
+
+    meck:unload(httpc),
+
+    ok.
+
+auth_method_private_key_jwt_with_dpop_and_nonce_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, _} = application:ensure_all_started(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ConfigurationBinary)
+    ),
+
+    #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
+        Configuration = Configuration0#oidcc_provider_configuration{
+            token_endpoint_auth_methods_supported = [<<"private_key_jwt">>],
+            token_endpoint_auth_signing_alg_values_supported = [<<"RS256">>],
+            dpop_signing_alg_values_supported = [<<"RS256">>]
+        },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+    LocalEndpoint = <<"https://my.server/auth">>,
+    AuthCode = <<"1234567890">>,
+    AccessToken = <<"access_token">>,
+    RefreshToken = <<"refresh_token">>,
+    DpopNonce = <<"dpop_nonce">>,
+    Claims =
+        #{
+            <<"iss">> => Issuer,
+            <<"sub">> => <<"sub">>,
+            <<"aud">> => ClientId,
+            <<"iat">> => erlang:system_time(second),
+            <<"exp">> => erlang:system_time(second) + 10,
+            <<"at_hash">> => <<"hrOQHuo3oE6FR82RIiX1SA">>
+        },
+
+    Jwk = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+
+    Jwt = jose_jwt:from(Claims),
+    Jws = #{<<"alg">> => <<"RS256">>},
+    {_Jws, Token} =
+        jose_jws:compact(
+            jose_jwt:sign(Jwk, Jws, Jwt)
+        ),
+
+    TokenData =
+        jsx:encode(#{
+            <<"access_token">> => AccessToken,
+            <<"token_type">> => <<"Bearer">>,
+            <<"id_token">> => Token,
+            <<"scope">> => <<"profile openid">>,
+            <<"refresh_token">> => RefreshToken
+        }),
+
+    DpopNonceError = jsx:encode(#{
+        <<"error">> => <<"use_dpop_nonce">>,
+        <<"error_description">> =>
+            <<"Authorization server requires nonce in DPoP proof">>
+    }),
+
+    ClientJwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    ClientJwk = ClientJwk0#jose_jwk{
+        fields = #{<<"kid">> => <<"private_kid">>, <<"use">> => <<"sig">>}
+    },
+
+    ClientContext = oidcc_client_context:from_manual(Configuration, Jwk, ClientId, ClientSecret, #{
+        client_jwks => ClientJwk
+    }),
+
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(
+            post,
+            {ReqTokenEndpoint, Header, "application/x-www-form-urlencoded", Body},
+            _HttpOpts,
+            _Opts
+        ) ->
+            TokenEndpoint = ReqTokenEndpoint,
+            ?assertMatch(none, proplists:lookup("authorization", Header)),
+            BodyMap = maps:from_list(uri_string:dissect_query(Body)),
+
+            ?assertMatch(
+                #{
+                    <<"grant_type">> := <<"authorization_code">>,
+                    <<"code">> := AuthCode,
+                    <<"client_id">> := ClientId,
+                    <<"client_assertion_type">> :=
+                        <<"urn:ietf:params:oauth:client-assertion-type:jwt-bearer">>,
+                    <<"client_assertion">> := _
+                },
+                BodyMap
+            ),
+
+            ClientAssertion = maps:get(<<"client_assertion">>, BodyMap),
+
+            {true, ClientAssertionJwt, ClientAssertionJws} = jose_jwt:verify(
+                ClientJwk, ClientAssertion
+            ),
+
+            ?assertMatch(
+                #jose_jws{alg = {_, 'RS256'}}, ClientAssertionJws
+            ),
+
+            #jose_jws{fields = ClientAssertionJwsFields} = ClientAssertionJws,
+            ?assertMatch(
+                #{
+                    <<"kid">> := <<"private_kid">>
+                },
+                ClientAssertionJwsFields
+            ),
+
+            ?assertMatch(
+                #jose_jwt{
+                    fields = #{
+                        <<"aud">> := TokenEndpoint,
+                        <<"exp">> := _,
+                        <<"iat">> := _,
+                        <<"iss">> := ClientId,
+                        <<"jti">> := _,
+                        <<"nbf">> := _,
+                        <<"sub">> := ClientId
+                    }
+                },
+                ClientAssertionJwt
+            ),
+
+            {_, DpopProof} = proplists:lookup("dpop", Header),
+
+            {true, DpopJwt, DpopJws} = jose_jwt:verify(
+                ClientJwk, DpopProof
+            ),
+
+            ?assertMatch(
+                #jose_jws{alg = {_, 'RS256'}}, DpopJws
+            ),
+
+            #jose_jws{fields = DpopJwsFields} = DpopJws,
+            ?assertMatch(
+                #{
+                    <<"kid">> := <<"private_kid">>,
+                    <<"typ">> := <<"dpop+jwt">>,
+                    <<"jwk">> := _
+                },
+                DpopJwsFields
+            ),
+
+            #{<<"jwk">> := DpopPublicKeyMap} = DpopJwsFields,
+            ?assertEqual(
+                DpopPublicKeyMap,
+                element(2, jose_jwk:to_public_map(ClientJwk))
+            ),
+
+            ?assertMatch(
+                #jose_jwt{
+                    fields = #{
+                        <<"exp">> := _,
+                        <<"iat">> := _,
+                        <<"jti">> := _,
+                        <<"htm">> := <<"POST">>,
+                        <<"htu">> := TokenEndpoint
+                    }
+                },
+                DpopJwt
+            ),
+
+            case DpopJwt of
+                #jose_jwt{
+                    fields = #{
+                        <<"nonce">> := DpopNonce
+                    }
+                } ->
+                    {ok, {
+                        {"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], TokenData
+                    }};
+                _ ->
+                    {ok, {
+                        {"HTTP/1.1", 400, "OK"},
+                        [{"content-type", "application/json"}, {"dpop-nonce", DpopNonce}],
+                        DpopNonceError
+                    }}
+            end
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    ?assertMatch(
+        {ok, #oidcc_token{
+            id = #oidcc_token_id{token = Token, claims = Claims},
+            access = #oidcc_token_access{token = AccessToken},
+            refresh = #oidcc_token_refresh{token = RefreshToken},
+            scope = [<<"profile">>, <<"openid">>]
+        }},
+        oidcc_token:retrieve(
+            AuthCode,
+            ClientContext,
+            #{redirect_uri => LocalEndpoint}
+        )
+    ),
+
+    true = meck:validate(httpc),
+
+    meck:unload(httpc),
+
+    ok.
+
+auth_method_private_key_jwt_with_invalid_dpop_nonce_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, _} = application:ensure_all_started(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ConfigurationBinary)
+    ),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        token_endpoint_auth_methods_supported = [<<"private_key_jwt">>],
+        token_endpoint_auth_signing_alg_values_supported = [<<"RS256">>],
+        dpop_signing_alg_values_supported = [<<"RS256">>]
+    },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+    LocalEndpoint = <<"https://my.server/auth">>,
+    AuthCode = <<"1234567890">>,
+    DpopNonce = <<"dpop_nonce">>,
+    Jwk = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+
+    DpopNonceError = jsx:encode(#{
+        <<"error">> => <<"use_dpop_nonce">>,
+        <<"error_description">> =>
+            <<"Authorization server requires nonce in DPoP proof">>
+    }),
+
+    ClientJwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    ClientJwk = ClientJwk0#jose_jwk{
+        fields = #{<<"kid">> => <<"private_kid">>, <<"use">> => <<"sig">>}
+    },
+
+    ClientContext = oidcc_client_context:from_manual(Configuration, Jwk, ClientId, ClientSecret, #{
+        client_jwks => ClientJwk
+    }),
+
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(
+            post,
+            {_Endpoint, _Header, "application/x-www-form-urlencoded", _Body},
+            _HttpOpts,
+            _Opts
+        ) ->
+            {ok, {
+                {"HTTP/1.1", 400, "OK"},
+                [{"content-type", "application/json"}, {"dpop-nonce", DpopNonce}],
+                DpopNonceError
+            }}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    ?assertMatch(
+        {error, _},
+        oidcc_token:retrieve(
+            AuthCode,
+            ClientContext,
+            #{
+                redirect_uri => LocalEndpoint,
+                dpop_nonce => <<"invalid_nonce">>
+            }
+        )
+    ),
+
+    true = meck:validate(httpc),
+
+    meck:unload(httpc),
+
+    ok.
+
 auth_method_client_secret_jwt_no_alg_test() ->
     PrivDir = code:priv_dir(oidcc),
 
@@ -1029,4 +1483,121 @@ preferred_auth_methods_test() ->
 
     meck:unload(httpc),
 
+    ok.
+
+authorization_headers_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ConfigurationBinary)
+    ),
+
+    SigningAlg = [<<"RS256">>],
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        dpop_signing_alg_values_supported = SigningAlg
+    },
+
+    Jwk = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    ClientJwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    ClientJwk = ClientJwk0#jose_jwk{
+        fields = #{<<"kid">> => <<"private_kid">>, <<"use">> => <<"sig">>}
+    },
+    {_, ClientPublicJwk} = jose_jwk:to_public_map(ClientJwk),
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+    Endpoint = <<"https://my.server/auth">>,
+    AccessToken = <<"access_token">>,
+    AccessTokenHash = base64:encode(crypto:hash(sha256, AccessToken), #{
+        mode => urlsafe, padding => false
+    }),
+
+    ClientContext = oidcc_client_context:from_manual(Configuration, Jwk, ClientId, ClientSecret, #{
+        client_jwks => ClientJwk
+    }),
+
+    AccessTokenRecord = #oidcc_token_access{token = AccessToken, type = <<"DPoP">>},
+
+    HeaderMap = oidcc_token:authorization_headers(AccessTokenRecord, get, Endpoint, ClientContext),
+    HeaderMapWithNonce = oidcc_token:authorization_headers(
+        AccessTokenRecord, post, Endpoint, ClientContext, #{dpop_nonce => <<"dpop_nonce">>}
+    ),
+
+    ?assertMatch(
+        #{
+            <<"authorization">> := <<"DPoP access_token">>,
+            <<"dpop">> := _
+        },
+        HeaderMap
+    ),
+
+    ?assertMatch(
+        #{
+            <<"authorization">> := <<"DPoP access_token">>,
+            <<"dpop">> := _
+        },
+        HeaderMapWithNonce
+    ),
+
+    #{<<"dpop">> := DpopProof} = HeaderMap,
+    #{<<"dpop">> := DpopProofWithNonce} = HeaderMapWithNonce,
+
+    ?assertMatch(
+        {ok, _},
+        oidcc_jwt_util:verify_signature(DpopProof, SigningAlg, ClientJwk)
+    ),
+    ?assertMatch(
+        {ok, _},
+        oidcc_jwt_util:verify_signature(DpopProofWithNonce, SigningAlg, ClientJwk)
+    ),
+
+    {ok, {DpopJwt, DpopJws}} = oidcc_jwt_util:verify_signature(DpopProof, SigningAlg, ClientJwk),
+    {ok, {DpopJwtWithNonce, DpopJwsWithNonce}} = oidcc_jwt_util:verify_signature(
+        DpopProofWithNonce, SigningAlg, ClientJwk
+    ),
+
+    ?assertMatch(
+        #jose_jws{
+            fields = #{
+                <<"typ">> := <<"dpop+jwt">>,
+                <<"kid">> := <<"private_kid">>,
+                <<"jwk">> := ClientPublicJwk
+            }
+        },
+        DpopJws
+    ),
+    ?assertEqual(
+        DpopJws,
+        DpopJwsWithNonce
+    ),
+
+    ?assertMatch(
+        #jose_jwt{
+            fields = #{
+                <<"jti">> := _,
+                <<"htm">> := <<"GET">>,
+                <<"htu">> := Endpoint,
+                <<"iat">> := _,
+                <<"exp">> := _,
+                <<"ath">> := AccessTokenHash
+            }
+        },
+        DpopJwt
+    ),
+    ?assertMatch(
+        #jose_jwt{
+            fields = #{
+                <<"jti">> := _,
+                <<"htm">> := <<"POST">>,
+                <<"htu">> := Endpoint,
+                <<"iat">> := _,
+                <<"exp">> := _,
+                <<"ath">> := AccessTokenHash,
+                <<"nonce">> := <<"dpop_nonce">>
+            }
+        },
+        DpopJwtWithNonce
+    ),
     ok.

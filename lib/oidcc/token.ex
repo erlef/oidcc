@@ -353,31 +353,6 @@ defmodule Oidcc.Token do
       |> :oidcc_token.client_credentials(opts)
       |> normalize_token_response()
 
-  @doc """
-  Generate a map of authorization headers to use when using the given
-  `Oidcc.Token.Access` struct to access an API endpoint.
-  """
-  @doc since: "3.2.0"
-  @spec authorization_headers(
-          access_token :: Access.t(),
-          method :: :get | :post,
-          endpoint :: String.t(),
-          client_context :: ClientContext.t()
-        ) :: %{String.t() => String.t()}
-  def authorization_headers(
-        access_token,
-        method,
-        endpoint,
-        client_context
-      ),
-      do:
-        :oidcc_token.authorization_headers(
-          Access.struct_to_record(access_token),
-          method,
-          endpoint,
-          ClientContext.struct_to_record(client_context)
-        )
-
   @doc false
   @spec normalize_token_response(
           response :: {:ok, :oidcc_token.t()} | {:error, :oidcc_token.error()}

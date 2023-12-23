@@ -896,3 +896,31 @@ dpop_proof_with_invalid_nonce_test() ->
     meck:unload(httpc),
 
     ok.
+
+retrieve_no_access_token_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration} =
+        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+
+    Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+
+    ClientContext = oidcc_client_context:from_manual(
+        Configuration, Jwks, ClientId, ClientSecret
+    ),
+
+    Token = #oidcc_token{
+        access = none,
+        id = #oidcc_token_id{}
+    },
+
+    ?assertMatch(
+        {error, no_access_token},
+        oidcc_userinfo:retrieve(Token, ClientContext, #{})
+    ),
+
+    ok.

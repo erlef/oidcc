@@ -166,7 +166,8 @@ defmodule Oidcc.ClientContext do
       ...>   )
   """
   @doc since: "3.2.0"
-  @spec apply_profiles(t(), :oidcc_profile.opts()) :: {:ok, t(), :oidcc_profile.opts_no_profiles()} | {:error, :oidcc_client_context.error()}
+  @spec apply_profiles(t(), :oidcc_profile.opts()) ::
+          {:ok, t(), :oidcc_profile.opts_no_profiles()} | {:error, :oidcc_client_context.error()}
   def apply_profiles(client_context, opts) do
     case :oidcc_client_context.apply_profiles(struct_to_record(client_context), opts) do
       {:ok, context_record, opts} ->

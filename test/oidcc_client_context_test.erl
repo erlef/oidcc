@@ -97,7 +97,6 @@ apply_profiles_fapi2_message_signing_test() ->
                 ],
                 code_challenge_methods_supported = [<<"S256">>],
                 require_pushed_authorization_requests = true,
-                require_signed_request_object = true,
                 authorization_response_iss_parameter_supported = true
             }
         },

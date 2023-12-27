@@ -63,7 +63,6 @@ apply_profiles(
     %% TODO include tls_client_auth">> here when it's supported by the library.
     Opts = map_put_new(preferred_auth_methods, [private_key_jwt], Opts3),
     apply_profiles(ClientContext, Opts);
-
 apply_profiles(
     #oidcc_client_context{} = ClientContext,
     #{profiles := [fapi2_message_signing | RestProfiles]} = Opts0
@@ -80,14 +79,11 @@ apply_profiles(
     %% Also require everything from FAPI2 Security Profile
     Opts = Opts0#{profiles => [fapi2_security_profile | RestProfiles]},
     apply_profiles(ClientContext, Opts);
-
 apply_profiles(#oidcc_client_context{}, #{profiles := [UnknownProfile | _]}) ->
     {error, {unknown_profile, UnknownProfile}};
-
 apply_profiles(#oidcc_client_context{} = ClientContext, #{profiles := []} = Opts0) ->
     Opts = maps:remove(profiles, Opts0),
     apply_profiles(ClientContext, Opts);
-
 apply_profiles(#oidcc_client_context{} = ClientContext, #{} = Opts) ->
     {ok, ClientContext, Opts}.
 

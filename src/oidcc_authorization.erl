@@ -202,7 +202,7 @@ maybe_append_dpop_jkt(
 maybe_append_dpop_jkt(QueryParams, _ClientContext) ->
     QueryParams.
 
--spec attempt_request_object(QueryParams, ClientContext) -> QueryParams when
+-spec attempt_request_object(QueryParams, ClientContext) -> {ok, QueryParams} | {error, error()} when
     QueryParams :: oidcc_http_util:query_params(),
     ClientContext :: oidcc_client_context:t().
 attempt_request_object(QueryParams, #oidcc_client_context{

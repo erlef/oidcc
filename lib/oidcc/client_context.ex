@@ -162,7 +162,7 @@ defmodule Oidcc.ClientContext do
       ...> {:ok, %Oidcc.ClientContext{}, %{}} =
       ...>   Oidcc.ClientContext.apply_profiles(
       ...>     client_context,
-      ...>     %{profiles: [:fapi2]}
+      ...>     %{profiles: [:fapi2_message_signing]}
       ...>   )
   """
   @doc since: "3.2.0"

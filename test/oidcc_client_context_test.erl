@@ -18,10 +18,10 @@ provider_not_running_test() ->
     ),
     ok.
 
-apply_profiles_fapi2_test() ->
+apply_profiles_fapi2_security_profile_test() ->
     ClientContext0 = client_context_fixture(),
     Opts0 = #{
-        profiles => [fapi2]
+        profiles => [fapi2_security_profile]
     },
 
     ProfileResult = oidcc_client_context:apply_profiles(ClientContext0, Opts0),
@@ -49,6 +49,55 @@ apply_profiles_fapi2_test() ->
                 ],
                 code_challenge_methods_supported = [<<"S256">>],
                 require_pushed_authorization_requests = true,
+                authorization_response_iss_parameter_supported = true
+            }
+        },
+        ClientContext
+    ),
+
+    ?assertMatch(
+        #{
+            preferred_auth_methods := [private_key_jwt],
+            require_pkce := true,
+            trusted_audiences := []
+        },
+        Opts
+    ),
+
+    ok.
+
+apply_profiles_fapi2_message_signing_test() ->
+    ClientContext0 = client_context_fixture(),
+    Opts0 = #{
+        profiles => [fapi2_message_signing]
+    },
+
+    ProfileResult = oidcc_client_context:apply_profiles(ClientContext0, Opts0),
+
+    ?assertMatch(
+        {ok, #oidcc_client_context{}, #{}},
+        ProfileResult
+    ),
+
+    {ok, ClientContext, Opts} = ProfileResult,
+
+    ?assertMatch(
+        #oidcc_client_context{
+            provider_configuration = #oidcc_provider_configuration{
+                response_types_supported = [<<"code">>],
+                id_token_signing_alg_values_supported = [<<"EdDSA">>],
+                userinfo_signing_alg_values_supported = [
+                    <<"PS256">>,
+                    <<"PS384">>,
+                    <<"PS512">>,
+                    <<"ES256">>,
+                    <<"ES384">>,
+                    <<"ES512">>,
+                    <<"EdDSA">>
+                ],
+                code_challenge_methods_supported = [<<"S256">>],
+                require_pushed_authorization_requests = true,
+                require_signed_request_object = true,
                 authorization_response_iss_parameter_supported = true
             }
         },

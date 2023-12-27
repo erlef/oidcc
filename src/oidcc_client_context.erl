@@ -61,9 +61,7 @@
 
 -type opts() :: authenticated_opts() | unauthenticated_opts().
 
--type error() ::
-    provider_not_ready
-    | {unknown_profile, atom()}.
+-type error() :: provider_not_ready.
 
 %% @doc Create Client Context from a {@link oidcc_provider_configuration_worker}
 %%
@@ -233,9 +231,9 @@ from_manual(
 
 %% @doc Apply OpenID Connect / OAuth2 Profiles to the context
 %%
-%% Currently, the only supported profile is `fapi2', which enables the requirements from:
-%% - https://openid.bitbucket.io/fapi/fapi-2_0-security-profile.html
-%% - https://openid.bitbucket.io/fapi/fapi-2_0-message-signing.html
+%% Currently, the only supported profiles are:
+%% - `fapi2_security_profile' - https://openid.bitbucket.io/fapi/fapi-2_0-security-profile.html
+%% - `fapi2_message_signing' - https://openid.bitbucket.io/fapi/fapi-2_0-message-signing.html
 %%
 %% It returns an updated `#oidcc_client_context{}' record and a map of options to
 %% be merged into the `oidcc_authorization` and `oidcc_token` functions.
@@ -248,7 +246,7 @@ from_manual(
 %% {#oidcc_client_context{} = ClientContext1, Opts} = oidcc_client_context:apply_profiles(
 %%   ClientContext,
 %%   #{
-%%     profiles => [fapi2]
+%%     profiles => [fapi2_message_signing]
 %%   }),
 %%
 %% {ok, Uri} = oidcc_authorization:create_redirect_uri(
@@ -258,10 +256,9 @@ from_manual(
 %% '''
 %% @end
 %% @since 3.2.0
--spec apply_profiles(ClientContext, Opts) ->
-    {ok, ClientContext, Opts} | {error, error()}
+-spec apply_profiles(ClientContext, oidcc_profile:opts()) ->
+    {ok, ClientContext, oidcc_profile:opts_no_profiles()} | {error, oidcc_profile:error()}
 when
-    ClientContext :: oidcc_client_context:t(),
-    Opts :: map().
+    ClientContext :: oidcc_client_context:t().
 apply_profiles(ClientContext, Opts) ->
     oidcc_profile:apply_profiles(ClientContext, Opts).

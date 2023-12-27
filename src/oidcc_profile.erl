@@ -12,18 +12,36 @@
 
 -export([apply_profiles/2]).
 
+-export_type([profile/0]).
+-export_type([opts/0]).
+-export_type([opts_no_profiles/0]).
+-export_type([error/0]).
+
+-type profile() :: fapi2_security_profile | fapi2_message_signing.
+-type opts() :: #{
+    profiles => [profile()],
+    require_pkce => boolean(),
+    trusted_audiences => [binary()] | any,
+    preferred_auth_methods => [oidcc_auth_util:auth_method()]
+}.
+-type opts_no_profiles() :: #{
+    require_pkce => boolean(),
+    trusted_audiences => [binary()] | any,
+    preferred_auth_methods => [oidcc_auth_util:auth_method()]
+}.
+-type error() :: {unknown_profile, atom()}.
+
 %% @private
--spec apply_profiles(ClientContext, Opts) ->
-    {ok, ClientContext, Opts} | {error, oidcc_client_context:error()}
+-spec apply_profiles(ClientContext, opts()) ->
+    {ok, ClientContext, opts_no_profiles()} | {error, error()}
 when
-    ClientContext :: oidcc_client_context:t(),
-    Opts :: map().
+    ClientContext :: oidcc_client_context:t().
 apply_profiles(
-    #oidcc_client_context{} = ClientContext0, #{profiles := [fapi2 | RestProfiles]} = Opts0
+    #oidcc_client_context{} = ClientContext0,
+    #{profiles := [fapi2_security_profile | RestProfiles]} = Opts0
 ) ->
-    %% FAPI2:
+    %% FAPI2 Security Profile
     %% - https://openid.bitbucket.io/fapi/fapi-2_0-security-profile.html
-    %% - https://openid.bitbucket.io/fapi/fapi-2_0-message-signing.html
     {ClientContext1, Opts1} = enforce_s256_pkce(ClientContext0, Opts0),
     ClientContext2 = limit_response_types([<<"code">>], ClientContext1),
     ClientContext3 = enforce_par(ClientContext2),
@@ -44,6 +62,20 @@ apply_profiles(
     Opts3 = map_put_new(trusted_audiences, [], Opts2),
     %% TODO include <<"tls_client_auth">> here when it's supported by the library.
     Opts = map_put_new(preferred_auth_methods, [private_key_jwt], Opts3),
+    apply_profiles(ClientContext, Opts);
+apply_profiles(
+    #oidcc_client_context{} = ClientContext0,
+    #{profiles := [fapi2_message_signing | RestProfiles]} = Opts0
+) ->
+    %% FAPI2 Message Signing:
+    %% - https://openid.bitbucket.io/fapi/fapi-2_0-message- signing.html
+    ClientContext = require_signed_request_object(ClientContext0),
+    %% TODO limit response_mode_supported to [<<"jwt">>] once JARM is supported.
+    %% This is required by the spec, but not currently by the conformance suite.
+    %% TODO require signed token introspection responses ()
+
+    %% Also require everything from FAPI2 Security Profile
+    Opts = Opts0#{profiles => [fapi2_security_profile | RestProfiles]},
     apply_profiles(ClientContext, Opts);
 apply_profiles(#oidcc_client_context{}, #{profiles := [UnknownProfile | _]}) ->
     {error, {unknown_profile, UnknownProfile}};
@@ -127,6 +159,16 @@ limit_signing_alg_values(AlgSupported, ClientContext0) ->
         ),
         authorization_signing_alg_values_supported = limit_values(AlgSupported, AuthorizationAlg),
         dpop_signing_alg_values_supported = limit_values(AlgSupported, DpopAlg)
+    },
+    ClientContext = ClientContext0#oidcc_client_context{
+        provider_configuration = ProviderConfiguration
+    },
+    ClientContext.
+
+require_signed_request_object(ClientContext0) ->
+    #oidcc_client_context{provider_configuration = ProviderConfiguration0} = ClientContext0,
+    ProviderConfiguration = ProviderConfiguration0#oidcc_provider_configuration{
+        require_signed_request_object = true
     },
     ClientContext = ClientContext0#oidcc_client_context{
         provider_configuration = ProviderConfiguration

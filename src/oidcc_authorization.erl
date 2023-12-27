@@ -47,6 +47,7 @@
 -type error() ::
     {grant_type_not_supported, authorization_code}
     | par_required
+    | request_object_required
     | pkce_verifier_required
     | no_supported_code_challenge
     | oidcc_http_util:error().
@@ -119,7 +120,7 @@ redirect_params(#oidcc_client_context{client_id = ClientId} = ClientContext, Opt
             maps:get(scopes, Opts, [openid]), QueryParams3
         ),
         QueryParams5 = maybe_append_dpop_jkt(QueryParams4, ClientContext),
-        QueryParams6 = attempt_request_object(QueryParams5, ClientContext),
+        {ok, QueryParams6} ?= attempt_request_object(QueryParams5, ClientContext),
         attempt_par(QueryParams6, ClientContext, Opts)
     end.
 
@@ -205,24 +206,19 @@ maybe_append_dpop_jkt(QueryParams, _ClientContext) ->
     QueryParams :: oidcc_http_util:query_params(),
     ClientContext :: oidcc_client_context:t().
 attempt_request_object(QueryParams, #oidcc_client_context{
-    provider_configuration = #oidcc_provider_configuration{request_parameter_supported = false}
-}) ->
-    QueryParams;
-attempt_request_object(QueryParams, #oidcc_client_context{client_secret = unauthenticated}) ->
-    QueryParams;
-attempt_request_object(QueryParams, #oidcc_client_context{
     client_id = ClientId,
     client_secret = ClientSecret,
     client_jwks = ClientJwks,
     provider_configuration = #oidcc_provider_configuration{
         issuer = Issuer,
         request_parameter_supported = true,
+        require_signed_request_object = RequireSignedRequestObject,
         request_object_signing_alg_values_supported = SigningAlgSupported0,
         request_object_encryption_alg_values_supported = EncryptionAlgSupported0,
         request_object_encryption_enc_values_supported = EncryptionEncSupported0
     },
     jwks = Jwks
-}) ->
+}) when ClientSecret =/= unauthenticated ->
     SigningAlgSupported =
         case SigningAlgSupported0 of
             undefined -> [];
@@ -280,8 +276,10 @@ attempt_request_object(QueryParams, #oidcc_client_context{
     Jwt = jose_jwt:from(Claims),
 
     case oidcc_jwt_util:sign(Jwt, SigningJwks, deprioritize_none_alg(SigningAlgSupported)) of
+        {error, no_supported_alg_or_key} when RequireSignedRequestObject =:= true ->
+            {error, request_object_required};
         {error, no_supported_alg_or_key} ->
-            QueryParams;
+            {ok, QueryParams};
         {ok, SignedRequestObject} ->
             case
                 oidcc_jwt_util:encrypt(
@@ -292,11 +290,17 @@ attempt_request_object(QueryParams, #oidcc_client_context{
                 )
             of
                 {ok, EncryptedRequestObject} ->
-                    [{<<"request">>, EncryptedRequestObject} | essential_params(QueryParams)];
+                    {ok, [{<<"request">>, EncryptedRequestObject} | essential_params(QueryParams)]};
                 {error, no_supported_alg_or_key} ->
-                    [{<<"request">>, SignedRequestObject} | essential_params(QueryParams)]
+                    {ok, [{<<"request">>, SignedRequestObject} | essential_params(QueryParams)]}
             end
-    end.
+    end;
+attempt_request_object(_QueryParams, #oidcc_client_context{
+    provider_configuration = #oidcc_provider_configuration{require_signed_request_object = true}
+}) ->
+    {error, request_object_required};
+attempt_request_object(QueryParams, _ClientContext) ->
+    {ok, QueryParams}.
 
 -spec attempt_par(QueryParams, ClientContext, Opts) ->
     {ok, QueryParams} | {error, error()}

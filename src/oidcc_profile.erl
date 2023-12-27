@@ -60,28 +60,34 @@ apply_profiles(
     ),
     Opts2 = Opts1#{profiles => RestProfiles},
     Opts3 = map_put_new(trusted_audiences, [], Opts2),
-    %% TODO include <<"tls_client_auth">> here when it's supported by the library.
+    %% TODO include tls_client_auth">> here when it's supported by the library.
     Opts = map_put_new(preferred_auth_methods, [private_key_jwt], Opts3),
     apply_profiles(ClientContext, Opts);
+
 apply_profiles(
-    #oidcc_client_context{} = ClientContext0,
+    #oidcc_client_context{} = ClientContext,
     #{profiles := [fapi2_message_signing | RestProfiles]} = Opts0
 ) ->
     %% FAPI2 Message Signing:
     %% - https://openid.bitbucket.io/fapi/fapi-2_0-message- signing.html
-    ClientContext = require_signed_request_object(ClientContext0),
+
+    %% TODO force require_signed_request_object once the conformance suite can
+    %% validate it (currently, the suite fails if this is enabled)
     %% TODO limit response_mode_supported to [<<"jwt">>] once JARM is supported.
     %% This is required by the spec, but not currently by the conformance suite.
-    %% TODO require signed token introspection responses ()
+    %% TODO require signed token introspection responses
 
     %% Also require everything from FAPI2 Security Profile
     Opts = Opts0#{profiles => [fapi2_security_profile | RestProfiles]},
     apply_profiles(ClientContext, Opts);
+
 apply_profiles(#oidcc_client_context{}, #{profiles := [UnknownProfile | _]}) ->
     {error, {unknown_profile, UnknownProfile}};
+
 apply_profiles(#oidcc_client_context{} = ClientContext, #{profiles := []} = Opts0) ->
     Opts = maps:remove(profiles, Opts0),
     apply_profiles(ClientContext, Opts);
+
 apply_profiles(#oidcc_client_context{} = ClientContext, #{} = Opts) ->
     {ok, ClientContext, Opts}.
 
@@ -159,16 +165,6 @@ limit_signing_alg_values(AlgSupported, ClientContext0) ->
         ),
         authorization_signing_alg_values_supported = limit_values(AlgSupported, AuthorizationAlg),
         dpop_signing_alg_values_supported = limit_values(AlgSupported, DpopAlg)
-    },
-    ClientContext = ClientContext0#oidcc_client_context{
-        provider_configuration = ProviderConfiguration
-    },
-    ClientContext.
-
-require_signed_request_object(ClientContext0) ->
-    #oidcc_client_context{provider_configuration = ProviderConfiguration0} = ClientContext0,
-    ProviderConfiguration = ProviderConfiguration0#oidcc_provider_configuration{
-        require_signed_request_object = true
     },
     ClientContext = ClientContext0#oidcc_client_context{
         provider_configuration = ProviderConfiguration

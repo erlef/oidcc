@@ -488,6 +488,39 @@ create_redirect_url_with_missing_config_request_object_test() ->
 
     ok.
 
+create_redirect_url_with_missing_config_request_object_required_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ValidConfigString)
+    ),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        request_parameter_supported = true,
+        require_signed_request_object = true
+    },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"at_least_32_character_client_secret">>,
+
+    Jwks0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    Jwks = Jwks0#jose_jwk{fields = #{<<"use">> => <<"sig">>}},
+
+    RedirectUri = <<"https://my.server/return">>,
+
+    ClientContext =
+        oidcc_client_context:from_manual(Configuration, Jwks, ClientId, ClientSecret),
+
+    ?assertEqual(
+        {error, request_object_required},
+        oidcc_authorization:create_redirect_url(ClientContext, #{
+            redirect_uri => RedirectUri
+        })
+    ),
+
+    ok.
+
 create_redirect_url_with_request_object_only_none_alg_test() ->
     PrivDir = code:priv_dir(oidcc),
 

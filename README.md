@@ -100,8 +100,8 @@ The refactoring for `v3` and the certification is funded as an
   * [RP-Initiated](https://openid.net/specs/openid-connect-rpinitiated-1_0.html)
 * [Demonstrating Proof of Possession (DPoP)](https://www.rfc-editor.org/rfc/rfc9449)
 * Profiles
-  * [FAPI2 Security Profile](https://openid.bitbucket.io/fapi/fapi-2_0-security-profile.html)
-  * [FAPI2 Message Signing](https://openid.bitbucket.io/fapi/fapi-2_0-message- signing.html)
+  * [FAPI 2.0 Security Profile](https://openid.bitbucket.io/fapi/fapi-2_0-security-profile.html)
+  * [FAPI 2.0 Message Signing](https://openid.bitbucket.io/fapi/fapi-2_0-message-signing.html)
 
 ## Setup
 

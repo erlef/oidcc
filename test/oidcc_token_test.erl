@@ -4,6 +4,7 @@
 -include_lib("jose/include/jose_jwk.hrl").
 -include_lib("jose/include/jose_jws.hrl").
 -include_lib("jose/include/jose_jwt.hrl").
+-include_lib("oidcc/include/oidcc_client_context.hrl").
 -include_lib("oidcc/include/oidcc_provider_configuration.hrl").
 -include_lib("oidcc/include/oidcc_token.hrl").
 
@@ -1601,3 +1602,129 @@ authorization_headers_test() ->
         DpopJwtWithNonce
     ),
     ok.
+
+trusted_audiences_test() ->
+    ClientContext =
+        #oidcc_client_context{
+            client_id = ClientId,
+            jwks = Jwk,
+            provider_configuration = #oidcc_provider_configuration{issuer = Issuer}
+        } = client_context_fixture(),
+
+    ExtraAudience = <<"audience_member">>,
+    LocalEndpoint = <<"https://my.server/auth">>,
+    AuthCode = <<"1234567890">>,
+    AccessToken = <<"access_token">>,
+    Claims =
+        #{
+            <<"iss">> => Issuer,
+            <<"sub">> => <<"sub">>,
+            <<"aud">> => [ClientId, ExtraAudience],
+            <<"azp">> => ClientId,
+            <<"iat">> => erlang:system_time(second),
+            <<"exp">> => erlang:system_time(second) + 10
+        },
+
+    Jwt = jose_jwt:from(Claims),
+    Jws = #{<<"alg">> => <<"RS256">>},
+    {_Jws, Token} =
+        jose_jws:compact(
+            jose_jwt:sign(Jwk, Jws, Jwt)
+        ),
+
+    TokenData =
+        jsx:encode(#{
+            <<"access_token">> => AccessToken,
+            <<"token_type">> => <<"Bearer">>,
+            <<"id_token">> => Token,
+            <<"scope">> => <<"profile openid">>
+        }),
+
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(
+            post,
+            {_TokenEndpoint, _Header, "application/x-www-form-urlencoded", _Body},
+            _HttpOpts,
+            _Opts
+        ) ->
+            {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], TokenData}}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    ?assertMatch(
+        {ok, #oidcc_token{}},
+        oidcc_token:retrieve(
+            AuthCode,
+            ClientContext,
+            #{redirect_uri => LocalEndpoint}
+        )
+    ),
+
+    ?assertMatch(
+        {ok, #oidcc_token{}},
+        oidcc_token:retrieve(
+            AuthCode,
+            ClientContext,
+            #{redirect_uri => LocalEndpoint, trusted_audiences => any}
+        )
+    ),
+
+    ?assertMatch(
+        {ok, #oidcc_token{}},
+        oidcc_token:retrieve(
+            AuthCode,
+            ClientContext,
+            #{redirect_uri => LocalEndpoint, trusted_audiences => [ExtraAudience]}
+        )
+    ),
+
+    ?assertMatch(
+        {error, {missing_claim, {<<"aud">>, ClientId}, Claims}},
+        oidcc_token:retrieve(
+            AuthCode,
+            ClientContext,
+            #{redirect_uri => LocalEndpoint, trusted_audiences => []}
+        )
+    ),
+
+    true = meck:validate(httpc),
+
+    meck:unload(httpc),
+
+    ok.
+
+retrieve_pkce_required_test() ->
+    ClientContext = client_context_fixture(),
+    RedirectUri = <<"https://redirect.example/">>,
+
+    ?assertEqual(
+        {error, pkce_verifier_required},
+        oidcc_token:retrieve(<<"code">>, ClientContext, #{
+            redirect_uri => RedirectUri,
+            require_pkce => true
+        })
+    ),
+
+    ok.
+
+client_context_fixture() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ConfigurationBinary)
+    ),
+
+    Jwk = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    ClientJwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    ClientJwk = ClientJwk0#jose_jwk{
+        fields = #{<<"kid">> => <<"private_kid">>, <<"use">> => <<"sig">>}
+    },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+
+    oidcc_client_context:from_manual(Configuration, Jwk, ClientId, ClientSecret, #{
+        client_jwks => ClientJwk
+    }).

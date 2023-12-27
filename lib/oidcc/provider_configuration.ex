@@ -117,6 +117,7 @@ defmodule Oidcc.ProviderConfiguration do
           authorization_encryption_alg_values_supported: [String.t()] | :undefined,
           authorization_encryption_enc_values_supported: [String.t()] | :undefined,
           dpop_signing_alg_values_supported: [String.t()] | :undefined,
+          require_signed_request_object: boolean(),
           extra_fields: %{String.t() => term()}
         }
 

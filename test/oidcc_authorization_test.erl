@@ -63,6 +63,8 @@ create_redirect_url_test() ->
             }
         ),
     Opts5 = maps:merge(BaseOpts, #{pkce_verifier => <<"foo">>}),
+    Opts6 = maps:merge(Opts5, #{require_pkce => true}),
+    Opts7 = maps:merge(BaseOpts, #{require_pkce => true}),
 
     {ok, Url1} = oidcc_authorization:create_redirect_url(ClientContext, BaseOpts),
     {ok, Url2} = oidcc_authorization:create_redirect_url(ClientContext, Opts1),
@@ -72,6 +74,7 @@ create_redirect_url_test() ->
     {ok, Url6} = oidcc_authorization:create_redirect_url(ClientContext, Opts5),
     {ok, Url7} = oidcc_authorization:create_redirect_url(PkcePlainClientContext, Opts5),
     {ok, Url8} = oidcc_authorization:create_redirect_url(NoPkceClientContext, Opts5),
+    {ok, Url9} = oidcc_authorization:create_redirect_url(PkcePlainClientContext, Opts6),
 
     ExpUrl1 =
         <<"https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
@@ -104,6 +107,18 @@ create_redirect_url_test() ->
     ExpUrl8 =
         <<"https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
     ?assertEqual(ExpUrl8, iolist_to_binary(Url8)),
+
+    ?assertEqual(iolist_to_binary(Url9), iolist_to_binary(Url7)),
+
+    ?assertEqual(
+        {error, no_supported_code_challenge},
+        oidcc_authorization:create_redirect_url(NoPkceClientContext, Opts6)
+    ),
+
+    ?assertEqual(
+        {error, pkce_verifier_required},
+        oidcc_authorization:create_redirect_url(ClientContext, Opts7)
+    ),
 
     ok.
 
@@ -469,6 +484,39 @@ create_redirect_url_with_missing_config_request_object_test() ->
             <<"scope">> => <<"openid">>
         },
         QueryParams
+    ),
+
+    ok.
+
+create_redirect_url_with_missing_config_request_object_required_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ValidConfigString)
+    ),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        request_parameter_supported = true,
+        require_signed_request_object = true
+    },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"at_least_32_character_client_secret">>,
+
+    Jwks0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    Jwks = Jwks0#jose_jwk{fields = #{<<"use">> => <<"sig">>}},
+
+    RedirectUri = <<"https://my.server/return">>,
+
+    ClientContext =
+        oidcc_client_context:from_manual(Configuration, Jwks, ClientId, ClientSecret),
+
+    ?assertEqual(
+        {error, request_object_required},
+        oidcc_authorization:create_redirect_url(ClientContext, #{
+            redirect_uri => RedirectUri
+        })
     ),
 
     ok.

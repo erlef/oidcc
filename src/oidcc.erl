@@ -69,15 +69,16 @@ when
     Opts :: oidcc_authorization:opts() | oidcc_client_context:opts(),
     Uri :: uri_string:uri_string().
 create_redirect_url(ProviderConfigurationWorkerName, ClientId, ClientSecret, Opts) ->
-    {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
+    {ClientContextOpts, OtherOpts0} = extract_client_context_opts(Opts),
     maybe
-        {ok, ClientContext} ?=
+        {ok, ClientContext0} ?=
             oidcc_client_context:from_configuration_worker(
                 ProviderConfigurationWorkerName,
                 ClientId,
                 ClientSecret,
                 ClientContextOpts
             ),
+        {ok, ClientContext, OtherOpts} = oidcc_profile:apply_profiles(ClientContext0, OtherOpts0),
         oidcc_authorization:create_redirect_url(ClientContext, OtherOpts)
     end.
 
@@ -128,16 +129,19 @@ retrieve_token(
     {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
 
     RefreshJwksFun = oidcc_jwt_util:refresh_jwks_fun(ProviderConfigurationWorkerName),
-    OptsWithRefresh = maps_put_new(refresh_jwks, RefreshJwksFun, OtherOpts),
+    OptsWithRefresh0 = maps_put_new(refresh_jwks, RefreshJwksFun, OtherOpts),
 
     maybe
-        {ok, ClientContext} ?=
+        {ok, ClientContext0} ?=
             oidcc_client_context:from_configuration_worker(
                 ProviderConfigurationWorkerName,
                 ClientId,
                 ClientSecret,
                 ClientContextOpts
             ),
+        {ok, ClientContext, OptsWithRefresh} = oidcc_profile:apply_profiles(
+            ClientContext0, OptsWithRefresh0
+        ),
         oidcc_token:retrieve(AuthCode, ClientContext, OptsWithRefresh)
     end.
 
@@ -190,16 +194,17 @@ retrieve_userinfo(
     ClientSecret,
     Opts
 ) ->
-    {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
+    {ClientContextOpts, OtherOpts0} = extract_client_context_opts(Opts),
 
     maybe
-        {ok, ClientContext} ?=
+        {ok, ClientContext0} ?=
             oidcc_client_context:from_configuration_worker(
                 ProviderConfigurationWorkerName,
                 ClientId,
                 ClientSecret,
                 ClientContextOpts
             ),
+        {ok, ClientContext, OtherOpts} = oidcc_profile:apply_profiles(ClientContext0, OtherOpts0),
         oidcc_userinfo:retrieve(Token, ClientContext, OtherOpts)
     end.
 
@@ -260,16 +265,19 @@ refresh_token(
     {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
 
     RefreshJwksFun = oidcc_jwt_util:refresh_jwks_fun(ProviderConfigurationWorkerName),
-    OptsWithRefresh = maps_put_new(refresh_jwks, RefreshJwksFun, OtherOpts),
+    OptsWithRefresh0 = maps_put_new(refresh_jwks, RefreshJwksFun, OtherOpts),
 
     maybe
-        {ok, ClientContext} ?=
+        {ok, ClientContext0} ?=
             oidcc_client_context:from_configuration_worker(
                 ProviderConfigurationWorkerName,
                 ClientId,
                 ClientSecret,
                 ClientContextOpts
             ),
+        {ok, ClientContext, OptsWithRefresh} = oidcc_profile:apply_profiles(
+            ClientContext0, OptsWithRefresh0
+        ),
         oidcc_token:refresh(RefreshToken, ClientContext, OptsWithRefresh)
     end.
 
@@ -314,16 +322,17 @@ introspect_token(
     ClientSecret,
     Opts
 ) ->
-    {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
+    {ClientContextOpts, OtherOpts0} = extract_client_context_opts(Opts),
 
     maybe
-        {ok, ClientContext} ?=
+        {ok, ClientContext0} ?=
             oidcc_client_context:from_configuration_worker(
                 ProviderConfigurationWorkerName,
                 ClientId,
                 ClientSecret,
                 ClientContextOpts
             ),
+        {ok, ClientContext, OtherOpts} = oidcc_profile:apply_profiles(ClientContext0, OtherOpts0),
         oidcc_token_introspection:introspect(Token, ClientContext, OtherOpts)
     end.
 
@@ -371,16 +380,19 @@ jwt_profile_token(Subject, ProviderConfigurationWorkerName, ClientId, ClientSecr
     {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
 
     RefreshJwksFun = oidcc_jwt_util:refresh_jwks_fun(ProviderConfigurationWorkerName),
-    OptsWithRefresh = maps_put_new(refresh_jwks, RefreshJwksFun, OtherOpts),
+    OptsWithRefresh0 = maps_put_new(refresh_jwks, RefreshJwksFun, OtherOpts),
 
     maybe
-        {ok, ClientContext} ?=
+        {ok, ClientContext0} ?=
             oidcc_client_context:from_configuration_worker(
                 ProviderConfigurationWorkerName,
                 ClientId,
                 ClientSecret,
                 ClientContextOpts
             ),
+        {ok, ClientContext, OptsWithRefresh} = oidcc_profile:apply_profiles(
+            ClientContext0, OptsWithRefresh0
+        ),
         oidcc_token:jwt_profile(Subject, ClientContext, Jwk, OptsWithRefresh)
     end.
 
@@ -415,16 +427,19 @@ client_credentials_token(ProviderConfigurationWorkerName, ClientId, ClientSecret
     {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
 
     RefreshJwksFun = oidcc_jwt_util:refresh_jwks_fun(ProviderConfigurationWorkerName),
-    OptsWithRefresh = maps_put_new(refresh_jwks, RefreshJwksFun, OtherOpts),
+    OptsWithRefresh0 = maps_put_new(refresh_jwks, RefreshJwksFun, OtherOpts),
 
     maybe
-        {ok, ClientContext} ?=
+        {ok, ClientContext0} ?=
             oidcc_client_context:from_configuration_worker(
                 ProviderConfigurationWorkerName,
                 ClientId,
                 ClientSecret,
                 ClientContextOpts
             ),
+        {ok, ClientContext, OptsWithRefresh} = oidcc_profile:apply_profiles(
+            ClientContext0, OptsWithRefresh0
+        ),
         oidcc_token:client_credentials(ClientContext, OptsWithRefresh)
     end.
 
@@ -464,16 +479,17 @@ when
     ClientId :: binary(),
     Opts :: oidcc_logout:initiate_url_opts() | oidcc_client_context:unauthenticated_opts().
 initiate_logout_url(Token, ProviderConfigurationWorkerName, ClientId, Opts) ->
-    {ClientContextOpts, OtherOpts} = extract_client_context_opts(Opts),
+    {ClientContextOpts, OtherOpts0} = extract_client_context_opts(Opts),
 
     maybe
-        {ok, ClientContext} ?=
+        {ok, ClientContext0} ?=
             oidcc_client_context:from_configuration_worker(
                 ProviderConfigurationWorkerName,
                 ClientId,
                 unauthenticated,
                 ClientContextOpts
             ),
+        {ok, ClientContext, OtherOpts} = oidcc_profile:apply_profiles(ClientContext0, OtherOpts0),
         oidcc_logout:initiate_url(Token, ClientContext, OtherOpts)
     end.
 

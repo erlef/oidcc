@@ -23,7 +23,8 @@
         state => binary(),
         nonce => binary(),
         pkce_verifier => binary(),
-        redirect_uri := uri_string:uri_string(),
+        require_pkce => boolean(),
+        redirect_uri => uri_string:uri_string(),
         url_extension => oidcc_http_util:query_params()
     }.
 %% Configure authorization redirect url
@@ -38,12 +39,18 @@
 %%   <li>`nonce' - nonce to pass to the provider</li>
 %%   <li>`pkce_verifier' - pkce verifier (random string), see
 %%     [https://datatracker.ietf.org/doc/html/rfc7636#section-4.1]</li>
+%%   <li>`require_pkce' - whether to require PKCE when getting the token</li>
 %%   <li>`redirect_uri' - redirect target after authorization is completed</li>
 %%   <li>`url_extension' - add custom query parameters to the authorization url</li>
 %% </ul>
 
 -type error() ::
-    {grant_type_not_supported, authorization_code} | par_required | oidcc_http_util:error().
+    {grant_type_not_supported, authorization_code}
+    | par_required
+    | request_object_required
+    | pkce_verifier_required
+    | no_supported_code_challenge
+    | oidcc_http_util:error().
 
 %% @doc
 %% Create Auth Redirect URL
@@ -104,31 +111,35 @@ redirect_params(#oidcc_client_context{client_id = ClientId} = ClientContext, Opt
         ],
     QueryParams1 = maybe_append(<<"state">>, maps:get(state, Opts, undefined), QueryParams),
     QueryParams2 = maybe_append(<<"nonce">>, maps:get(nonce, Opts, undefined), QueryParams1),
-    QueryParams3 = append_code_challenge(
-        maps:get(pkce_verifier, Opts, none), QueryParams2, ClientContext
-    ),
-    QueryParams4 = oidcc_scope:query_append_scope(
-        maps:get(scopes, Opts, [openid]), QueryParams3
-    ),
-    QueryParams5 = maybe_append_dpop_jkt(QueryParams4, ClientContext),
-    QueryParams6 = attempt_request_object(QueryParams5, ClientContext),
-    attempt_par(QueryParams6, ClientContext, Opts).
+    maybe
+        {ok, QueryParams3} ?=
+            append_code_challenge(
+                Opts, QueryParams2, ClientContext
+            ),
+        QueryParams4 = oidcc_scope:query_append_scope(
+            maps:get(scopes, Opts, [openid]), QueryParams3
+        ),
+        QueryParams5 = maybe_append_dpop_jkt(QueryParams4, ClientContext),
+        {ok, QueryParams6} ?= attempt_request_object(QueryParams5, ClientContext),
+        attempt_par(QueryParams6, ClientContext, Opts)
+    end.
 
--spec append_code_challenge(PkceVerifier, QueryParams, ClientContext) ->
-    oidcc_http_util:query_params()
+-spec append_code_challenge(Opts, QueryParams, ClientContext) ->
+    {ok, oidcc_http_util:query_params()} | {error, error()}
 when
-    PkceVerifier :: binary() | none,
+    Opts :: opts(),
     QueryParams :: oidcc_http_util:query_params(),
     ClientContext :: oidcc_client_context:t().
-append_code_challenge(none, QueryParams, _ClientContext) ->
-    QueryParams;
-append_code_challenge(CodeVerifier, QueryParams, ClientContext) ->
+append_code_challenge(#{pkce_verifier := CodeVerifier} = Opts, QueryParams, ClientContext) ->
     #oidcc_client_context{provider_configuration = ProviderConfiguration} = ClientContext,
     #oidcc_provider_configuration{code_challenge_methods_supported = CodeChallengeMethodsSupported} =
         ProviderConfiguration,
+    RequirePkce = maps:get(require_pkce, Opts, false),
     case CodeChallengeMethodsSupported of
+        undefined when RequirePkce =:= true ->
+            {error, no_supported_code_challenge};
         undefined ->
-            QueryParams;
+            {ok, QueryParams};
         Methods when is_list(Methods) ->
             case
                 {
@@ -140,21 +151,27 @@ append_code_challenge(CodeVerifier, QueryParams, ClientContext) ->
                     CodeChallenge = base64:encode(crypto:hash(sha256, CodeVerifier), #{
                         mode => urlsafe, padding => false
                     }),
-                    [
+                    {ok, [
                         {<<"code_challenge">>, CodeChallenge},
                         {<<"code_challenge_method">>, <<"S256">>}
                         | QueryParams
-                    ];
+                    ]};
                 {false, true} ->
-                    [
+                    {ok, [
                         {<<"code_challenge">>, CodeVerifier},
                         {<<"code_challenge_method">>, <<"plain">>}
                         | QueryParams
-                    ];
+                    ]};
+                {false, false} when RequirePkce =:= true ->
+                    {error, no_supported_code_challenge};
                 {false, false} ->
-                    QueryParams
+                    {ok, QueryParams}
             end
-    end.
+    end;
+append_code_challenge(#{require_pkce := true}, _QueryParams, _ClientContext) ->
+    {error, pkce_verifier_required};
+append_code_challenge(_Opts, QueryParams, _ClientContext) ->
+    {ok, QueryParams}.
 
 -spec maybe_append(Key, Value, QueryParams) -> QueryParams when
     Key :: unicode:chardata(),
@@ -185,15 +202,11 @@ maybe_append_dpop_jkt(
 maybe_append_dpop_jkt(QueryParams, _ClientContext) ->
     QueryParams.
 
--spec attempt_request_object(QueryParams, ClientContext) -> QueryParams when
+-spec attempt_request_object(QueryParams, ClientContext) ->
+    {ok, QueryParams} | {error, error()}
+when
     QueryParams :: oidcc_http_util:query_params(),
     ClientContext :: oidcc_client_context:t().
-attempt_request_object(QueryParams, #oidcc_client_context{
-    provider_configuration = #oidcc_provider_configuration{request_parameter_supported = false}
-}) ->
-    QueryParams;
-attempt_request_object(QueryParams, #oidcc_client_context{client_secret = unauthenticated}) ->
-    QueryParams;
 attempt_request_object(QueryParams, #oidcc_client_context{
     client_id = ClientId,
     client_secret = ClientSecret,
@@ -201,12 +214,13 @@ attempt_request_object(QueryParams, #oidcc_client_context{
     provider_configuration = #oidcc_provider_configuration{
         issuer = Issuer,
         request_parameter_supported = true,
+        require_signed_request_object = RequireSignedRequestObject,
         request_object_signing_alg_values_supported = SigningAlgSupported0,
         request_object_encryption_alg_values_supported = EncryptionAlgSupported0,
         request_object_encryption_enc_values_supported = EncryptionEncSupported0
     },
     jwks = Jwks
-}) ->
+}) when ClientSecret =/= unauthenticated ->
     SigningAlgSupported =
         case SigningAlgSupported0 of
             undefined -> [];
@@ -264,8 +278,10 @@ attempt_request_object(QueryParams, #oidcc_client_context{
     Jwt = jose_jwt:from(Claims),
 
     case oidcc_jwt_util:sign(Jwt, SigningJwks, deprioritize_none_alg(SigningAlgSupported)) of
+        {error, no_supported_alg_or_key} when RequireSignedRequestObject =:= true ->
+            {error, request_object_required};
         {error, no_supported_alg_or_key} ->
-            QueryParams;
+            {ok, QueryParams};
         {ok, SignedRequestObject} ->
             case
                 oidcc_jwt_util:encrypt(
@@ -276,11 +292,17 @@ attempt_request_object(QueryParams, #oidcc_client_context{
                 )
             of
                 {ok, EncryptedRequestObject} ->
-                    [{<<"request">>, EncryptedRequestObject} | essential_params(QueryParams)];
+                    {ok, [{<<"request">>, EncryptedRequestObject} | essential_params(QueryParams)]};
                 {error, no_supported_alg_or_key} ->
-                    [{<<"request">>, SignedRequestObject} | essential_params(QueryParams)]
+                    {ok, [{<<"request">>, SignedRequestObject} | essential_params(QueryParams)]}
             end
-    end.
+    end;
+attempt_request_object(_QueryParams, #oidcc_client_context{
+    provider_configuration = #oidcc_provider_configuration{require_signed_request_object = true}
+}) ->
+    {error, request_object_required};
+attempt_request_object(QueryParams, _ClientContext) ->
+    {ok, QueryParams}.
 
 -spec attempt_par(QueryParams, ClientContext, Opts) ->
     {ok, QueryParams} | {error, error()}

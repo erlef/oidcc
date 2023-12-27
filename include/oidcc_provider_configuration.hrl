@@ -107,6 +107,8 @@
         authorization_response_iss_parameter_supported = false :: boolean(),
         %% OAuth 2.0 Demonstrating Proof of Possession (DPoP)
         dpop_signing_alg_values_supported = undefined :: [binary()] | undefined,
+        %% RFC 9101 The OAuth 2.0 Authorization Framework: JWT-Secured Authorization Request (JAR)
+        require_signed_request_object = false :: boolean(),
         %% Unknown Fields
         extra_fields = #{} :: #{binary() => term()}
     }

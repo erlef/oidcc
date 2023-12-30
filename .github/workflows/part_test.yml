@@ -94,7 +94,7 @@ jobs:
         include:
           - otp: "26.0"
             unstable: false
-          - otp: "26.1"
+          - otp: "26.2"
             unstable: false
           - otp: "master"
             unstable: true
@@ -133,7 +133,7 @@ jobs:
         include:
           - otp: "26.0"
             unstable: false
-          - otp: "26.1"
+          - otp: "26.2"
             unstable: false
           - otp: "master"
             unstable: true
@@ -172,9 +172,9 @@ jobs:
         include:
           - elixir: "1.14.5"
             unstable: false
-          - elixir: "1.15.0"
-            unstable: false
           - elixir: "1.15.7"
+            unstable: false
+          - elixir: "1.16.0"
             unstable: false
           - elixir: "main"
             unstable: true

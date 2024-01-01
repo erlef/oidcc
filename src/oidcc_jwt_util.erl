@@ -12,6 +12,8 @@
 -include_lib("jose/include/jose_jwt.hrl").
 
 -export([client_secret_oct_keys/2]).
+-export([merge_client_secret_oct_keys/3]).
+-export([decrypt_and_verify/5]).
 -export([decrypt_if_needed/4]).
 -export([encrypt/4]).
 -export([evaluate_for_all_keys/2]).
@@ -133,8 +135,10 @@ verify_claims(Claims, ExpClaims) ->
 %% @private
 -spec client_secret_oct_keys(AllowedAlgorithms, ClientSecret) -> jose_jwk:key() | none when
     AllowedAlgorithms :: [binary()] | undefined,
-    ClientSecret :: binary().
+    ClientSecret :: binary() | unauthenticated.
 client_secret_oct_keys(undefined, _ClientSecret) ->
+    none;
+client_secret_oct_keys(_AllowedAlgorithms, unauthenticated) ->
     none;
 client_secret_oct_keys(AllowedAlgorithms, ClientSecret) ->
     case
@@ -143,10 +147,23 @@ client_secret_oct_keys(AllowedAlgorithms, ClientSecret) ->
             lists:member(<<"HS512">>, AllowedAlgorithms)
     of
         true ->
-            Jwk = jose_jwk:from_oct(ClientSecret),
-            Jwk#jose_jwk{fields = maps:merge(Jwk#jose_jwk.fields, #{<<"use">> => <<"sig">>})};
+            jose_jwk:from_oct(ClientSecret);
         false ->
             none
+    end.
+
+%% @private
+-spec merge_client_secret_oct_keys(Jwks :: jose_jwk:key(), AllowedAlgorithms, ClientSecret) ->
+    jose_jwk:key()
+when
+    AllowedAlgorithms :: [binary()] | undefined,
+    ClientSecret :: binary() | unauthenticated.
+merge_client_secret_oct_keys(Jwks, AllowedAlgorithms, ClientSecret) ->
+    case client_secret_oct_keys(AllowedAlgorithms, ClientSecret) of
+        none ->
+            Jwks;
+        OctKeys ->
+            merge_jwks(Jwks, OctKeys)
     end.
 
 %% @private
@@ -232,6 +249,35 @@ sign(Jwt, Jwk, [Algorithm | RestAlgorithms], JwsFields0) ->
         _ -> sign(Jwt, Jwk, RestAlgorithms, JwsFields0)
     end.
 
+%% private
+-spec decrypt_and_verify(
+    Jwt :: binary(),
+    Jwks :: jose_jwk:key(),
+    SigningAlgs :: [binary()] | undefined,
+    EncryptionAlgs :: [binary()] | undefined,
+    EncryptionEncs :: [binary()] | undefined
+) ->
+    {ok, {#jose_jwt{}, #jose_jwe{} | #jose_jws{}}} | {error, error()}.
+decrypt_and_verify(Jwt, Jwks, SigningAlgs, EncryptionAlgs, EncryptionEncs) ->
+    %% we call jwe_peek_protected/1 before `decrypt/4' so that we can
+    %% handle unencrypted tokens in the case where SupportedAlgorithms /
+    %% SupportedEncValues are undefined (where `decrypt/4' returns
+    %% {error, no_supported_alg_or_key}).
+    case jwe_peek_protected(Jwt) of
+        {ok, Jwe} ->
+            case decrypt(Jwt, Jwks, EncryptionAlgs, EncryptionEncs) of
+                {ok, Decrypted} ->
+                    verify_decrypted_token(Decrypted, SigningAlgs, Jwe, Jwks);
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+        {error, not_encrypted} ->
+            %% signed JWT
+            verify_signature(Jwt, SigningAlgs, Jwks);
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
 %% @private
 -spec decrypt_if_needed(
     Jwt :: binary(),
@@ -241,8 +287,14 @@ sign(Jwt, Jwk, [Algorithm | RestAlgorithms], JwsFields0) ->
 ) ->
     {ok, binary()} | {error, no_supported_alg_or_key}.
 decrypt_if_needed(Jwt, Jwk, SupportedAlgorithms, SupportedEncValues) ->
-    case decrypt(Jwt, Jwk, SupportedAlgorithms, SupportedEncValues) of
-        {ok, Decrypted} -> {ok, Decrypted};
+    maybe
+        %% we call jwe_peek_protected/1 before `decrypt/4' so that we can
+        %% handle unencrypted tokens in the case where SupportedAlgorithms /
+        %% SupportedEncValues are undefined (where `decrypt/4' returns
+        %% {error, no_supported_alg_or_key}).
+        {ok, _Jwe} ?= jwe_peek_protected(Jwt),
+        decrypt(Jwt, Jwk, SupportedAlgorithms, SupportedEncValues)
+    else
         {error, not_encrypted} -> {ok, Jwt};
         {error, Reason} -> {error, Reason}
     end.
@@ -308,6 +360,8 @@ decrypt(Jwt, #jose_jwk{} = Jwk, SupportedAlgorithms, SupportedEncValues) ->
         case Jwk of
             #jose_jwk{fields = #{<<"kid">> := CmpKid}} when CmpKid =/= Kid, Kid =/= none ->
                 {error, {no_matching_key_with_kid, Kid}};
+            #jose_jwk{fields = #{<<"use">> := NotEnc}} when NotEnc =/= <<"enc">> ->
+                {error, no_matching_key};
             _ ->
                 try
                     {Token, _Jwe} = jose_jwe:block_decrypt(Jwk, Jwt),
@@ -329,6 +383,21 @@ verify_in_list(Value, List) ->
             {error, no_matching_key}
     end.
 
+verify_decrypted_token(Jwt, SigningAlgs, Jwe, Jwks) ->
+    case verify_signature(Jwt, SigningAlgs, Jwks) of
+        {ok, Result} ->
+            %% encrypted + signed (nested) JWT
+            {ok, Result};
+        {error, invalid_jwt_token} ->
+            %% encrypted JWT
+            try
+                {ok, {jose_jwt:from_binary(Jwt), Jwe}}
+            catch
+                _ -> {error, invalid_jwt_token}
+            end;
+        {error, Reason} ->
+            {error, Reason}
+    end.
 %% @private
 -spec encrypt(
     Jwt :: binary(),
@@ -359,10 +428,12 @@ encrypt(Jwt, Jwk, [_Algorithm | RestAlgorithms], SupportedEncValues, []) ->
 encrypt(Jwt, Jwk, [Algorithm | _RestAlgorithms] = SupportedAlgorithms, SupportedEncValues, [
     EncValue | RestEncValues
 ]) ->
+    JweParams0 = #{<<"alg">> => Algorithm, <<"enc">> => EncValue},
     EncryptionCallback = fun
-        (#jose_jwk{fields = #{<<"use">> := <<"enc">>} = Fields} = Key) ->
+        (#jose_jwk{fields = #{<<"use">> := NotEnc}}) when NotEnc =/= <<"enc">> ->
+            error;
+        (#jose_jwk{fields = Fields} = Key) ->
             try
-                JweParams0 = #{<<"alg">> => Algorithm, <<"enc">> => EncValue},
                 JweParams =
                     case maps:get(<<"kid">>, Fields, undefined) of
                         undefined -> JweParams0;
@@ -372,6 +443,7 @@ encrypt(Jwt, Jwk, [Algorithm | _RestAlgorithms] = SupportedAlgorithms, Supported
                 {_Jws, Token} = jose_jwe:compact(jose_jwk:block_encrypt(Jwt, Jwe, Key)),
                 {ok, Token}
             catch
+                error:undef -> error;
                 error:{not_supported, _Alg} -> error
             end;
         (_Key) ->

@@ -252,20 +252,12 @@ attempt_request_object(QueryParams, #oidcc_client_context{
             #jose_jwk{} -> oidcc_jwt_util:merge_jwks(Jwks, ClientJwks)
         end,
 
-    SigningJwks =
-        case oidcc_jwt_util:client_secret_oct_keys(SigningAlgSupported, ClientSecret) of
-            none ->
-                JwksWithClientJwks;
-            SigningOctJwk ->
-                oidcc_jwt_util:merge_jwks(JwksWithClientJwks, SigningOctJwk)
-        end,
-    EncryptionJwks =
-        case oidcc_jwt_util:client_secret_oct_keys(EncryptionAlgSupported, ClientSecret) of
-            none ->
-                JwksWithClientJwks;
-            EncryptionOctJwk ->
-                oidcc_jwt_util:merge_jwks(JwksWithClientJwks, EncryptionOctJwk)
-        end,
+    SigningJwks = oidcc_jwt_util:merge_client_secret_oct_keys(
+        JwksWithClientJwks, SigningAlgSupported, ClientSecret
+    ),
+    EncryptionJwks = oidcc_jwt_util:merge_client_secret_oct_keys(
+        JwksWithClientJwks, EncryptionAlgSupported, ClientSecret
+    ),
 
     MaxClockSkew =
         case application:get_env(oidcc, max_clock_skew) of

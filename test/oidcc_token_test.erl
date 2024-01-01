@@ -1890,6 +1890,47 @@ validate_jarm_invalid_token_test() ->
 
     ok.
 
+validate_id_token_encrypted_token_test() ->
+    #oidcc_client_context{client_id = ClientId, jwks = Jwk, provider_configuration = Configuration0} =
+        ClientContext0 = client_context_fapi2_fixture(),
+
+    #oidcc_provider_configuration{issuer = Issuer} =
+        Configuration = Configuration0#oidcc_provider_configuration{
+            token_endpoint_auth_methods_supported = [<<"private_key_jwt">>],
+            token_endpoint_auth_signing_alg_values_supported = [<<"RS256">>],
+            id_token_encryption_alg_values_supported = [<<"RSA-OAEP">>],
+            id_token_encryption_enc_values_supported = [<<"A256GCM">>]
+        },
+
+    ClientContext = ClientContext0#oidcc_client_context{provider_configuration = Configuration},
+
+    Claims =
+        #{
+            <<"iss">> => Issuer,
+            <<"sub">> => <<"sub">>,
+            <<"aud">> => ClientId,
+            <<"iat">> => erlang:system_time(second),
+            <<"exp">> => erlang:system_time(second) + 10,
+            <<"at_hash">> => <<"hrOQHuo3oE6FR82RIiX1SA">>
+        },
+
+    Jwt = jose_jwt:from(Claims),
+    Jws = #{<<"alg">> => <<"RS256">>},
+    {_Jws, Token0} =
+        jose_jws:compact(
+            jose_jwt:sign(Jwk, Jws, Jwt)
+        ),
+    Jwe = #{<<"alg">> => <<"RSA-OAEP">>, <<"enc">> => <<"A256GCM">>},
+    {_Jwe, Token} =
+        jose_jwe:compact(jose_jwk:block_encrypt(Token0, Jwe, Jwk)),
+
+    ?assertEqual(
+        {ok, Claims},
+        oidcc_token:validate_id_token(Token, ClientContext, #{})
+    ),
+
+    ok.
+
 client_context_fapi2_fixture() ->
     PrivDir = code:priv_dir(oidcc),
 
@@ -1902,7 +1943,7 @@ client_context_fapi2_fixture() ->
     Jwk = Jwk0#jose_jwk{fields = #{<<"use">> => <<"sig">>}},
     ClientJwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
     ClientJwk = ClientJwk0#jose_jwk{
-        fields = #{<<"kid">> => <<"private_kid">>, <<"use">> => <<"sig">>}
+        fields = #{<<"kid">> => <<"private_kid">>}
     },
 
     ClientId = <<"client_id">>,

@@ -207,6 +207,73 @@ jwt_test() ->
 
     ok.
 
+jwt_encrypted_not_signed_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok,
+        #oidcc_provider_configuration{} =
+            Configuration} =
+        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+
+    Jwk = jose_jwk:generate_key({rsa, 1024}),
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+
+    ClientContext = oidcc_client_context:from_manual(
+        Configuration, Jwk, ClientId, ClientSecret
+    ),
+
+    Sub = <<"123456">>,
+
+    %% iss and aud claims are only required if the token is signed; not encrypted.
+    %% https://openid.net/specs/openid-connect-core-1_0.html#rfc.section.5.3.2
+    %%  If signed, the UserInfo Response MUST contain the Claims iss (issuer)
+    %%  and aud (audience) as members. The iss value MUST be the OP's Issuer
+    %%  Identifier URL. The aud value MUST be or include the RP's Client ID
+    %%  value.
+    {_, UserinfoJwt} = jose_jwt:to_binary(#{
+        <<"name">> => <<"joe">>,
+        <<"sub">> => Sub,
+        <<"iat">> => erlang:system_time(second),
+        <<"exp">> => erlang:system_time(second) + 10
+    }),
+    UserinfoJwe = #{<<"alg">> => <<"RSA-OAEP">>, <<"enc">> => <<"A256GCM">>},
+
+    {_Jwe, HttpBody} =
+        jose_jwe:compact(
+            jose_jwk:block_encrypt(UserinfoJwt, UserinfoJwe, Jwk)
+        ),
+
+    HttpFun =
+        fun(get, {_Url, _Header}, _HttpOpts, _Opts) ->
+            {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/jwt"}], HttpBody}}
+        end,
+    ok = meck:new(httpc),
+    ok = meck:expect(httpc, request, HttpFun),
+
+    AccessToken = <<"opensesame">>,
+    Token =
+        #oidcc_token{
+            access = #oidcc_token_access{token = AccessToken},
+            id =
+                #oidcc_token_id{
+                    token = "id_token",
+                    claims = #{<<"sub">> => Sub}
+                }
+        },
+
+    ?assertMatch(
+        {ok, #{<<"name">> := <<"joe">>}},
+        oidcc_userinfo:retrieve(Token, ClientContext, #{})
+    ),
+
+    true = meck:validate(httpc),
+    meck:unload(httpc),
+
+    ok.
+
 distributed_claims_test() ->
     PrivDir = code:priv_dir(oidcc),
 

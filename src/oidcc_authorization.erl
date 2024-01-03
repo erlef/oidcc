@@ -25,7 +25,8 @@
         pkce_verifier => binary(),
         require_pkce => boolean(),
         redirect_uri => uri_string:uri_string(),
-        url_extension => oidcc_http_util:query_params()
+        url_extension => oidcc_http_util:query_params(),
+        response_mode => binary()
     }.
 %% Configure authorization redirect url
 %%
@@ -42,6 +43,7 @@
 %%   <li>`require_pkce' - whether to require PKCE when getting the token</li>
 %%   <li>`redirect_uri' - redirect target after authorization is completed</li>
 %%   <li>`url_extension' - add custom query parameters to the authorization url</li>
+%%   <li>`response_mode' - response mode to use (defaults to `<<"query">>')</li>
 %% </ul>
 
 -type error() ::
@@ -111,17 +113,24 @@ redirect_params(#oidcc_client_context{client_id = ClientId} = ClientContext, Opt
         ],
     QueryParams1 = maybe_append(<<"state">>, maps:get(state, Opts, undefined), QueryParams),
     QueryParams2 = maybe_append(<<"nonce">>, maps:get(nonce, Opts, undefined), QueryParams1),
+    QueryParams3 =
+        case maps:get(response_mode, Opts, <<"query">>) of
+            <<"query">> ->
+                QueryParams2;
+            ResponseMode when is_binary(ResponseMode) ->
+                [{<<"response_mode">>, ResponseMode} | QueryParams2]
+        end,
     maybe
-        {ok, QueryParams3} ?=
+        {ok, QueryParams4} ?=
             append_code_challenge(
-                Opts, QueryParams2, ClientContext
+                Opts, QueryParams3, ClientContext
             ),
-        QueryParams4 = oidcc_scope:query_append_scope(
-            maps:get(scopes, Opts, [openid]), QueryParams3
+        QueryParams5 = oidcc_scope:query_append_scope(
+            maps:get(scopes, Opts, [openid]), QueryParams4
         ),
-        QueryParams5 = maybe_append_dpop_jkt(QueryParams4, ClientContext),
-        {ok, QueryParams6} ?= attempt_request_object(QueryParams5, ClientContext),
-        attempt_par(QueryParams6, ClientContext, Opts)
+        QueryParams6 = maybe_append_dpop_jkt(QueryParams5, ClientContext),
+        {ok, QueryParams7} ?= attempt_request_object(QueryParams6, ClientContext),
+        attempt_par(QueryParams7, ClientContext, Opts)
     end.
 
 -spec append_code_challenge(Opts, QueryParams, ClientContext) ->

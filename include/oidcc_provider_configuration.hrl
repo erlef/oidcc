@@ -22,7 +22,7 @@
         %% OpenID Connect Discovery 1.0 / OAuth 2.0 Discovery (draft-jones-oauth-discovery-01)
         response_types_supported :: [binary()],
         %% OpenID Connect Discovery 1.0 / OAuth 2.0 Discovery (draft-jones-oauth-discovery-01)
-        response_modes_supported :: [binary()],
+        response_modes_supported = [<<"query">>, <<"fragment">>] :: [binary()],
         %% OpenID Connect Discovery 1.0 / OAuth 2.0 Discovery (draft-jones-oauth-discovery-01)
         grant_types_supported = [<<"authorization_code">>, <<"implicit">>] :: [binary()],
         %% OpenID Connect Discovery 1.0

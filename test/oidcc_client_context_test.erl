@@ -85,6 +85,7 @@ apply_profiles_fapi2_message_signing_test() ->
         #oidcc_client_context{
             provider_configuration = #oidcc_provider_configuration{
                 response_types_supported = [<<"code">>],
+                response_modes_supported = [<<"jwt">>, <<"query.jwt">>],
                 id_token_signing_alg_values_supported = [<<"EdDSA">>],
                 userinfo_signing_alg_values_supported = [
                     <<"PS256">>,

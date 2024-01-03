@@ -6,18 +6,22 @@
 
 -feature(maybe_expr, enable).
 
+-include_lib("jose/include/jose_jwe.hrl").
 -include_lib("jose/include/jose_jwk.hrl").
 -include_lib("jose/include/jose_jws.hrl").
 -include_lib("jose/include/jose_jwt.hrl").
 
 -export([client_secret_oct_keys/2]).
+-export([decrypt_if_needed/4]).
 -export([encrypt/4]).
 -export([evaluate_for_all_keys/2]).
 -export([merge_jwks/2]).
+-export([peek_payload/1]).
 -export([refresh_jwks_fun/1]).
 -export([sign/3]).
 -export([sign/4]).
 -export([verify_claims/2]).
+-export([verify_not_none_alg/1]).
 -export([verify_signature/3]).
 
 -export_type([claims/0]).
@@ -31,7 +35,9 @@
     no_matching_key
     | invalid_jwt_token
     | {no_matching_key_with_kid, Kid :: binary()}
-    | {none_alg_used, Jwt :: #jose_jwt{}, Jws :: #jose_jws{}}.
+    | none_alg_used
+    | {none_alg_used, Jwt :: #jose_jwt{}, Jws :: #jose_jws{}}
+    | not_encrypted.
 
 -type claims() :: #{binary() => term()}.
 
@@ -188,14 +194,22 @@ sign(Jwt, Jwk, [Algorithm | RestAlgorithms], JwsFields0) ->
         #jose_jws{fields = JwsFields} =
             Jws0 ?= jose_jws:from_map(JwsFields0#{<<"alg">> => Algorithm}),
         SigningCallback = fun
-            (#jose_jwk{fields = #{<<"use">> := <<"sig">>} = Fields} = Key) ->
+            (#jose_jwk{fields = Fields} = Key) when Algorithm =/= <<"none">> ->
                 %% add the kid field to the JWS signature if present
                 KidField = maps:with([<<"kid">>], Fields),
                 Jws = Jws0#jose_jws{fields = maps:merge(KidField, JwsFields)},
                 try
+                    %% ensure key is either for signatures, or not specified
+                    ok =
+                        case Fields of
+                            #{<<"use">> := <<"sig">>} -> ok;
+                            #{<<"use">> := _} -> error;
+                            #{} -> ok
+                        end,
                     {_Jws, Token} = jose_jws:compact(jose_jwt:sign(Key, Jws, Jwt)),
                     {ok, Token}
                 catch
+                    error:{badmatch, _} -> error;
                     error:not_supported -> error;
                     error:{not_supported, _Alg} -> error;
                     %% Some Keys crash if a public key is provided
@@ -216,6 +230,103 @@ sign(Jwt, Jwk, [Algorithm | RestAlgorithms], JwsFields0) ->
         {ok, Token}
     else
         _ -> sign(Jwt, Jwk, RestAlgorithms, JwsFields0)
+    end.
+
+%% @private
+-spec decrypt_if_needed(
+    Jwt :: binary(),
+    Jwk :: jose_jwk:key(),
+    SupportedAlgorithms :: [binary()] | undefined,
+    SupportedEncValues :: [binary()] | undefined
+) ->
+    {ok, binary()} | {error, no_supported_alg_or_key}.
+decrypt_if_needed(Jwt, Jwk, SupportedAlgorithms, SupportedEncValues) ->
+    case decrypt(Jwt, Jwk, SupportedAlgorithms, SupportedEncValues) of
+        {ok, Decrypted} -> {ok, Decrypted};
+        {error, not_encrypted} -> {ok, Jwt};
+        {error, Reason} -> {error, Reason}
+    end.
+
+-spec jwe_peek_protected(Jwt :: binary()) ->
+    {ok, #jose_jwe{}} | {error, not_encrypted | no_matching_key}.
+jwe_peek_protected(Jwt) ->
+    %% jose_jwt:peek_protected(Jwt) doesn't work with encrypted tokens
+    maybe
+        [ProtectedEncoded, _, _, _, _] ?= binary:split(Jwt, <<".">>, [global]),
+        Protected = jose_jwa_base64url:decode(ProtectedEncoded),
+        #jose_jwe{} = Jwe ?= jose_jwe:from(Protected),
+        {ok, Jwe}
+    else
+        [_, _, _] ->
+            {error, not_encrypted};
+        _ ->
+            {error, no_matching_key}
+    end.
+
+-spec decrypt(
+    Jwt :: binary(),
+    Jwk :: jose_jwk:key(),
+    SupportedAlgorithms :: [binary()] | undefined,
+    SupportedEncValues :: [binary()] | undefined
+) ->
+    {ok, binary()} | {error, error()}.
+decrypt(_Jwt, _Jwk, undefined, _SupportedEncValues) ->
+    {error, no_supported_alg_or_key};
+decrypt(_Jwt, _Jwk, _SupportedAlgorithms, undefined) ->
+    {error, no_supported_alg_or_key};
+decrypt(Jwt, #jose_jwk{keys = {jose_jwk_set, Keys}}, SupportedAlgorithms, SupportedEncValues) ->
+    lists:foldl(
+        fun
+            (_Key, {ok, _Res} = Acc) ->
+                Acc;
+            (Key, Acc) ->
+                case {decrypt(Jwt, Key, SupportedAlgorithms, SupportedEncValues), Acc} of
+                    {{ok, Res}, _Acc} ->
+                        {ok, Res};
+                    {_Res, {error, {no_matching_key_with_kid, Kid}}} ->
+                        {error, {no_matching_key_with_kid, Kid}};
+                    {Res, _Acc} ->
+                        Res
+                end
+        end,
+        {error, no_matching_key},
+        Keys
+    );
+decrypt(Jwt, #jose_jwk{} = Jwk, SupportedAlgorithms, SupportedEncValues) ->
+    maybe
+        {ok, Jwe} ?= jwe_peek_protected(Jwt),
+        {_, #{<<"alg">> := JwtAlg, <<"enc">> := JwtEnc}} = jose_jwe:to_map(Jwe),
+        ok ?= verify_in_list(JwtAlg, SupportedAlgorithms),
+        ok ?= verify_in_list(JwtEnc, SupportedEncValues),
+        Kid =
+            case Jwe of
+                #jose_jwe{fields = #{<<"kid">> := IntKid}} ->
+                    IntKid;
+                #jose_jwe{} ->
+                    none
+            end,
+        case Jwk of
+            #jose_jwk{fields = #{<<"kid">> := CmpKid}} when CmpKid =/= Kid, Kid =/= none ->
+                {error, {no_matching_key_with_kid, Kid}};
+            _ ->
+                try
+                    {Token, _Jwe} = jose_jwe:block_decrypt(Jwk, Jwt),
+                    {ok, Token}
+                catch
+                    error:_ when Kid =:= none ->
+                        {error, no_matching_key};
+                    error:_ ->
+                        {error, {no_matching_key_with_kid, Kid}}
+                end
+        end
+    end.
+
+verify_in_list(Value, List) ->
+    case lists:member(Value, List) of
+        true ->
+            ok;
+        false ->
+            {error, no_matching_key}
     end.
 
 %% @private
@@ -289,3 +400,22 @@ evaluate_for_all_keys(#jose_jwk{keys = {jose_jwk_set, Keys}}, Callback) ->
     );
 evaluate_for_all_keys(#jose_jwk{} = Jwk, Callback) ->
     Callback(Jwk).
+
+%% @private
+-spec verify_not_none_alg(#jose_jws{}) -> ok | {error, none_alg_used}.
+verify_not_none_alg(#jose_jws{fields = #{<<"alg">> := <<"none">>}}) ->
+    {error, none_alg_used};
+verify_not_none_alg(#jose_jws{}) ->
+    ok.
+
+%% @private
+-spec peek_payload(binary()) -> {ok, #jose_jwt{}} | {error, invalid_jwt_token}.
+peek_payload(Jwt) ->
+    try
+        {ok, jose_jwt:peek_payload(Jwt)}
+    catch
+        error:{badarg, [_Token]} ->
+            {error, invalid_jwt_token};
+        error:function_clause ->
+            {error, invalid_jwt_token}
+    end.

@@ -31,6 +31,7 @@
 -export([jwt_profile/4]).
 -export([refresh/3]).
 -export([retrieve/3]).
+-export([validate_jarm/3]).
 -export([validate_id_token/3]).
 -export([authorization_headers/4]).
 -export([authorization_headers/5]).
@@ -44,6 +45,7 @@
 -export_type([refresh_opts/0]).
 -export_type([refresh_opts_no_sub/0]).
 -export_type([retrieve_opts/0]).
+-export_type([validate_jarm_opts/0]).
 -export_type([t/0]).
 
 -type id() :: #oidcc_token_id{token :: binary(), claims :: oidcc_jwt_util:claims()}.
@@ -150,6 +152,11 @@
         request_opts => oidcc_http_util:request_opts(),
         url_extension => oidcc_http_util:query_params(),
         body_extension => oidcc_http_util:query_params()
+    }.
+
+-type validate_jarm_opts() ::
+    #{
+        trusted_audiences => [binary()] | any
     }.
 %% Options for refreshing a token
 %%
@@ -347,6 +354,120 @@ retrieve(AuthCode, ClientContext, Opts) ->
             end;
         false ->
             {error, {grant_type_not_supported, authorization_code}}
+    end.
+
+%% @doc
+%% Validate the JARM response, returning the valid claims as a map.
+%%
+%% The response was sent to the local endpoint by the OpenId Connect provider,
+%% using redirects
+%%
+%% <h2>Examples</h2>
+%%
+%% ```
+%% {ok, ClientContext} =
+%%   oidcc_client_context:from_configuration_worker(provider_name,
+%%                                                  <<"client_id">>,
+%%                                                  <<"client_secret">>),
+%%
+%% %% Get Response from Redirect
+%%
+%% {ok, #{<<"code">> := AuthCode}} =
+%%   oidcc:validate_jarm(Response, ClientContext, #{}),
+%%
+%% {ok, #oidcc_token{}} = oidcc:retrieve(AuthCode, ClientContext,
+%%   #{redirect_uri => <<"https://redirect.example/">>}.
+%% '''
+%% @end
+%% @since 3.2.0
+-spec validate_jarm(Response, ClientContext, Opts) ->
+    {ok, oidcc_jwt_util:claims()} | {error, error()}
+when
+    Response :: binary(),
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: validate_jarm_opts().
+validate_jarm(Response, ClientContext, Opts) ->
+    #oidcc_client_context{
+        provider_configuration = Configuration,
+        client_id = ClientId,
+        client_secret = ClientSecret,
+        client_jwks = ClientJwks,
+        jwks = Jwks
+    } = ClientContext,
+    #oidcc_provider_configuration{
+        issuer = Issuer,
+        authorization_signing_alg_values_supported = SigningAlgSupported0,
+        authorization_encryption_alg_values_supported = EncryptionAlgSupported0,
+        authorization_encryption_enc_values_supported = EncryptionEncSupported0
+    } =
+        Configuration,
+
+    SigningAlgSupported =
+        case SigningAlgSupported0 of
+            undefined -> [];
+            SigningAlgs -> SigningAlgs
+        end,
+    EncryptionAlgSupported =
+        case EncryptionAlgSupported0 of
+            undefined -> [];
+            EncryptionAlgs -> EncryptionAlgs
+        end,
+    EncryptionEncSupported =
+        case EncryptionEncSupported0 of
+            undefined -> [];
+            EncryptionEncs -> EncryptionEncs
+        end,
+    JwksWithClientJwks =
+        case ClientJwks of
+            none -> Jwks;
+            #jose_jwk{} -> oidcc_jwt_util:merge_jwks(Jwks, ClientJwks)
+        end,
+
+    SigningJwks =
+        case oidcc_jwt_util:client_secret_oct_keys(SigningAlgSupported, ClientSecret) of
+            none ->
+                JwksWithClientJwks;
+            SigningOctJwk ->
+                oidcc_jwt_util:merge_jwks(JwksWithClientJwks, SigningOctJwk)
+        end,
+    EncryptionJwks =
+        case oidcc_jwt_util:client_secret_oct_keys(EncryptionAlgSupported, ClientSecret) of
+            none ->
+                JwksWithClientJwks;
+            EncryptionOctJwk ->
+                oidcc_jwt_util:merge_jwks(JwksWithClientJwks, EncryptionOctJwk)
+        end,
+    %% https://openid.net/specs/oauth-v2-jarm-final.html#name-processing-rules
+    %% 1. decrypt if necessary
+    %% 2. validate <<"iss">> claim
+    %% 3. validate <<"aud">> claim
+    %% 4. validate <<"exp">> claim
+    %% 5. validate signature (valid, not <<"none">> alg)
+    %% 6. continue processing
+    maybe
+        {ok, DecryptedResponse} ?=
+            oidcc_jwt_util:decrypt_if_needed(
+                Response,
+                EncryptionJwks,
+                EncryptionAlgSupported,
+                EncryptionEncSupported
+            ),
+        ExpClaims = [
+            {<<"iss">>, Issuer}
+        ],
+        TrustedAudience = maps:get(trusted_audiences, Opts, any),
+        {ok, #jose_jwt{fields = PeekClaims}} ?=
+            oidcc_jwt_util:peek_payload(DecryptedResponse),
+        ok ?= oidcc_jwt_util:verify_claims(PeekClaims, ExpClaims),
+        ok ?= verify_aud_claim(PeekClaims, ClientId, TrustedAudience),
+        ok ?= verify_exp_claim(PeekClaims),
+        ok ?= verify_nbf_claim(PeekClaims),
+        {ok, {#jose_jwt{fields = Claims}, Jws}} ?=
+            oidcc_jwt_util:verify_signature(
+                DecryptedResponse, SigningAlgSupported, SigningJwks
+            ),
+        ok ?= oidcc_jwt_util:verify_not_none_alg(Jws),
+        {ok, Claims}
     end.
 
 %% @doc Refresh Token

@@ -1609,7 +1609,7 @@ trusted_audiences_test() ->
             client_id = ClientId,
             jwks = Jwk,
             provider_configuration = #oidcc_provider_configuration{issuer = Issuer}
-        } = client_context_fixture(),
+        } = client_context_fapi2_fixture(),
 
     ExtraAudience = <<"audience_member">>,
     LocalEndpoint = <<"https://my.server/auth">>,
@@ -1695,7 +1695,7 @@ trusted_audiences_test() ->
     ok.
 
 retrieve_pkce_required_test() ->
-    ClientContext = client_context_fixture(),
+    ClientContext = client_context_fapi2_fixture(),
     RedirectUri = <<"https://redirect.example/">>,
 
     ?assertEqual(
@@ -1708,15 +1708,198 @@ retrieve_pkce_required_test() ->
 
     ok.
 
-client_context_fixture() ->
+validate_jarm_test() ->
+    ClientContext0 = client_context_fapi2_fixture(),
+    #oidcc_client_context{
+        client_id = ClientId,
+        jwks = Jwk,
+        provider_configuration =
+            #oidcc_provider_configuration{
+                issuer = Issuer
+            }
+    } = ClientContext0,
+    EncAlgValue = <<"RSA-OAEP-256">>,
+    EncEncValue = <<"A256GCM">>,
+    EncJwk0 = jose_jwk:generate_key({rsa, 2048}),
+    EncJwk = EncJwk0#jose_jwk{fields = #{<<"use">> => <<"enc">>}},
+    ClientContext = ClientContext0#oidcc_client_context{
+        jwks = oidcc_jwt_util:merge_jwks(Jwk, EncJwk)
+    },
+    Jws = #{<<"alg">> => <<"RS256">>},
+    AuthCode = <<"123456">>,
+    JarmClaims = #{
+        <<"iss">> => Issuer,
+        <<"aud">> => ClientId,
+        <<"code">> => AuthCode,
+        <<"exp">> => erlang:system_time(second) + 10
+    },
+    {_, JarmToken0} = jose_jws:compact(
+        jose_jwt:sign(Jwk, Jws, JarmClaims)
+    ),
+    {_, JarmToken} = jose_jwe:compact(
+        jose_jwk:block_encrypt(
+            JarmToken0,
+            jose_jwe:from_map(#{<<"alg">> => EncAlgValue, <<"enc">> => EncEncValue}),
+            EncJwk
+        )
+    ),
+
+    ?assertEqual(
+        {ok, JarmClaims},
+        oidcc_token:validate_jarm(
+            JarmToken,
+            ClientContext,
+            #{}
+        )
+    ),
+
+    ok.
+
+validate_jarm_invalid_token_test() ->
+    ClientContext = client_context_fapi2_fixture(),
+    #oidcc_client_context{
+        client_id = ClientId,
+        jwks = Jwk,
+        provider_configuration =
+            #oidcc_provider_configuration{
+                issuer = Issuer
+            }
+    } = ClientContext,
+
+    Jws = #{<<"alg">> => <<"RS256">>},
+    RedirectUri = <<"https://redirect.example/">>,
+    JarmClaims = #{
+        <<"iss">> => Issuer,
+        <<"aud">> => ClientId,
+        <<"code">> => <<"123456">>,
+        <<"exp">> => erlang:system_time(second) + 10
+    },
+    JarmClaimsInvalidIssuer = JarmClaims#{
+        <<"iss">> => <<"invalid">>
+    },
+    JarmClaimsExtraAudience = JarmClaims#{
+        <<"aud">> => [ClientId, <<"extra">>]
+    },
+    JarmClaimsExpired = JarmClaims#{
+        <<"exp">> => erlang:system_time(second) - 10
+    },
+    JarmClaimsNotYetValid = JarmClaims#{
+        <<"nbf">> => erlang:system_time(second) + 10
+    },
+    {_, JarmTokenInvalidIssuer} = jose_jws:compact(
+        jose_jwt:sign(Jwk, Jws, jose_jwt:from(JarmClaimsInvalidIssuer))
+    ),
+    {_, JarmTokenExtraAudience} = jose_jws:compact(
+        jose_jwt:sign(Jwk, Jws, jose_jwt:from(JarmClaimsExtraAudience))
+    ),
+    {_, JarmTokenExpired} = jose_jws:compact(
+        jose_jwt:sign(Jwk, Jws, jose_jwt:from(JarmClaimsExpired))
+    ),
+    {_, JarmTokenNotYetValid} = jose_jws:compact(
+        jose_jwt:sign(Jwk, Jws, jose_jwt:from(JarmClaimsNotYetValid))
+    ),
+    {_, JarmTokenWrongSignature} = jose_jws:compact(
+        jose_jwt:sign(jose_jwk:generate_key({rsa, 2048}), Jws, jose_jwt:from(JarmClaims))
+    ),
+    {_, JarmTokenWrongSignatureInvalidIssuer} = jose_jws:compact(
+        jose_jwt:sign(
+            jose_jwk:generate_key({rsa, 2048}), Jws, jose_jwt:from(JarmClaimsInvalidIssuer)
+        )
+    ),
+
+    ?assertMatch(
+        {error, {missing_claim, {<<"iss">>, Issuer}, JarmClaimsInvalidIssuer}},
+        oidcc_token:validate_jarm(
+            JarmTokenInvalidIssuer,
+            ClientContext,
+            #{}
+        )
+    ),
+
+    ?assertMatch(
+        {error, {missing_claim, {<<"iss">>, Issuer}, JarmClaimsInvalidIssuer}},
+        oidcc_token:validate_jarm(
+            JarmTokenWrongSignatureInvalidIssuer,
+            ClientContext,
+            #{}
+        )
+    ),
+
+    ?assertMatch(
+        {error, {missing_claim, {<<"aud">>, ClientId}, JarmClaimsExtraAudience}},
+        oidcc_token:validate_jarm(
+            JarmTokenExtraAudience,
+            ClientContext,
+            #{trusted_audiences => []}
+        )
+    ),
+
+    ?assertMatch(
+        {ok, #{}},
+        oidcc_token:validate_jarm(
+            JarmTokenExtraAudience,
+            ClientContext,
+            #{trusted_audiences => any}
+        )
+    ),
+
+    ?assertMatch(
+        {ok, #{}},
+        oidcc_token:validate_jarm(
+            JarmTokenExtraAudience,
+            ClientContext,
+            #{trusted_audiences => [<<"extra">>]}
+        )
+    ),
+
+    ?assertMatch(
+        {error, {missing_claim, {<<"aud">>, ClientId}, JarmClaimsExtraAudience}},
+        oidcc_token:validate_jarm(
+            JarmTokenExtraAudience,
+            ClientContext,
+            #{trusted_audiences => [<<"not_extra">>]}
+        )
+    ),
+
+    ?assertMatch(
+        {error, token_expired},
+        oidcc_token:validate_jarm(
+            JarmTokenExpired,
+            ClientContext,
+            #{}
+        )
+    ),
+
+    ?assertMatch(
+        {error, token_not_yet_valid},
+        oidcc_token:validate_jarm(
+            JarmTokenNotYetValid,
+            ClientContext,
+            #{redirect_uri => RedirectUri}
+        )
+    ),
+
+    ?assertMatch(
+        {error, no_matching_key},
+        oidcc_token:validate_jarm(
+            JarmTokenWrongSignature,
+            ClientContext,
+            #{redirect_uri => RedirectUri}
+        )
+    ),
+
+    ok.
+
+client_context_fapi2_fixture() ->
     PrivDir = code:priv_dir(oidcc),
 
-    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/fapi2-metadata.json"),
     {ok, Configuration} = oidcc_provider_configuration:decode_configuration(
         jose:decode(ConfigurationBinary)
     ),
 
-    Jwk = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    Jwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    Jwk = Jwk0#jose_jwk{fields = #{<<"use">> => <<"sig">>}},
     ClientJwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
     ClientJwk = ClientJwk0#jose_jwk{
         fields = #{<<"kid">> => <<"private_kid">>, <<"use">> => <<"sig">>}

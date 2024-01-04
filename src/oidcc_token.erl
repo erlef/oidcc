@@ -23,6 +23,7 @@
 -include("oidcc_provider_configuration.hrl").
 -include("oidcc_token.hrl").
 
+-include_lib("jose/include/jose_jwe.hrl").
 -include_lib("jose/include/jose_jwk.hrl").
 -include_lib("jose/include/jose_jws.hrl").
 -include_lib("jose/include/jose_jwt.hrl").
@@ -895,13 +896,16 @@ validate_id_token(IdToken, ClientContext, any) ->
 validate_id_token(IdToken, ClientContext, Opts) when is_map(Opts) ->
     #oidcc_client_context{
         provider_configuration = Configuration,
-        jwks = #jose_jwk{} = Jwks,
+        jwks = #jose_jwk{} = Jwks0,
         client_id = ClientId,
-        client_secret = ClientSecret
+        client_secret = ClientSecret,
+        client_jwks = ClientJwks
     } =
         ClientContext,
     #oidcc_provider_configuration{
         id_token_signing_alg_values_supported = AllowAlgorithms,
+        id_token_encryption_alg_values_supported = EncryptionAlgs,
+        id_token_encryption_enc_values_supported = EncryptionEncs,
         issuer = Issuer
     } =
         Configuration,
@@ -918,19 +922,16 @@ validate_id_token(IdToken, ClientContext, Opts) when is_map(Opts) ->
                 Bin when is_binary(Bin) ->
                     [{<<"nonce">>, Nonce} | ExpClaims0]
             end,
-        JwksInclOct =
-            case ClientSecret of
-                unauthenticated ->
-                    Jwks;
-                Secret ->
-                    case oidcc_jwt_util:client_secret_oct_keys(AllowAlgorithms, Secret) of
-                        none ->
-                            Jwks;
-                        OctJwk ->
-                            oidcc_jwt_util:merge_jwks(Jwks, OctJwk)
-                    end
+        Jwks1 =
+            case ClientJwks of
+                none -> Jwks0;
+                #jose_jwk{} -> oidcc_jwt_util:merge_jwks(Jwks0, ClientJwks)
             end,
-        MaybeVerified = oidcc_jwt_util:verify_signature(IdToken, AllowAlgorithms, JwksInclOct),
+        Jwks2 = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks1, AllowAlgorithms, ClientSecret),
+        Jwks = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks2, EncryptionAlgs, ClientSecret),
+        MaybeVerified = oidcc_jwt_util:decrypt_and_verify(
+            IdToken, Jwks, AllowAlgorithms, EncryptionAlgs, EncryptionEncs
+        ),
         {ok, {#jose_jwt{fields = Claims}, Jws}} ?=
             case MaybeVerified of
                 {ok, Valid} ->
@@ -950,6 +951,8 @@ validate_id_token(IdToken, ClientContext, Opts) when is_map(Opts) ->
             #jose_jws{alg = {jose_jws_alg_none, none}} ->
                 {error, {none_alg_used, Claims}};
             #jose_jws{} ->
+                {ok, Claims};
+            #jose_jwe{} ->
                 {ok, Claims}
         end
     end.

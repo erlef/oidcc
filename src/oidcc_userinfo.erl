@@ -17,7 +17,9 @@
 -include("oidcc_provider_configuration.hrl").
 -include("oidcc_token.hrl").
 
+-include_lib("jose/include/jose_jwe.hrl").
 -include_lib("jose/include/jose_jwk.hrl").
+-include_lib("jose/include/jose_jws.hrl").
 -include_lib("jose/include/jose_jwt.hrl").
 
 -export([retrieve/3]).
@@ -188,24 +190,33 @@ validate_userinfo_body({json, Userinfo}, _ClientContext, Opts) ->
         {ExpectedSubject, #{<<"sub">> := ExpectedSubject} = Map} -> {ok, Map};
         {_, #{}} -> {error, bad_subject}
     end;
-validate_userinfo_body({jwt, UserinfoBody}, ClientContext, Opts) ->
+validate_userinfo_body({jwt, UserinfoBody}, ClientContext, Opts0) ->
     #oidcc_client_context{provider_configuration = Configuration, client_id = ClientId} =
         ClientContext,
     #oidcc_provider_configuration{issuer = Issuer} = Configuration,
-    ExpectedSubject = maps:get(expected_subject, Opts),
-    ExpectedClaims0 = [
+    ExpectedSubject = maps:get(expected_subject, Opts0),
+    %% only validate these claims if the token is signed:
+    %% https://openid.net/specs/openid-connect-core-1_0.html#rfc.section.5.3.2
+    ExpectedSignedClaims = [
         {<<"aud">>, ClientId},
         {<<"iss">>, Issuer}
     ],
     ExpectedClaims =
-        case maps:get(expected_subject, Opts) of
-            any -> ExpectedClaims0;
-            ExpectedSubject -> [{<<"sub">>, ExpectedSubject} | ExpectedClaims0]
+        case maps:get(expected_subject, Opts0) of
+            any -> [];
+            ExpectedSubject -> [{<<"sub">>, ExpectedSubject}]
         end,
+    Opts = maps:merge(
+        #{
+            expected_signed_claims => ExpectedSignedClaims,
+            expected_claims => ExpectedClaims
+        },
+        Opts0
+    ),
     validate_userinfo_token(
         UserinfoBody,
         ClientContext,
-        maps:put(expected_claims, ExpectedClaims, Opts)
+        Opts
     ).
 
 -spec validate_userinfo_token(Token, ClientContext, Opts) ->
@@ -217,45 +228,59 @@ when
         #{
             refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
             expected_subject => binary(),
+            expected_signed_claims => [{binary(), term()}],
             expected_claims => [{binary(), term()}]
         },
     Claims :: oidcc_jwt_util:claims().
 validate_userinfo_token(UserinfoToken, ClientContext, Opts) ->
     RefreshJwksFun = maps:get(refresh_jwks, Opts, undefined),
-    ExpClaims = maps:get(expected_claims, Opts, []),
     #oidcc_client_context{
         provider_configuration = Configuration,
-        jwks = #jose_jwk{} = Jwks,
+        jwks = #jose_jwk{} = Jwks0,
         client_id = ClientId,
-        client_secret = ClientSecret
+        client_secret = ClientSecret,
+        client_jwks = ClientJwks
     } =
         ClientContext,
     #oidcc_provider_configuration{
         userinfo_signing_alg_values_supported = AllowAlgorithms,
+        userinfo_encryption_alg_values_supported = EncryptionAlgs,
+        userinfo_encryption_enc_values_supported = EncryptionEncs,
         issuer = Issuer
     } =
         Configuration,
     maybe
-        JwksInclOct =
-            case ClientSecret of
-                unauthenticated ->
-                    Jwks;
-                Secret ->
-                    case oidcc_jwt_util:client_secret_oct_keys(AllowAlgorithms, Secret) of
-                        none ->
-                            Jwks;
-                        OctJwk ->
-                            oidcc_jwt_util:merge_jwks(Jwks, OctJwk)
-                    end
+        Jwks1 = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks0, AllowAlgorithms, ClientSecret),
+        Jwks2 = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks1, EncryptionAlgs, ClientSecret),
+        Jwks =
+            case ClientJwks of
+                #jose_jwk{} ->
+                    oidcc_jwt_util:merge_jwks(Jwks2, ClientJwks);
+                _ ->
+                    Jwks2
             end,
-        {ok, {#jose_jwt{fields = Claims}, _Jws}} ?=
-            oidcc_jwt_util:verify_signature(UserinfoToken, AllowAlgorithms, JwksInclOct),
+        {ok, {#jose_jwt{fields = Claims}, JwsOrJwe}} ?=
+            oidcc_jwt_util:decrypt_and_verify(
+                UserinfoToken,
+                Jwks,
+                AllowAlgorithms,
+                EncryptionAlgs,
+                EncryptionEncs
+            ),
+        ExpClaims =
+            case JwsOrJwe of
+                #jose_jws{} ->
+                    maps:get(expected_claims, Opts, []) ++
+                        maps:get(expected_signed_claims, Opts, []);
+                #jose_jwe{} ->
+                    maps:get(expected_claims, Opts, [])
+            end,
         ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),
         {ok, maps:remove(nonce, Claims)}
     else
         {error, {no_matching_key_with_kid, Kid}} when RefreshJwksFun =/= undefined ->
             maybe
-                {ok, RefreshedJwks} ?= RefreshJwksFun(Jwks, Kid),
+                {ok, RefreshedJwks} ?= RefreshJwksFun(Jwks0, Kid),
                 RefreshedClientContext = ClientContext#oidcc_client_context{jwks = RefreshedJwks},
                 validate_userinfo_token(UserinfoToken, RefreshedClientContext, Opts)
             end;

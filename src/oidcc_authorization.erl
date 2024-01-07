@@ -341,7 +341,7 @@ attempt_par(
                 issuer = Issuer,
                 token_endpoint_auth_methods_supported = SupportedAuthMethods,
                 token_endpoint_auth_signing_alg_values_supported = SigningAlgs,
-                pushed_authorization_request_endpoint = PushedAuthorizationRequestEndpoint
+                pushed_authorization_request_endpoint = PushedAuthorizationRequestEndpoint0
             }
     } = ClientContext,
     Opts
@@ -356,10 +356,10 @@ attempt_par(
     %% https://datatracker.ietf.org/doc/html/rfc9126#section-2
     %% > To address that ambiguity, the issuer identifier URL of the authorization
     %% > server according to [RFC8414] SHOULD be used as the value of the audience.
-    AuthenticationOpts = #{audience => Issuer},
+    AuthenticationOpts = maps:put(audience, Issuer, Opts),
 
     maybe
-        {ok, {Body0, Header}} ?=
+        {ok, {Body0, Header}, AuthMethod} ?=
             oidcc_auth_util:add_client_authentication(
                 QueryParams,
                 Header0,
@@ -370,6 +370,12 @@ attempt_par(
             ),
         %% ensure no duplicate parameters (such as client_id)
         Body = lists:ukeysort(1, Body0),
+        PushedAuthorizationRequestEndpoint = oidcc_auth_util:maybe_mtls_endpoint(
+            PushedAuthorizationRequestEndpoint0,
+            AuthMethod,
+            <<"pushed_authorization_request_endpoint">>,
+            ClientContext
+        ),
         Request =
             {PushedAuthorizationRequestEndpoint, Header, "application/x-www-form-urlencoded",
                 uri_string:compose_query(Body)},

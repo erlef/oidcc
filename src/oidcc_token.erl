@@ -1099,19 +1099,13 @@ retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext, Opts, TelemetryOpts, Aut
     #oidcc_client_context{provider_configuration = Configuration} =
         ClientContext,
     #oidcc_provider_configuration{
-        token_endpoint = TokenEndpoint,
+        token_endpoint = TokenEndpoint0,
         token_endpoint_auth_methods_supported = SupportedAuthMethods0,
         token_endpoint_auth_signing_alg_values_supported = SigningAlgs
     } =
         Configuration,
 
     QueryParams = maps:get(url_extension, Opts, []),
-
-    Endpoint =
-        case QueryParams of
-            [] -> TokenEndpoint;
-            _ -> [TokenEndpoint, <<"?">>, uri_string:compose_query(QueryParams)]
-        end,
 
     Header0 = [{"accept", "application/jwt, application/json"}],
 
@@ -1132,10 +1126,18 @@ retrieve_a_token(QsBodyIn, PkceVerifier, ClientContext, Opts, TelemetryOpts, Aut
                 #{}
         end,
     maybe
-        {ok, {Body, Header1}} ?=
+        {ok, {Body, Header1}, AuthMethod} ?=
             oidcc_auth_util:add_client_authentication(
                 QsBody, Header0, SupportedAuthMethods, SigningAlgs, Opts, ClientContext
             ),
+        TokenEndpoint = oidcc_auth_util:maybe_mtls_endpoint(
+            TokenEndpoint0, AuthMethod, <<"token_endpoint">>, ClientContext
+        ),
+        Endpoint =
+            case QueryParams of
+                [] -> TokenEndpoint;
+                _ -> [TokenEndpoint, <<"?">>, uri_string:compose_query(QueryParams)]
+            end,
         Header = oidcc_auth_util:add_dpop_proof_header(
             Header1, post, Endpoint, DpopOpts, ClientContext
         ),

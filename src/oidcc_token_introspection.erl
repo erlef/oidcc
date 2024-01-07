@@ -114,13 +114,13 @@ introspect(AccessToken, ClientContext, Opts) ->
     } =
         ClientContext,
     #oidcc_provider_configuration{
-        introspection_endpoint = Endpoint,
+        introspection_endpoint = Endpoint0,
         issuer = Issuer,
         introspection_endpoint_auth_methods_supported = SupportedAuthMethods,
         introspection_endpoint_auth_signing_alg_values_supported = AllowAlgorithms
     } = Configuration,
 
-    case Endpoint of
+    case Endpoint0 of
         undefined ->
             {error, introspection_not_supported};
         _ ->
@@ -140,10 +140,16 @@ introspect(AccessToken, ClientContext, Opts) ->
                         #{}
                 end,
             maybe
-                {ok, {Body, Header1}} ?=
+                {ok, {Body, Header1}, AuthMethod} ?=
                     oidcc_auth_util:add_client_authentication(
                         Body0, Header0, SupportedAuthMethods, AllowAlgorithms, Opts, ClientContext
                     ),
+                Endpoint = oidcc_auth_util:maybe_mtls_endpoint(
+                    Endpoint0,
+                    AuthMethod,
+                    <<"introspection_endpoint">>,
+                    ClientContext
+                ),
                 Header = oidcc_auth_util:add_dpop_proof_header(
                     Header1, post, Endpoint, DpopOpts, ClientContext
                 ),

@@ -636,6 +636,28 @@ uri_concatenation_test() ->
 
     ok.
 
+decode_fapi2_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, Configuration} = file:read_file(PrivDir ++ "/test/fixtures/fapi2-metadata.json"),
+    ?assertMatch(
+        {ok, #oidcc_provider_configuration{
+            issuer = <<"https://my.provider">>,
+            tls_client_certificate_bound_access_tokens = true,
+            mtls_endpoint_aliases = #{
+                <<"authorization_endpoint">> := <<"https://my.provider/tls/auth">>,
+                <<"registration_endpoint">> := <<"https://my.provider/tls/register">>,
+                <<"device_authorization_endpoint">> := <<"https://my.provider/tls/device/code">>,
+                <<"token_endpoint">> := <<"https://my.provider/tls/token">>,
+                <<"introspection_endpoint">> := <<"https://my.provider/tls/introspection">>,
+                <<"userinfo_endpoint">> := <<"https://my.provider/tls/userinfo">>
+            }
+        }},
+        oidcc_provider_configuration:decode_configuration(jose:decode(Configuration))
+    ),
+
+    ok.
+
 google_merge_json(Merge) ->
     PrivDir = code:priv_dir(oidcc),
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/google-metadata.json"),

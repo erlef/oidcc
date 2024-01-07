@@ -124,6 +124,7 @@
         authorization_response_iss_parameter_supported :: boolean(),
         dpop_signing_alg_values_supported :: [binary()] | undefined,
         require_signed_request_object :: boolean(),
+        mtls_endpoint_aliases :: #{binary() => uri_string:uri_string()},
         extra_fields :: #{binary() => term()}
     }.
 %% Record containing OpenID and OAuth 2.0 Configuration
@@ -359,7 +360,9 @@ decode_configuration(Configuration0, Opts) ->
                 authorization_response_iss_parameter_supported :=
                     AuthorizationResponseIssParameterSupported,
                 dpop_signing_alg_values_supported := DpopSigningAlgValuesSupported,
-                require_signed_request_object := RequireSignedRequestObject
+                require_signed_request_object := RequireSignedRequestObject,
+                mtls_endpoint_aliases := MtlsEndpointAliases,
+                tls_client_certificate_bound_access_tokens := TlsClientCertificateBoundAccessTokens
             },
             ExtraFields
         }} ?=
@@ -470,6 +473,13 @@ decode_configuration(Configuration0, Opts) ->
                     {optional, dpop_signing_alg_values_supported, undefined,
                         fun parse_token_signing_alg_values_no_none/2},
                     {optional, require_signed_request_object, false,
+                        fun oidcc_decode_util:parse_setting_boolean/2},
+                    {optional, mtls_endpoint_aliases, #{},
+                        case AllowUnsafeHttp of
+                            true -> fun oidcc_decode_util:parse_setting_uri_map/2;
+                            false -> fun oidcc_decode_util:parse_setting_uri_https_map/2
+                        end},
+                    {optional, tls_client_certificate_bound_access_tokens, false,
                         fun oidcc_decode_util:parse_setting_boolean/2}
                 ],
                 #{}
@@ -547,6 +557,8 @@ decode_configuration(Configuration0, Opts) ->
                 AuthorizationResponseIssParameterSupported,
             dpop_signing_alg_values_supported = DpopSigningAlgValuesSupported,
             require_signed_request_object = RequireSignedRequestObject,
+            mtls_endpoint_aliases = MtlsEndpointAliases,
+            tls_client_certificate_bound_access_tokens = TlsClientCertificateBoundAccessTokens,
             extra_fields = ExtraFields
         }}
     end.

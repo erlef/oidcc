@@ -118,6 +118,8 @@ defmodule Oidcc.ProviderConfiguration do
           authorization_encryption_enc_values_supported: [String.t()] | :undefined,
           dpop_signing_alg_values_supported: [String.t()] | :undefined,
           require_signed_request_object: boolean(),
+          mtls_endpoint_aliases: %{binary() => :uri_string.uri_string()},
+          tls_client_certificate_bound_access_tokens: boolean(),
           extra_fields: %{String.t() => term()}
         }
 

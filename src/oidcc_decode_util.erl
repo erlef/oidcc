@@ -13,6 +13,8 @@
 -export([parse_setting_number/2]).
 -export([parse_setting_uri/2]).
 -export([parse_setting_uri_https/2]).
+-export([parse_setting_uri_map/2]).
+-export([parse_setting_uri_https_map/2]).
 
 -export_type([error/0]).
 
@@ -92,6 +94,48 @@ parse_setting_uri_https(Setting, Field) when is_binary(Setting) ->
     end;
 parse_setting_uri_https(_Setting, Field) ->
     {error, {invalid_config_property, {uri_https, Field}}}.
+
+%% @private
+-spec parse_setting_uri_map(Setting :: term(), Field :: atom()) ->
+    {ok, #{binary() => uri_string:uri_string()}} | {error, error()}.
+parse_setting_uri_map(Setting, Field) ->
+    do_parse_setting_uri_map(Setting, Field, fun parse_setting_uri/2).
+
+%% @private
+-spec parse_setting_uri_https_map(Setting :: term(), Field :: atom()) ->
+    {ok, #{binary() => uri_string:uri_string()}} | {error, error()}.
+parse_setting_uri_https_map(Setting, Field) ->
+    do_parse_setting_uri_map(Setting, Field, fun parse_setting_uri_https/2).
+
+do_parse_setting_uri_map(#{} = Setting, Field, Parser) ->
+    SettingList = maps:to_list(Setting),
+    case
+        lists:foldl(
+            fun
+                (_Elem, {error, Reason}) ->
+                    {error, Reason};
+                ({BinKey, Value}, {ok, Acc}) when is_binary(BinKey) ->
+                    case Parser(Value, Field) of
+                        {ok, SettingValue} ->
+                            {ok, [{BinKey, SettingValue} | Acc]};
+                        {error, Reason} ->
+                            {error, Reason}
+                    end;
+                (_, _) ->
+                    {error, {invalid_config_property, {uri_map, Field}}}
+            end,
+
+            {ok, []},
+            SettingList
+        )
+    of
+        {ok, ParsedList} ->
+            {ok, maps:from_list(ParsedList)};
+        {error, Reason} ->
+            {error, Reason}
+    end;
+do_parse_setting_uri_map(_Setting, Field, _Parser) ->
+    {error, {invalid_config_property, {uri_map, Field}}}.
 
 %% @private
 -spec parse_setting_binary(Setting :: term(), Field :: atom()) ->

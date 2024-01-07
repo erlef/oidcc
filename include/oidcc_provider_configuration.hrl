@@ -109,6 +109,10 @@
         dpop_signing_alg_values_supported = undefined :: [binary()] | undefined,
         %% RFC 9101 The OAuth 2.0 Authorization Framework: JWT-Secured Authorization Request (JAR)
         require_signed_request_object = false :: boolean(),
+        %% RFC 8705 OAuth 2.0 Mutual-TLS Client Authentication and Certificate-Bound Access Tokens
+        mtls_endpoint_aliases = #{} :: #{binary() => uri_string:uri_string()},
+        %% RFC 8705 OAuth 2.0 Mutual-TLS Client Authentication and Certificate-Bound Access Tokens
+        tls_client_certificate_bound_access_tokens = false :: boolean(),
         %% Unknown Fields
         extra_fields = #{} :: #{binary() => term()}
     }

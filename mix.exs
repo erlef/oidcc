@@ -23,7 +23,11 @@ defmodule Oidcc.Mixfile do
     ]
   end
 
-  def application, do: [extra_applications: extra_applications(Mix.env())]
+  def application,
+    do: [
+      mod: {:oidcc_app, []},
+      extra_applications: extra_applications(Mix.env())
+    ]
 
   defp extra_applications(env)
   defp extra_applications(:dev), do: [:inets, :ssl, :edoc, :xmerl]

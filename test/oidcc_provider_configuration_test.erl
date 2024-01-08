@@ -593,7 +593,7 @@ document_overrides_quirk_test() ->
 uri_concatenation_test() ->
     ok = meck:new(httpc, [no_link]),
     HttpFun =
-        fun(get, {ReqEndpoint, _Header}, _HttpOpts, _Opts) ->
+        fun(get, {ReqEndpoint, _Header}, _HttpOpts, _Opts, _Profile) ->
             self() ! {req, ReqEndpoint},
 
             {ok, {{"HTTP/1.1", 501, "Not Implemented"}, [], ""}}

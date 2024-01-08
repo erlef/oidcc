@@ -26,7 +26,7 @@ json_test() ->
     BadSub = <<"123789">>,
 
     HttpFun =
-        fun(get, {Url, _Header}, _HttpOpts, _Opts) ->
+        fun(get, {Url, _Header}, _HttpOpts, _Opts, _Profile) ->
             Url = UserInfoEndpoint,
             {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], HttpBody}}
         end,
@@ -141,7 +141,7 @@ jwt_test() ->
         ),
 
     HttpFun =
-        fun(get, {Url, _Header}, _HttpOpts, _Opts) ->
+        fun(get, {Url, _Header}, _HttpOpts, _Opts, _Profile) ->
             Url = UserInfoEndpoint,
             {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/jwt"}], HttpBody}}
         end,
@@ -247,7 +247,7 @@ jwt_encrypted_not_signed_test() ->
         ),
 
     HttpFun =
-        fun(get, {_Url, _Header}, _HttpOpts, _Opts) ->
+        fun(get, {_Url, _Header}, _HttpOpts, _Opts, _Profile) ->
             {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/jwt"}], HttpBody}}
         end,
     ok = meck:new(httpc),
@@ -641,7 +641,7 @@ dpop_proof_test() ->
     ),
 
     HttpFun =
-        fun(get, {Url, Header}, _HttpOpts, _Opts) ->
+        fun(get, {Url, Header}, _HttpOpts, _Opts, _Profile) ->
             Url = UserInfoEndpoint,
             {_, Authorization} =
                 proplists:lookup("authorization", Header),
@@ -742,7 +742,7 @@ dpop_proof_case_insensitive_token_type_test() ->
     AccessToken = <<"opensesame">>,
 
     HttpFun =
-        fun(get, {Url, Header}, _HttpOpts, _Opts) ->
+        fun(get, {Url, Header}, _HttpOpts, _Opts, _Profile) ->
             Url = UserInfoEndpoint,
             {_, Authorization} =
                 proplists:lookup("authorization", Header),
@@ -816,7 +816,7 @@ dpop_proof_with_nonce_test() ->
     }),
 
     HttpFun =
-        fun(get, {Url, Header}, _HttpOpts, _Opts) ->
+        fun(get, {Url, Header}, _HttpOpts, _Opts, _Profile) ->
             Url = UserInfoEndpoint,
             {_, Authorization} =
                 proplists:lookup("authorization", Header),
@@ -933,7 +933,7 @@ dpop_proof_with_invalid_nonce_test() ->
     }),
 
     HttpFun =
-        fun(get, _UrlHeader, _HttpOpts, _Opts) ->
+        fun(get, _UrlHeader, _HttpOpts, _Opts, _Profile) ->
             {ok, {
                 {"HTTP/1.1", 400, "Bad Request"},
                 [{"content-type", "application/json"}, {"dpop-nonce", DpopNonce}],

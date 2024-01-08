@@ -739,7 +739,8 @@ create_redirect_url_with_par_url_test() ->
             post,
             {ReqParEndpoint, Header, "application/x-www-form-urlencoded", Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             ?assertMatch(<<"https://my.server/par">>, ReqParEndpoint),
             ?assertMatch(none, proplists:lookup("authorization", Header)),
@@ -838,7 +839,8 @@ create_redirect_url_with_par_error_when_required_test() ->
             post,
             {_Endpoint, _Header, _ContentType, _Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             {ok, {{"HTTP/1.1", 400, "OK"}, [{"content-type", "application/json"}], ParResponseData}}
         end,
@@ -892,7 +894,8 @@ create_redirect_url_with_par_invalid_response_test() ->
             post,
             {_Endpoint, _Header, _ContentType, _Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             {ok, {{"HTTP/1.1", 201, "OK"}, [{"content-type", "application/json"}], ParResponseData}}
         end,
@@ -957,7 +960,8 @@ create_redirect_url_with_par_client_secret_jwt_request_object_test() ->
             post,
             {_Endpoint, _Header, "application/x-www-form-urlencoded", Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             BodyParsed = uri_string:dissect_query(Body),
             BodyMap = maps:from_list(BodyParsed),

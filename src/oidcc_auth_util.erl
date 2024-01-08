@@ -32,7 +32,7 @@
 -spec add_client_authentication(
     QueryList, Header, SupportedAuthMethods, AllowAlgorithms, Opts, ClientContext
 ) ->
-    {ok, {oidcc_http_util:query_params(), [oidcc_http_util:http_header()]}}
+    {ok, {oidcc_http_util:query_params(), [oidcc_http_util:http_header()]}, auth_method()}
     | {error, error()}
 when
     QueryList :: oidcc_http_util:query_params(),

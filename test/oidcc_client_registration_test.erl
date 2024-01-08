@@ -46,7 +46,8 @@ register_test() ->
             post,
             {ReqEndpoint, _Header, "application/json", Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             RegistrationEndpoint = ReqEndpoint,
 
@@ -164,7 +165,8 @@ registration_invalid_response_test() ->
             post,
             {ReqEndpoint, _Header, "application/json", Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             RegistrationEndpoint = ReqEndpoint,
 

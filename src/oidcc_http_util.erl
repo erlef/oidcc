@@ -92,10 +92,10 @@ request(Method, Request, TelemetryOpts, RequestOpts) ->
     SslOpts = maps:get(ssl, RequestOpts, undefined),
 
     HttpOpts0 = [{timeout, Timeout}],
-    HttpOpts =
+    {HttpOpts, HttpProfile} =
         case SslOpts of
-            undefined -> HttpOpts0;
-            _Opts -> [{ssl, SslOpts} | HttpOpts0]
+            undefined -> {HttpOpts0, default};
+            _Opts -> {[{ssl, SslOpts} | HttpOpts0], oidcc_app:httpc_profile()}
         end,
 
     telemetry:span(
@@ -108,7 +108,8 @@ request(Method, Request, TelemetryOpts, RequestOpts) ->
                         Method,
                         Request,
                         HttpOpts,
-                        [{body_format, binary}]
+                        [{body_format, binary}],
+                        HttpProfile
                     ),
                 {ok, BodyAndFormat} ?= extract_successful_response(Response),
                 {{ok, {BodyAndFormat, Headers}}, TelemetryExtraMeta}

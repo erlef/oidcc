@@ -73,6 +73,19 @@ client_cert(_Config) ->
             keyfile => KeyFile
         }
     ],
+
+    ?assertMatch(
+        {error, {http_error, 403, <<"">>}},
+        oidcc_http_util:request(
+            get, {"https://certauth.idrix.fr/json/", []}, telemetry_opts(), #{
+                ssl => [
+                    {verify, verify_peer},
+                    {cacerts, public_key:cacerts_get()}
+                ]
+            }
+        )
+    ),
+
     ?assertMatch(
         {ok, {
             {json, #{

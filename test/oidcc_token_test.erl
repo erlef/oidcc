@@ -1947,6 +1947,73 @@ validate_id_token_encrypted_token_test() ->
 
     ok.
 
+validate_jwt_test() ->
+    #oidcc_client_context{
+        client_id = ClientId,
+        jwks = Jwk,
+        provider_configuration = #oidcc_provider_configuration{issuer = Issuer}
+    } =
+        ClientContext = client_context_fapi2_fixture(),
+
+    GoodClaims =
+        #{
+            <<"iss">> => Issuer,
+            <<"aud">> => ClientId,
+            <<"sub">> => <<"1234">>,
+            <<"iat">> => erlang:system_time(second),
+            <<"exp">> => erlang:system_time(second) + 10
+        },
+    Expired = GoodClaims#{<<"exp">> => erlang:system_time(second) - 1},
+    NotYetValid = GoodClaims#{<<"nbf">> => erlang:system_time(second) + 5},
+    WrongIssuer = GoodClaims#{<<"iss">> => <<"wrong">>},
+    WrongAudience = GoodClaims#{<<"aud">> => <<"wrong">>},
+
+    JwtFun = fun(Claims) ->
+        Jwt = jose_jwt:from(Claims),
+        Jws = #{<<"alg">> => <<"RS256">>},
+        {_Jws, Token} =
+            jose_jws:compact(
+                jose_jwt:sign(Jwk, Jws, Jwt)
+            ),
+        Token
+    end,
+
+    Opts = #{
+        signing_algs => [<<"RS256">>]
+    },
+
+    ?assertEqual(
+        {ok, GoodClaims},
+        oidcc_token:validate_jwt(JwtFun(GoodClaims), ClientContext, Opts)
+    ),
+
+    ?assertEqual(
+        {error, token_expired},
+        oidcc_token:validate_jwt(JwtFun(Expired), ClientContext, Opts)
+    ),
+
+    ?assertEqual(
+        {error, token_not_yet_valid},
+        oidcc_token:validate_jwt(JwtFun(NotYetValid), ClientContext, Opts)
+    ),
+
+    ?assertEqual(
+        {error, {missing_claim, {<<"iss">>, Issuer}, WrongIssuer}},
+        oidcc_token:validate_jwt(JwtFun(WrongIssuer), ClientContext, Opts)
+    ),
+
+    ?assertEqual(
+        {error, {missing_claim, {<<"aud">>, ClientId}, WrongAudience}},
+        oidcc_token:validate_jwt(JwtFun(WrongAudience), ClientContext, Opts)
+    ),
+
+    ?assertEqual(
+        {error, no_matching_key},
+        oidcc_token:validate_jwt(JwtFun(WrongAudience), ClientContext, #{})
+    ),
+
+    ok.
+
 client_context_fapi2_fixture() ->
     PrivDir = code:priv_dir(oidcc),
 

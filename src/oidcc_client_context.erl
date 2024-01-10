@@ -179,7 +179,7 @@ from_manual(Configuration, Jwks, ClientId, ClientSecret) ->
 %%
 %% #oidcc_client_context{} =
 %%   oidcc_client_context:from_manual(
-%%     Metdata,
+%%     Metadata,
 %%     Jwks,
 %%     <<"client_id">>,
 %%     <<"client_secret">>,

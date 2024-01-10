@@ -41,7 +41,7 @@
 %% </ul>
 
 %% @doc
-%% Initiate URI for Relaying Party initated Logout
+%% Initiate URI for Relaying Party initiated Logout
 %%
 %% See [https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout]
 %%

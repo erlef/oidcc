@@ -444,7 +444,7 @@ client_credentials_token(ProviderConfigurationWorkerName, ClientId, ClientSecret
     end.
 
 %% @doc
-%% Create Initiate URI for Relaying Party initated Logout
+%% Create Initiate URI for Relaying Party initiated Logout
 %%
 %% See [https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout]
 %%

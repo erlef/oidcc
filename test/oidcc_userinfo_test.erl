@@ -277,7 +277,7 @@ jwt_encrypted_not_signed_test() ->
 distributed_claims_test() ->
     PrivDir = code:priv_dir(oidcc),
 
-    %% Enable none algorythm for test
+    %% Enable none algorithm for test
     jose:unsecured_signing(true),
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
@@ -374,7 +374,7 @@ distributed_claims_test() ->
 distributed_claims_invalid_json_resp_test() ->
     PrivDir = code:priv_dir(oidcc),
 
-    %% Enable none algorythm for test
+    %% Enable none algorithm for test
     jose:unsecured_signing(true),
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
@@ -456,7 +456,7 @@ distributed_claims_invalid_json_resp_test() ->
 distributed_claims_http_error_resp_test() ->
     PrivDir = code:priv_dir(oidcc),
 
-    %% Enable none algorythm for test
+    %% Enable none algorithm for test
     jose:unsecured_signing(true),
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
@@ -538,7 +538,7 @@ distributed_claims_http_error_resp_test() ->
 distributed_claims_invalid_source_mapping_test() ->
     PrivDir = code:priv_dir(oidcc),
 
-    %% Enable none algorythm for test
+    %% Enable none algorithm for test
     jose:unsecured_signing(true),
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),

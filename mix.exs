@@ -25,7 +25,6 @@ defmodule Oidcc.Mixfile do
 
   def application,
     do: [
-      mod: {:oidcc_app, []},
       extra_applications: extra_applications(Mix.env())
     ]
 

@@ -28,7 +28,8 @@
 
 -type request_opts() :: #{
     timeout => timeout(),
-    ssl => [ssl:tls_option()]
+    ssl => [ssl:tls_option()],
+    httpc_profile => atom() | pid()
 }.
 %% See {@link httpc:request/5}
 %%
@@ -85,32 +86,18 @@ when
             Accumulator :: term()},
     TelemetryOpts :: telemetry_opts(),
     RequestOpts :: request_opts().
-request(Method, Request0, TelemetryOpts, RequestOpts) ->
+request(Method, Request, TelemetryOpts, RequestOpts) ->
     TelemetryTopic = maps:get(topic, TelemetryOpts),
     TelemetryExtraMeta = maps:get(extra_meta, TelemetryOpts, #{}),
     Timeout = maps:get(timeout, RequestOpts, timer:minutes(1)),
     SslOpts = maps:get(ssl, RequestOpts, undefined),
+    HttpProfile = maps:get(httpc_profile, RequestOpts, default),
 
     HttpOpts0 = [{timeout, Timeout}],
     HttpOpts =
         case SslOpts of
             undefined -> HttpOpts0;
             _Opts -> [{ssl, SslOpts} | HttpOpts0]
-        end,
-
-    %% if we're using special SSL opts, always close the connection after we're
-    %% done. we do this to work around an issue with httpc where it doesn't take
-    %% the client certificates into account when pipelining, so if the HTTP
-    %% implementation changes we should think about undoing this.
-    {Request, HttpProfile} =
-        case using_client_certificate(SslOpts) of
-            false ->
-                {Request0, default};
-            true ->
-                ReqHeaders0 = element(2, Request0),
-                ReqHeaders1 = [{"connection", "close"} | ReqHeaders0],
-                ReqHeaders = lists:ukeysort(1, ReqHeaders1),
-                {setelement(2, Request0, ReqHeaders), oidcc_app:httpc_profile()}
         end,
 
     telemetry:span(
@@ -181,21 +168,3 @@ fetch_content_type(Headers) ->
         _Other ->
             unknown
     end.
-
--spec using_client_certificate([ssl:tls_client_option()] | undefined) -> boolean().
-using_client_certificate(undefined) ->
-    false;
-using_client_certificate(SslOpts) ->
-    lists:foldl(
-        fun
-            (_, true) -> true;
-            ({key, _}, _) -> true;
-            ({keyfile, _}, _) -> true;
-            ({cert, _}, _) -> true;
-            ({certfile, _}, _) -> true;
-            ({certs_keys, _}, _) -> true;
-            (_, Acc) -> Acc
-        end,
-        false,
-        SslOpts
-    ).

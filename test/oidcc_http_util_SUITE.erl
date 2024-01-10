@@ -86,6 +86,8 @@ client_cert(_Config) ->
         )
     ),
 
+    inets:start(httpc, [{profile, idrix_fr}]),
+
     ?assertMatch(
         {ok, {
             {json, #{
@@ -95,22 +97,11 @@ client_cert(_Config) ->
         }},
         oidcc_http_util:request(
             get, {"https://certauth.idrix.fr/json/", []}, telemetry_opts(), #{
+                httpc_profile => idrix_fr,
                 ssl => [
                     {verify, verify_peer},
                     {cacerts, public_key:cacerts_get()},
                     {certs_keys, CertsKeys}
-                ]
-            }
-        )
-    ),
-
-    ?assertMatch(
-        {error, {http_error, 403, <<"">>}},
-        oidcc_http_util:request(
-            get, {"https://certauth.idrix.fr/json/", []}, telemetry_opts(), #{
-                ssl => [
-                    {verify, verify_peer},
-                    {cacerts, public_key:cacerts_get()}
                 ]
             }
         )

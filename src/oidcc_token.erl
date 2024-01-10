@@ -393,51 +393,28 @@ validate_jarm(Response, ClientContext, Opts) ->
         client_id = ClientId,
         client_secret = ClientSecret,
         client_jwks = ClientJwks,
-        jwks = Jwks
+        jwks = Jwks0
     } = ClientContext,
     #oidcc_provider_configuration{
         issuer = Issuer,
-        authorization_signing_alg_values_supported = SigningAlgSupported0,
-        authorization_encryption_alg_values_supported = EncryptionAlgSupported0,
-        authorization_encryption_enc_values_supported = EncryptionEncSupported0
+        authorization_signing_alg_values_supported = SigningAlgSupported,
+        authorization_encryption_alg_values_supported = EncryptionAlgSupported,
+        authorization_encryption_enc_values_supported = EncryptionEncSupported
     } =
         Configuration,
 
-    SigningAlgSupported =
-        case SigningAlgSupported0 of
-            undefined -> [];
-            SigningAlgs -> SigningAlgs
-        end,
-    EncryptionAlgSupported =
-        case EncryptionAlgSupported0 of
-            undefined -> [];
-            EncryptionAlgs -> EncryptionAlgs
-        end,
-    EncryptionEncSupported =
-        case EncryptionEncSupported0 of
-            undefined -> [];
-            EncryptionEncs -> EncryptionEncs
-        end,
-    JwksWithClientJwks =
+    Jwks1 =
         case ClientJwks of
-            none -> Jwks;
-            #jose_jwk{} -> oidcc_jwt_util:merge_jwks(Jwks, ClientJwks)
+            none -> Jwks0;
+            #jose_jwk{} -> oidcc_jwt_util:merge_jwks(Jwks0, ClientJwks)
         end,
 
-    SigningJwks =
-        case oidcc_jwt_util:client_secret_oct_keys(SigningAlgSupported, ClientSecret) of
-            none ->
-                JwksWithClientJwks;
-            SigningOctJwk ->
-                oidcc_jwt_util:merge_jwks(JwksWithClientJwks, SigningOctJwk)
-        end,
-    EncryptionJwks =
-        case oidcc_jwt_util:client_secret_oct_keys(EncryptionAlgSupported, ClientSecret) of
-            none ->
-                JwksWithClientJwks;
-            EncryptionOctJwk ->
-                oidcc_jwt_util:merge_jwks(JwksWithClientJwks, EncryptionOctJwk)
-        end,
+    Jwks2 = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks1, SigningAlgSupported, ClientSecret),
+    Jwks = oidcc_jwt_util:merge_client_secret_oct_keys(
+        Jwks2, EncryptionAlgSupported, ClientSecret
+    ),
+    ExpClaims = [{<<"iss">>, Issuer}],
+    TrustedAudience = maps:get(trusted_audiences, Opts, any),
     %% https://openid.net/specs/oauth-v2-jarm-final.html#name-processing-rules
     %% 1. decrypt if necessary
     %% 2. validate <<"iss">> claim
@@ -446,27 +423,14 @@ validate_jarm(Response, ClientContext, Opts) ->
     %% 5. validate signature (valid, not <<"none">> alg)
     %% 6. continue processing
     maybe
-        {ok, DecryptedResponse} ?=
-            oidcc_jwt_util:decrypt_if_needed(
-                Response,
-                EncryptionJwks,
-                EncryptionAlgSupported,
-                EncryptionEncSupported
-            ),
-        ExpClaims = [
-            {<<"iss">>, Issuer}
-        ],
-        TrustedAudience = maps:get(trusted_audiences, Opts, any),
-        {ok, #jose_jwt{fields = PeekClaims}} ?=
-            oidcc_jwt_util:peek_payload(DecryptedResponse),
-        ok ?= oidcc_jwt_util:verify_claims(PeekClaims, ExpClaims),
-        ok ?= verify_aud_claim(PeekClaims, ClientId, TrustedAudience),
-        ok ?= verify_exp_claim(PeekClaims),
-        ok ?= verify_nbf_claim(PeekClaims),
         {ok, {#jose_jwt{fields = Claims}, Jws}} ?=
-            oidcc_jwt_util:verify_signature(
-                DecryptedResponse, SigningAlgSupported, SigningJwks
+            oidcc_jwt_util:decrypt_and_verify(
+                Response, Jwks, SigningAlgSupported, EncryptionAlgSupported, EncryptionEncSupported
             ),
+        ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),
+        ok ?= verify_aud_claim(Claims, ClientId, TrustedAudience),
+        ok ?= verify_exp_claim(Claims),
+        ok ?= verify_nbf_claim(Claims),
         ok ?= oidcc_jwt_util:verify_not_none_alg(Jws),
         {ok, Claims}
     end.

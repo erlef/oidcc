@@ -14,7 +14,6 @@
 -export([client_secret_oct_keys/2]).
 -export([merge_client_secret_oct_keys/3]).
 -export([decrypt_and_verify/5]).
--export([decrypt_if_needed/4]).
 -export([encrypt/4]).
 -export([evaluate_for_all_keys/2]).
 -export([merge_jwks/2]).
@@ -276,27 +275,6 @@ decrypt_and_verify(Jwt, Jwks, SigningAlgs, EncryptionAlgs, EncryptionEncs) ->
             verify_signature(Jwt, SigningAlgs, Jwks);
         {error, Reason} ->
             {error, Reason}
-    end.
-
-%% @private
--spec decrypt_if_needed(
-    Jwt :: binary(),
-    Jwk :: jose_jwk:key(),
-    SupportedAlgorithms :: [binary()] | undefined,
-    SupportedEncValues :: [binary()] | undefined
-) ->
-    {ok, binary()} | {error, no_supported_alg_or_key}.
-decrypt_if_needed(Jwt, Jwk, SupportedAlgorithms, SupportedEncValues) ->
-    maybe
-        %% we call jwe_peek_protected/1 before `decrypt/4' so that we can
-        %% handle unencrypted tokens in the case where SupportedAlgorithms /
-        %% SupportedEncValues are undefined (where `decrypt/4' returns
-        %% {error, no_supported_alg_or_key}).
-        {ok, _Jwe} ?= jwe_peek_protected(Jwt),
-        decrypt(Jwt, Jwk, SupportedAlgorithms, SupportedEncValues)
-    else
-        {error, not_encrypted} -> {ok, Jwt};
-        {error, Reason} -> {error, Reason}
     end.
 
 -spec jwe_peek_protected(Jwt :: binary()) ->

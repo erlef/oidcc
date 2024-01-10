@@ -1817,7 +1817,7 @@ validate_jarm_invalid_token_test() ->
     ),
 
     ?assertMatch(
-        {error, {missing_claim, {<<"iss">>, Issuer}, JarmClaimsInvalidIssuer}},
+        {error, no_matching_key},
         oidcc_token:validate_jarm(
             JarmTokenWrongSignatureInvalidIssuer,
             ClientContext,

@@ -42,7 +42,7 @@ defmodule Oidcc.ClientRegistration do
   alias Oidcc.ProviderConfiguration
 
   @typedoc """
-  Client Metdata Struct
+  Client Metadata Struct
 
   See https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata and
   https://openid.net/specs/openid-connect-rpinitiated-1_0.html#ClientMetadata

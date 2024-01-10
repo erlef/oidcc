@@ -68,7 +68,7 @@ defmodule Oidcc do
       ...>     issuer: "https://api.login.yahoo.com"
       ...>   })
       ...>
-      ...> # Get auth_code fromm redirect
+      ...> # Get auth_code from redirect
       ...> auth_code = "auth_code"
       ...>
       ...> Oidcc.retrieve_token(
@@ -111,7 +111,7 @@ defmodule Oidcc do
       ...>     issuer: "https://api.login.yahoo.com"
       ...>   })
       ...>
-      ...> # Get refresh_token fromm redirect
+      ...> # Get refresh_token from redirect
       ...> refresh_token = "refresh_token"
       ...>
       ...> Oidcc.refresh_token(
@@ -354,7 +354,7 @@ defmodule Oidcc do
       |> Oidcc.Token.normalize_token_response()
 
   @doc """
-  Create Initiate URI for Relaying Party initated Logout
+  Create Initiate URI for Relaying Party initiated Logout
 
   See [https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout]
 

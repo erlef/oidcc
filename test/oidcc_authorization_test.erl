@@ -578,7 +578,7 @@ create_redirect_url_with_request_object_only_none_alg_test() ->
 create_redirect_url_with_request_object_only_none_alg_unsecured_test() ->
     PrivDir = code:priv_dir(oidcc),
 
-    %% Enable none algorythm for test
+    %% Enable none algorithm for test
     jose:unsecured_signing(true),
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),

@@ -136,7 +136,7 @@ defmodule Oidcc.Token do
       ...>     "client_secret"
       ...>   )
       ...>
-      ...> # Get auth_code fromm redirect
+      ...> # Get auth_code from redirect
       ...> auth_code = "auth_code"
       ...>
       ...> Oidcc.Token.retrieve(
@@ -182,7 +182,7 @@ defmodule Oidcc.Token do
       ...>     "client_secret"
       ...>   )
       ...>
-      ...> # Get auth_code fromm redirect
+      ...> # Get auth_code from redirect
       ...> response = "JWT"
       ...>
       ...> Oidcc.Token.validate_jarm(
@@ -226,7 +226,7 @@ defmodule Oidcc.Token do
       ...>     "client_secret"
       ...>   )
       ...>
-      ...> # Get refresh_token fromm redirect
+      ...> # Get refresh_token from redirect
       ...> refresh_token = "refresh_token"
       ...>
       ...> Oidcc.Token.refresh(

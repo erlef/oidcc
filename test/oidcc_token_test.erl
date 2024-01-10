@@ -76,7 +76,8 @@ retrieve_none_test() ->
             post,
             {ReqTokenEndpoint, Header, "application/x-www-form-urlencoded", Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             ?assertEqual(<<TokenEndpoint/binary, "?foo=bar">>, iolist_to_binary(ReqTokenEndpoint)),
             ?assertMatch({"authorization", _}, proplists:lookup("authorization", Header)),
@@ -206,7 +207,8 @@ retrieve_rs256_with_rotation_test() ->
             post,
             {ReqTokenEndpoint, Header, "application/x-www-form-urlencoded", Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             TokenEndpoint = ReqTokenEndpoint,
             ?assertMatch(none, proplists:lookup("authorization", Header)),
@@ -308,7 +310,8 @@ retrieve_hs256_test() ->
             post,
             {ReqTokenEndpoint, _Header, "application/x-www-form-urlencoded", _Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             TokenEndpoint = ReqTokenEndpoint,
             {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], TokenData}}
@@ -390,7 +393,8 @@ retrieve_hs256_with_max_clock_skew_test() ->
             post,
             {ReqTokenEndpoint, _Header, "application/x-www-form-urlencoded", _Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             TokenEndpoint = ReqTokenEndpoint,
             {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], TokenData}}
@@ -490,7 +494,8 @@ auth_method_client_secret_jwt_test() ->
             post,
             {ReqTokenEndpoint, Header, "application/x-www-form-urlencoded", Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             TokenEndpoint = ReqTokenEndpoint,
             ?assertMatch(none, proplists:lookup("authorization", Header)),
@@ -615,7 +620,8 @@ auth_method_client_secret_jwt_with_max_clock_skew_test() ->
             post,
             {ReqTokenEndpoint, _, "application/x-www-form-urlencoded", Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             TokenEndpoint = ReqTokenEndpoint,
             BodyMap = maps:from_list(uri_string:dissect_query(Body)),
@@ -714,7 +720,8 @@ auth_method_private_key_jwt_no_supported_alg_test() ->
             post,
             {ReqTokenEndpoint, Header, "application/x-www-form-urlencoded", Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             TokenEndpoint = ReqTokenEndpoint,
 
@@ -819,7 +826,8 @@ auth_method_private_key_jwt_test() ->
             post,
             {ReqTokenEndpoint, Header, "application/x-www-form-urlencoded", Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             TokenEndpoint = ReqTokenEndpoint,
             ?assertMatch(none, proplists:lookup("authorization", Header)),
@@ -960,7 +968,8 @@ auth_method_private_key_jwt_with_dpop_test() ->
             post,
             {ReqTokenEndpoint, Header, "application/x-www-form-urlencoded", Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             TokenEndpoint = ReqTokenEndpoint,
             ?assertMatch(none, proplists:lookup("authorization", Header)),
@@ -1147,7 +1156,8 @@ auth_method_private_key_jwt_with_dpop_and_nonce_test() ->
             post,
             {ReqTokenEndpoint, Header, "application/x-www-form-urlencoded", Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             TokenEndpoint = ReqTokenEndpoint,
             ?assertMatch(none, proplists:lookup("authorization", Header)),
@@ -1320,7 +1330,8 @@ auth_method_private_key_jwt_with_invalid_dpop_nonce_test() ->
             post,
             {_Endpoint, _Header, "application/x-www-form-urlencoded", _Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             {ok, {
                 {"HTTP/1.1", 400, "OK"},
@@ -1445,7 +1456,8 @@ preferred_auth_methods_test() ->
             post,
             {ReqTokenEndpoint, Header, "application/x-www-form-urlencoded", Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             TokenEndpoint = ReqTokenEndpoint,
             ?assertMatch({"authorization", _}, proplists:lookup("authorization", Header)),
@@ -1646,7 +1658,8 @@ trusted_audiences_test() ->
             post,
             {_TokenEndpoint, _Header, "application/x-www-form-urlencoded", _Body},
             _HttpOpts,
-            _Opts
+            _Opts,
+            _Profile
         ) ->
             {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], TokenData}}
         end,

@@ -28,7 +28,8 @@
 
 -type request_opts() :: #{
     timeout => timeout(),
-    ssl => [ssl:tls_option()]
+    ssl => [ssl:tls_option()],
+    httpc_profile => atom() | pid()
 }.
 %% See {@link httpc:request/5}
 %%
@@ -90,6 +91,7 @@ request(Method, Request, TelemetryOpts, RequestOpts) ->
     TelemetryExtraMeta = maps:get(extra_meta, TelemetryOpts, #{}),
     Timeout = maps:get(timeout, RequestOpts, timer:minutes(1)),
     SslOpts = maps:get(ssl, RequestOpts, undefined),
+    HttpProfile = maps:get(httpc_profile, RequestOpts, default),
 
     HttpOpts0 = [{timeout, Timeout}],
     HttpOpts =
@@ -108,7 +110,8 @@ request(Method, Request, TelemetryOpts, RequestOpts) ->
                         Method,
                         Request,
                         HttpOpts,
-                        [{body_format, binary}]
+                        [{body_format, binary}],
+                        HttpProfile
                     ),
                 {ok, BodyAndFormat} ?= extract_successful_response(Response),
                 {{ok, {BodyAndFormat, Headers}}, TelemetryExtraMeta}

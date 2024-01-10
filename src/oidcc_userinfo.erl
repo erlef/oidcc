@@ -134,7 +134,6 @@ retrieve(#oidcc_token_access{} = AccessTokenRecord, #oidcc_client_context{} = Cl
         client_id = ClientId
     } = ClientContext,
     #oidcc_provider_configuration{
-        userinfo_endpoint = Endpoint,
         issuer = Issuer
     } = Configuration,
     #oidcc_token_access{token = AccessToken, type = AccessTokenType} = AccessTokenRecord,
@@ -144,10 +143,23 @@ retrieve(#oidcc_token_access{} = AccessTokenRecord, #oidcc_client_context{} = Cl
     %% separate the two.
     %%
     AuthorizationOpts = Opts#{},
+    Endpoint =
+        case Configuration of
+            #oidcc_provider_configuration{
+                tls_client_certificate_bound_access_tokens = true,
+                mtls_endpoint_aliases = #{
+                    <<"userinfo_endpoint">> := MtlsEndpoint
+                }
+            } ->
+                MtlsEndpoint;
+            #oidcc_provider_configuration{
+                userinfo_endpoint = UserinfoEndpoint
+            } ->
+                UserinfoEndpoint
+        end,
     Header = oidcc_auth_util:add_authorization_header(
         AccessToken, AccessTokenType, get, Endpoint, AuthorizationOpts, ClientContext
     ),
-
     Request = {Endpoint, Header},
     RequestOpts = maps:get(request_opts, Opts, #{}),
     TelemetryOpts = #{

@@ -14,19 +14,25 @@
 -export_type([auth_method/0, error/0]).
 
 -type auth_method() ::
-    none | client_secret_basic | client_secret_post | client_secret_jwt | private_key_jwt.
+    none
+    | client_secret_basic
+    | client_secret_post
+    | client_secret_jwt
+    | private_key_jwt
+    | tls_client_auth.
 
 -type error() :: no_supported_auth_method.
 
 -export([add_client_authentication/6]).
 -export([add_dpop_proof_header/5]).
 -export([add_authorization_header/6]).
+-export([maybe_mtls_endpoint/4]).
 
 %% @private
 -spec add_client_authentication(
     QueryList, Header, SupportedAuthMethods, AllowAlgorithms, Opts, ClientContext
 ) ->
-    {ok, {oidcc_http_util:query_params(), [oidcc_http_util:http_header()]}}
+    {ok, {oidcc_http_util:query_params(), [oidcc_http_util:http_header()]}, auth_method()}
     | {error, error()}
 when
     QueryList :: oidcc_http_util:query_params(),
@@ -42,6 +48,7 @@ add_client_authentication(
 ) ->
     PreferredAuthMethods = maps:get(preferred_auth_methods, Opts, [
         private_key_jwt,
+        tls_client_auth,
         client_secret_jwt,
         client_secret_post,
         client_secret_basic,
@@ -55,7 +62,7 @@ add_client_authentication(
                 )
             of
                 {ok, {QueryList, Header}} ->
-                    {ok, {QueryList, Header}};
+                    {ok, {QueryList, Header}, AuthMethod};
                 {error, _} ->
                     add_client_authentication(
                         QueryList0,
@@ -178,6 +185,22 @@ add_authentication(
             signed_client_assertion(AllowAlgorithms, Opts, ClientContext, ClientJwks),
         {ok, add_jwt_bearer_assertion(ClientAssertion, QsBodyList, Header, ClientContext)}
     else
+        _ ->
+            {error, auth_method_not_possible}
+    end;
+add_authentication(
+    QsBodyList,
+    Header,
+    tls_client_auth,
+    _AllowAlgorithms,
+    Opts,
+    #oidcc_client_context{client_id = ClientId}
+) ->
+    case Opts of
+        #{request_opts := #{ssl := _}} ->
+            %% only supported if custom SSL params are provided
+            NewBodyList = [{<<"client_id">>, ClientId} | QsBodyList],
+            {ok, {NewBodyList, Header}};
         _ ->
             {error, auth_method_not_possible}
     end.
@@ -314,6 +337,25 @@ add_authorization_header(
         _ ->
             [oidcc_http_util:bearer_auth_header(AccessToken)]
     end.
+
+%% @private
+-spec maybe_mtls_endpoint(
+    Endpoint, auth_method(), MtlsEndpointName, ClientContext
+) -> Endpoint when
+    Endpoint :: uri_string:uri_string(),
+    MtlsEndpointName :: binary(),
+    ClientContext :: oidcc_client_context:t().
+maybe_mtls_endpoint(Endpoint, tls_client_auth, MtlsEndpointName, ClientContext) ->
+    case
+        ClientContext#oidcc_client_context.provider_configuration#oidcc_provider_configuration.mtls_endpoint_aliases
+    of
+        #{MtlsEndpointName := MtlsEndpoint} ->
+            MtlsEndpoint;
+        _ ->
+            Endpoint
+    end;
+maybe_mtls_endpoint(Endpoint, _AuthMethod, _EndpointName, _ClientContext) ->
+    Endpoint.
 
 -spec dpop_proof(Method, Endpoint, Claims, ClientContext) -> {ok, binary()} | error when
     Method :: post | get,

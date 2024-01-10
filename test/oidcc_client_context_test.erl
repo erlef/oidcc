@@ -57,11 +57,56 @@ apply_profiles_fapi2_security_profile_test() ->
 
     ?assertMatch(
         #{
-            preferred_auth_methods := [private_key_jwt],
+            preferred_auth_methods := [private_key_jwt, tls_client_auth],
             require_pkce := true,
-            trusted_audiences := []
+            trusted_audiences := [],
+            request_opts := #{
+                ssl := _
+            }
         },
         Opts
+    ),
+
+    #{request_opts := #{ssl := SslOpts}} = Opts,
+
+    ?assertEqual(
+        {ciphers, [
+            #{
+                cipher => 'aes_128_gcm',
+                mac => aead,
+                key_exchange => dhe_rsa,
+                prf => sha256
+            },
+            #{
+                cipher => 'aes_128_gcm',
+                mac => aead,
+                key_exchange => ecdhe_rsa,
+                prf => sha256
+            },
+            #{
+                cipher => 'aes_256_gcm',
+                mac => aead,
+                key_exchange => dhe_rsa,
+                prf => sha384
+            },
+            #{
+                cipher => 'aes_256_gcm',
+                mac => aead,
+                key_exchange => ecdhe_rsa,
+                prf => sha384
+            }
+        ]},
+        lists:keyfind(ciphers, 1, SslOpts)
+    ),
+
+    ?assertEqual(
+        {verify, verify_peer},
+        lists:keyfind(verify, 1, SslOpts)
+    ),
+
+    ?assertMatch(
+        {cacerts, _},
+        lists:keyfind(cacerts, 1, SslOpts)
     ),
 
     ok.
@@ -106,9 +151,12 @@ apply_profiles_fapi2_message_signing_test() ->
 
     ?assertMatch(
         #{
-            preferred_auth_methods := [private_key_jwt],
+            preferred_auth_methods := [private_key_jwt, tls_client_auth],
             require_pkce := true,
-            trusted_audiences := []
+            trusted_audiences := [],
+            request_opts := #{
+                ssl := _
+            }
         },
         Opts
     ),

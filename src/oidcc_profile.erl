@@ -22,12 +22,14 @@
     profiles => [profile()],
     require_pkce => boolean(),
     trusted_audiences => [binary()] | any,
-    preferred_auth_methods => [oidcc_auth_util:auth_method()]
+    preferred_auth_methods => [oidcc_auth_util:auth_method()],
+    request_opts => oidcc_http_util:request_opts()
 }.
 -type opts_no_profiles() :: #{
     require_pkce => boolean(),
     trusted_audiences => [binary()] | any,
-    preferred_auth_methods => [oidcc_auth_util:auth_method()]
+    preferred_auth_methods => [oidcc_auth_util:auth_method()],
+    request_opts => oidcc_http_util:request_opts()
 }.
 -type error() :: {unknown_profile, atom()}.
 
@@ -60,8 +62,17 @@ apply_profiles(
     ),
     Opts2 = Opts1#{profiles => RestProfiles},
     Opts3 = map_put_new(trusted_audiences, [], Opts2),
-    %% TODO include tls_client_auth">> here when it's supported by the library.
-    Opts = map_put_new(preferred_auth_methods, [private_key_jwt], Opts3),
+    Opts4 = map_put_new(preferred_auth_methods, [private_key_jwt, tls_client_auth], Opts3),
+    Opts5 = put_tls_defaults(Opts4),
+    Opts = limit_tls_ciphers(
+        [
+            "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256",
+            "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+            "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384",
+            "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+        ],
+        Opts5
+    ),
     apply_profiles(ClientContext, Opts);
 apply_profiles(
     #oidcc_client_context{} = ClientContext0,
@@ -181,6 +192,23 @@ limit_signing_alg_values(AlgSupported, ClientContext0) ->
         provider_configuration = ProviderConfiguration
     },
     ClientContext.
+
+put_tls_defaults(Opts) ->
+    RequestOpts0 = maps:get(request_opts, Opts, #{}),
+    SslOpts0 = maps:get(ssl, RequestOpts0, []),
+    SslOpts1 = SslOpts0 ++ httpc:ssl_verify_host_options(true),
+    SslOpts = lists:ukeysort(1, SslOpts1),
+    RequestOpts = RequestOpts0#{ssl => SslOpts},
+    Opts#{request_opts => RequestOpts}.
+
+limit_tls_ciphers(SupportedCipherStrs, Opts) ->
+    RequestOpts0 = maps:get(request_opts, Opts, #{}),
+    SslOpts0 = maps:get(ssl, RequestOpts0, []),
+    SupportedCiphers = lists:map(fun ssl:str_to_suite/1, SupportedCipherStrs),
+    SslOpts1 = [{ciphers, SupportedCiphers} | SslOpts0],
+    SslOpts = lists:ukeysort(1, SslOpts1),
+    RequestOpts = RequestOpts0#{ssl => SslOpts},
+    Opts#{request_opts => RequestOpts}.
 
 limit_values(_Limit, undefined) ->
     undefined;

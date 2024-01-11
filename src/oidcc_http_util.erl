@@ -153,7 +153,7 @@ extract_successful_response({{_HttpVersion, StatusCode, _HttpStatusName}, Header
         end,
     case proplists:lookup("dpop-nonce", Headers) of
         {"dpop-nonce", DpopNonce} ->
-            {error, {use_dpop_nonce, DpopNonce, Body}};
+            {error, {use_dpop_nonce, iolist_to_binary(DpopNonce), Body}};
         _ ->
             {error, {http_error, StatusCode, Body}}
     end.

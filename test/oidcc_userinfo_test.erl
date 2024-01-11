@@ -871,7 +871,10 @@ dpop_proof_with_nonce_test() ->
                 _ ->
                     {ok, {
                         {"HTTP/1.1", 400, "Bad Request"},
-                        [{"content-type", "application/json"}, {"dpop-nonce", DpopNonce}],
+                        [
+                            {"content-type", "application/json"},
+                            {"dpop-nonce", binary_to_list(DpopNonce)}
+                        ],
                         DpopNonceError
                     }}
             end
@@ -936,7 +939,7 @@ dpop_proof_with_invalid_nonce_test() ->
         fun(get, _UrlHeader, _HttpOpts, _Opts, _Profile) ->
             {ok, {
                 {"HTTP/1.1", 400, "Bad Request"},
-                [{"content-type", "application/json"}, {"dpop-nonce", DpopNonce}],
+                [{"content-type", "application/json"}, {"dpop-nonce", binary_to_list(DpopNonce)}],
                 DpopNonceError
             }}
         end,

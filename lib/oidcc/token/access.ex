@@ -33,17 +33,26 @@ defmodule Oidcc.Token.Access do
           endpoint :: String.t(),
           client_context :: ClientContext.t()
         ) :: %{String.t() => String.t()}
+  @spec authorization_headers(
+          access_token :: t(),
+          method :: :get | :post,
+          endpoint :: String.t(),
+          client_context :: ClientContext.t(),
+          opts :: :oidcc_token.authorization_headers_opts()
+        ) :: %{String.t() => String.t()}
   def authorization_headers(
         access_token,
         method,
         endpoint,
-        client_context
+        client_context,
+        opts \\ %{}
       ),
       do:
         :oidcc_token.authorization_headers(
           struct_to_record(access_token),
           method,
           endpoint,
-          ClientContext.struct_to_record(client_context)
+          ClientContext.struct_to_record(client_context),
+          opts
         )
 end

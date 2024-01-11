@@ -1259,7 +1259,10 @@ auth_method_private_key_jwt_with_dpop_and_nonce_test() ->
                 _ ->
                     {ok, {
                         {"HTTP/1.1", 400, "OK"},
-                        [{"content-type", "application/json"}, {"dpop-nonce", DpopNonce}],
+                        [
+                            {"content-type", "application/json"},
+                            {"dpop-nonce", binary_to_list(DpopNonce)}
+                        ],
                         DpopNonceError
                     }}
             end

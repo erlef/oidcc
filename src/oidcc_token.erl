@@ -38,6 +38,7 @@
 -export([authorization_headers/5]).
 
 -export_type([access/0]).
+-export_type([authorization_headers_opts/0]).
 -export_type([client_credentials_opts/0]).
 -export_type([error/0]).
 -export_type([id/0]).
@@ -187,6 +188,10 @@
     request_opts => oidcc_http_util:request_opts(),
     url_extension => oidcc_http_util:query_params(),
     body_extension => oidcc_http_util:query_params()
+}.
+
+-type authorization_headers_opts() :: #{
+    dpop_nonce => binary()
 }.
 
 -type error() ::
@@ -954,7 +959,7 @@ when
     Method :: post | get,
     Endpoint :: uri_string:uri_string(),
     ClientContext :: oidcc_client_context:t(),
-    Opts :: #{dpop_nonce => binary()},
+    Opts :: authorization_headers_opts(),
     HeaderMap :: #{binary() => binary()}.
 authorization_headers(AccessTokenRecord, Method, Endpoint, ClientContext) ->
     authorization_headers(AccessTokenRecord, Method, Endpoint, ClientContext, #{}).

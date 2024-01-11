@@ -38,7 +38,7 @@ defmodule Oidcc.Token.Access do
           method :: :get | :post,
           endpoint :: String.t(),
           client_context :: ClientContext.t(),
-          opts :: %{optional(:dpop_nonce) => binary()}
+          opts :: :oidcc_token.authorization_headers_opts()
         ) :: %{String.t() => String.t()}
   def authorization_headers(
         access_token,

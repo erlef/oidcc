@@ -65,6 +65,9 @@ create_redirect_url_test() ->
     Opts5 = maps:merge(BaseOpts, #{pkce_verifier => <<"foo">>}),
     Opts6 = maps:merge(Opts5, #{require_pkce => true}),
     Opts7 = maps:merge(BaseOpts, #{require_pkce => true}),
+    Opts8 = maps:merge(BaseOpts, #{purpose => <<"purpose">>}),
+    Opts9 = maps:merge(Opts8, #{purpose_required => true}),
+    Opts10 = maps:merge(BaseOpts, #{purpose_required => true}),
 
     {ok, Url1} = oidcc_authorization:create_redirect_url(ClientContext, BaseOpts),
     {ok, Url2} = oidcc_authorization:create_redirect_url(ClientContext, Opts1),
@@ -75,6 +78,8 @@ create_redirect_url_test() ->
     {ok, Url7} = oidcc_authorization:create_redirect_url(PkcePlainClientContext, Opts5),
     {ok, Url8} = oidcc_authorization:create_redirect_url(NoPkceClientContext, Opts5),
     {ok, Url9} = oidcc_authorization:create_redirect_url(PkcePlainClientContext, Opts6),
+    {ok, Url10} = oidcc_authorization:create_redirect_url(ClientContext, Opts8),
+    {ok, Url11} = oidcc_authorization:create_redirect_url(ClientContext, Opts9),
 
     ExpUrl1 =
         <<"https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
@@ -110,6 +115,12 @@ create_redirect_url_test() ->
 
     ?assertEqual(iolist_to_binary(Url9), iolist_to_binary(Url7)),
 
+    ExpUrl10 =
+        <<"https://my.provider/auth?scope=openid&purpose=purpose&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn&test=id">>,
+    ?assertEqual(ExpUrl10, iolist_to_binary(Url10)),
+
+    ?assertEqual(iolist_to_binary(Url11), iolist_to_binary(Url10)),
+
     ?assertEqual(
         {error, no_supported_code_challenge},
         oidcc_authorization:create_redirect_url(NoPkceClientContext, Opts6)
@@ -118,6 +129,11 @@ create_redirect_url_test() ->
     ?assertEqual(
         {error, pkce_verifier_required},
         oidcc_authorization:create_redirect_url(ClientContext, Opts7)
+    ),
+
+    ?assertEqual(
+        {error, purpose_required},
+        oidcc_authorization:create_redirect_url(ClientContext, Opts10)
     ),
 
     ok.

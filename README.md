@@ -100,6 +100,7 @@ The refactoring for `v3` and the certification is funded as an
   * [RP-Initiated](https://openid.net/specs/openid-connect-rpinitiated-1_0.html)
 * [JWT Secured Authorization Response Mode for OAuth 2.0 (JARM)](https://openid.net/specs/oauth-v2-jarm-final.html)
 * [Demonstrating Proof of Possession (DPoP)](https://www.rfc-editor.org/rfc/rfc9449)
+* [OAuth 2 Purpose Request Parameter](https://cdn.connectid.com.au/specifications/oauth2-purpose-01.html)
 * Profiles
   * [FAPI 2.0 Security Profile](https://openid.bitbucket.io/fapi/fapi-2_0-security-profile.html)
   * [FAPI 2.0 Message Signing](https://openid.bitbucket.io/fapi/fapi-2_0-message-signing.html)

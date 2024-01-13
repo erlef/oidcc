@@ -24,6 +24,8 @@
         nonce => binary(),
         pkce_verifier => binary(),
         require_pkce => boolean(),
+        purpose => binary(),
+        require_purpose => boolean(),
         redirect_uri => uri_string:uri_string(),
         url_extension => oidcc_http_util:query_params(),
         response_mode => binary()
@@ -38,6 +40,9 @@
 %%   <li>`scopes' - list of scopes to request (defaults to `[<<"openid">>]')</li>
 %%   <li>`state' - state to pass to the provider</li>
 %%   <li>`nonce' - nonce to pass to the provider</li>
+%%   <li>`purpose' - purpose of the authorization request, see
+%%     [https://cdn.connectid.com.au/specifications/oauth2-purpose-01.html]</li>
+%%   <li>`require_purpose' - whether to require a `purpose' value</li>
 %%   <li>`pkce_verifier' - pkce verifier (random string), see
 %%     [https://datatracker.ietf.org/doc/html/rfc7636#section-4.1]</li>
 %%   <li>`require_pkce' - whether to require PKCE when getting the token</li>
@@ -51,6 +56,7 @@
     | par_required
     | request_object_required
     | pkce_verifier_required
+    | purpose_required
     | no_supported_code_challenge
     | oidcc_http_util:error().
 
@@ -105,32 +111,34 @@ create_redirect_url(#oidcc_client_context{} = ClientContext, Opts) ->
     ClientContext :: oidcc_client_context:t(),
     Opts :: opts().
 redirect_params(#oidcc_client_context{client_id = ClientId} = ClientContext, Opts) ->
-    QueryParams =
+    QueryParams0 =
         [
             {<<"response_type">>, maps:get(response_type, Opts, <<"code">>)},
             {<<"client_id">>, ClientId},
             {<<"redirect_uri">>, maps:get(redirect_uri, Opts)}
         ],
-    QueryParams1 = maybe_append(<<"state">>, maps:get(state, Opts, undefined), QueryParams),
+    QueryParams1 = maybe_append(<<"state">>, maps:get(state, Opts, undefined), QueryParams0),
     QueryParams2 = maybe_append(<<"nonce">>, maps:get(nonce, Opts, undefined), QueryParams1),
-    QueryParams3 =
+    QueryParams3 = maybe_append(<<"purpose">>, maps:get(purpose, Opts, undefined), QueryParams2),
+    QueryParams4 =
         case maps:get(response_mode, Opts, <<"query">>) of
             <<"query">> ->
-                QueryParams2;
+                QueryParams3;
             ResponseMode when is_binary(ResponseMode) ->
-                [{<<"response_mode">>, ResponseMode} | QueryParams2]
+                [{<<"response_mode">>, ResponseMode} | QueryParams3]
         end,
     maybe
-        {ok, QueryParams4} ?=
+        ok ?= validate_purpose_required(Opts),
+        {ok, QueryParams5} ?=
             append_code_challenge(
-                Opts, QueryParams3, ClientContext
+                Opts, QueryParams4, ClientContext
             ),
-        QueryParams5 = oidcc_scope:query_append_scope(
-            maps:get(scopes, Opts, [openid]), QueryParams4
+        QueryParams6 = oidcc_scope:query_append_scope(
+            maps:get(scopes, Opts, [openid]), QueryParams5
         ),
-        QueryParams6 = maybe_append_dpop_jkt(QueryParams5, ClientContext),
-        {ok, QueryParams7} ?= attempt_request_object(QueryParams6, ClientContext),
-        attempt_par(QueryParams7, ClientContext, Opts)
+        QueryParams7 = maybe_append_dpop_jkt(QueryParams6, ClientContext),
+        {ok, QueryParams} ?= attempt_request_object(QueryParams7, ClientContext),
+        attempt_par(QueryParams, ClientContext, Opts)
     end.
 
 -spec append_code_challenge(Opts, QueryParams, ClientContext) ->
@@ -190,6 +198,15 @@ maybe_append(_Key, undefined, QueryParams) ->
     QueryParams;
 maybe_append(Key, Value, QueryParams) ->
     [{Key, Value} | QueryParams].
+
+-spec validate_purpose_required(Opts) -> ok | {error, purpose_required} when
+    Opts :: opts().
+validate_purpose_required(#{purpose := Purpose}) when is_binary(Purpose) ->
+    ok;
+validate_purpose_required(#{purpose_required := true}) ->
+    {error, purpose_required};
+validate_purpose_required(_Opts) ->
+    ok.
 
 -spec maybe_append_dpop_jkt(QueryParams, ClientContext) ->
     QueryParams

@@ -163,6 +163,62 @@ apply_profiles_fapi2_message_signing_test() ->
 
     ok.
 
+apply_profiles_fapi2_connectid_au_test() ->
+    ClientContext0 = client_context_fixture(),
+    Opts0 = #{
+        profiles => [fapi2_connectid_au]
+    },
+
+    ProfileResult = oidcc_client_context:apply_profiles(ClientContext0, Opts0),
+
+    ?assertMatch(
+        {ok, #oidcc_client_context{}, #{}},
+        ProfileResult
+    ),
+
+    {ok, ClientContext, Opts} = ProfileResult,
+
+    ?assertMatch(
+        #oidcc_client_context{
+            provider_configuration = #oidcc_provider_configuration{
+                token_endpoint = <<"https://my.provider/tls/token">>,
+                userinfo_endpoint = <<"https://my.provider/tls/userinfo">>,
+                response_types_supported = [<<"code">>],
+                response_modes_supported = [<<"jwt">>, <<"query.jwt">>],
+                id_token_signing_alg_values_supported = [<<"EdDSA">>],
+                userinfo_signing_alg_values_supported = [
+                    <<"PS256">>,
+                    <<"PS384">>,
+                    <<"PS512">>,
+                    <<"ES256">>,
+                    <<"ES384">>,
+                    <<"ES512">>,
+                    <<"EdDSA">>
+                ],
+                code_challenge_methods_supported = [<<"S256">>],
+                require_pushed_authorization_requests = true,
+                pushed_authorization_request_endpoint = undefined,
+                authorization_response_iss_parameter_supported = true
+            }
+        },
+        ClientContext
+    ),
+
+    ?assertMatch(
+        #{
+            preferred_auth_methods := [private_key_jwt, tls_client_auth],
+            require_pkce := true,
+            require_purpose := true,
+            trusted_audiences := [],
+            request_opts := #{
+                ssl := _
+            }
+        },
+        Opts
+    ),
+
+    ok.
+
 apply_profiles_unknown_test() ->
     ClientContext = client_context_fixture(),
     Opts = #{

@@ -34,6 +34,7 @@
 -export([retrieve/3]).
 -export([validate_jarm/3]).
 -export([validate_id_token/3]).
+-export([validate_jwt/3]).
 -export([authorization_headers/4]).
 -export([authorization_headers/5]).
 
@@ -48,6 +49,7 @@
 -export_type([refresh_opts_no_sub/0]).
 -export_type([retrieve_opts/0]).
 -export_type([validate_jarm_opts/0]).
+-export_type([validate_jwt_opts/0]).
 -export_type([t/0]).
 
 -type id() :: #oidcc_token_id{token :: binary(), claims :: oidcc_jwt_util:claims()}.
@@ -193,6 +195,13 @@
 -type authorization_headers_opts() :: #{
     dpop_nonce => binary()
 }.
+
+-type validate_jwt_opts() ::
+    #{
+        signing_algs => [binary()] | undefined,
+        encryption_algs => [binary()] | undefined,
+        encryption_encs => [binary()] | undefined
+    }.
 
 -type error() ::
     {missing_claim, MissingClaim :: binary(), Claims :: oidcc_jwt_util:claims()}
@@ -924,6 +933,74 @@ validate_id_token(IdToken, ClientContext, Opts) when is_map(Opts) ->
             #jose_jwe{} ->
                 {ok, Claims}
         end
+    end.
+
+%% @doc Validate JWT
+%%
+%% Validates a generic JWT (such as an access token) from the given provider.
+%% Useful if the issuer is shared between multiple applications, and the access token
+%% generated for a user at one client is used to validate their access at another client.
+%%
+%% <h2>Examples</h2>
+%%
+%% ```
+%% {ok, ClientContext} =
+%%   oidcc_client_context:from_configuration_worker(provider_name,
+%%                                                  <<"client_id">>,
+%%                                                  <<"client_secret">>),
+%%
+%% %% Get Jwt from Authorization header
+%%
+%% {ok, Claims} =
+%%   oidcc:validate_jwt(Jwt, ClientContext, Opts).
+%% '''
+%% @end
+%% @since 3.2.0
+-spec validate_jwt(Jwt, ClientContext, Opts) ->
+    {ok, Claims} | {error, error()}
+when
+    Jwt :: binary(),
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: validate_jwt_opts(),
+    Claims :: oidcc_jwt_util:claims().
+validate_jwt(Jwt, ClientContext, Opts) when is_map(Opts) ->
+    #oidcc_client_context{
+        provider_configuration = Configuration,
+        jwks = #jose_jwk{} = Jwks0,
+        client_id = ClientId,
+        client_secret = ClientSecret,
+        client_jwks = ClientJwks
+    } =
+        ClientContext,
+    #oidcc_provider_configuration{
+        issuer = Issuer
+    } =
+        Configuration,
+
+    SigningAlgs = maps:get(signing_algs, Opts, []),
+    EncryptionAlgs = maps:get(encryption_algs, Opts, []),
+    EncryptionEncs = maps:get(encryption_encs, Opts, []),
+    ExpClaims = [{<<"iss">>, Issuer}],
+    Jwks1 =
+        case ClientJwks of
+            none -> Jwks0;
+            #jose_jwk{} -> oidcc_jwt_util:merge_jwks(Jwks0, ClientJwks)
+        end,
+    Jwks2 = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks1, SigningAlgs, ClientSecret),
+    Jwks = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks2, EncryptionAlgs, ClientSecret),
+    TrustedAudience = maps:get(trusted_audience, Opts, any),
+
+    maybe
+        {ok, {#jose_jwt{fields = Claims}, _}} ?=
+            oidcc_jwt_util:decrypt_and_verify(
+                Jwt, Jwks, SigningAlgs, EncryptionAlgs, EncryptionEncs
+            ),
+        ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),
+        ok ?= verify_missing_required_claims(Claims),
+        ok ?= verify_aud_claim(Claims, ClientId, TrustedAudience),
+        ok ?= verify_exp_claim(Claims),
+        ok ?= verify_nbf_claim(Claims),
+        {ok, Claims}
     end.
 
 %% @doc Authorization headers

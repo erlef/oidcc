@@ -304,6 +304,52 @@ defmodule Oidcc.Token do
       )
 
   @doc """
+  Validate JWT
+
+  Validates a generic JWT (such as an access token) from the given provider.
+  Useful if the issuer is shared between multiple applications, and the access token
+  generated for a user at one client is used to validate their access at another client.
+
+  ## Examples
+
+      iex> {:ok, pid} =
+      ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
+      ...>     issuer: "https://api.login.yahoo.com"
+      ...>   })
+      ...>
+      ...> {:ok, client_context} =
+      ...>   Oidcc.ClientContext.from_configuration_worker(
+      ...>     pid,
+      ...>     "client_id",
+      ...>     "client_secret"
+      ...>   )
+      ...>
+      ...> #Get JWT from Authorization header
+      ...> jwt = "jwt"
+      ...>
+      ...> opts = %{
+      ...>   signing_algs: client_context.provider_configuration.id_token_signing_alg_values_supported
+      ...> }
+      ...>
+      ...> Oidcc.Token.validate_jwt(jwt, client_context, opts)
+      ...> # => {:ok, %{"sub" => "sub", ... }}
+
+  """
+  @doc since: "3.0.0"
+  @spec validate_jwt(
+          jwt :: String.t(),
+          client_context :: ClientContext.t(),
+          opts :: :oidcc_token.validate_jwt_opts()
+        ) :: {:ok, :oidcc_jwt_util.claims()} | {:error, :oidcc_token.error()}
+  def validate_jwt(jwt, client_context, opts),
+    do:
+      :oidcc_token.validate_jwt(
+        jwt,
+        ClientContext.struct_to_record(client_context),
+        opts
+      )
+
+  @doc """
   Retrieve JSON Web Token (JWT) Profile Token
 
   See https://datatracker.ietf.org/doc/html/rfc7523#section-4

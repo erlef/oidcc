@@ -17,7 +17,8 @@
 -export_type([opts_no_profiles/0]).
 -export_type([error/0]).
 
--type profile() :: fapi2_security_profile | fapi2_message_signing | fapi2_connectid_au.
+-type profile() ::
+    mtls_constrain | fapi2_security_profile | fapi2_message_signing | fapi2_connectid_au.
 -type opts() :: #{
     profiles => [profile()],
     require_pkce => boolean(),
@@ -98,55 +99,74 @@ apply_profiles(
 ) ->
     %% FAPI2 ConnectID profile
     maybe
-        %% Require everything from FAPI2 Message Signing
+        %% Require everything from FAPI2 Message Signing, and use mTLS
+        %% sender-constrained tokens
         {ok, ClientContext1, Opts1} ?=
             apply_profiles(ClientContext0, Opts0#{
-                profiles => [fapi2_message_signing | RestProfiles]
+                profiles => [fapi2_message_signing, mtls_constrain | RestProfiles]
             }),
         %% Require `purpose' field
         Opts2 = Opts1#{require_purpose => true},
-        %% If a PAR endpoint is present in the mTLS aliases, use that as the default
-        #oidcc_client_context{provider_configuration = Configuration1} = ClientContext1,
-        Configuration2 =
-            case Configuration1#oidcc_provider_configuration.mtls_endpoint_aliases of
-                #{
-                    <<"pushed_authorization_request_endpoint">> := MtlsParEndpoint
-                } ->
-                    Configuration1#oidcc_provider_configuration{
-                        pushed_authorization_request_endpoint = MtlsParEndpoint
-                    };
-                _ ->
-                    Configuration1
-            end,
-        %% If the token endpoint is present in the mTLS aliases, use that as the default
-        Configuration3 =
-            case Configuration2#oidcc_provider_configuration.mtls_endpoint_aliases of
-                #{
-                    <<"token_endpoint">> := MtlsTokenEndpoint
-                } ->
-                    Configuration2#oidcc_provider_configuration{
-                        token_endpoint = MtlsTokenEndpoint
-                    };
-                _ ->
-                    Configuration2
-            end,
-        %% If the userinfo endpoint is present in the mTLS aliases, use that as the default
-        Configuration4 =
-            case Configuration3#oidcc_provider_configuration.mtls_endpoint_aliases of
-                #{
-                    <<"userinfo_endpoint">> := MtlsUserinfoEndpoint
-                } ->
-                    Configuration3#oidcc_provider_configuration{
-                        userinfo_endpoint = MtlsUserinfoEndpoint
-                    };
-                _ ->
-                    Configuration3
-            end,
-        ClientContext2 = ClientContext1#oidcc_client_context{
-            provider_configuration = Configuration4
-        },
-        {ok, ClientContext2, Opts2}
+        {ok, ClientContext1, Opts2}
     end;
+apply_profiles(
+    #oidcc_client_context{} = ClientContext0,
+    #{profiles := [mtls_constrain | RestProfiles]} = Opts0
+) ->
+    %% If a PAR endpoint is present in the mTLS aliases, use that as the default
+    #oidcc_client_context{provider_configuration = Configuration0} = ClientContext0,
+    Configuration1 =
+        case Configuration0#oidcc_provider_configuration.mtls_endpoint_aliases of
+            #{
+                <<"pushed_authorization_request_endpoint">> := MtlsParEndpoint
+            } ->
+                Configuration0#oidcc_provider_configuration{
+                    pushed_authorization_request_endpoint = MtlsParEndpoint
+                };
+            _ ->
+                Configuration0
+        end,
+    %% If the token endpoint is present in the mTLS aliases, use that as the default
+    Configuration2 =
+        case Configuration1#oidcc_provider_configuration.mtls_endpoint_aliases of
+            #{
+                <<"token_endpoint">> := MtlsTokenEndpoint
+            } ->
+                Configuration1#oidcc_provider_configuration{
+                    token_endpoint = MtlsTokenEndpoint
+                };
+            _ ->
+                Configuration1
+        end,
+    %% If the userinfo endpoint is present in the mTLS aliases, use that as the default
+    Configuration3 =
+        case Configuration2#oidcc_provider_configuration.mtls_endpoint_aliases of
+            #{
+                <<"userinfo_endpoint">> := MtlsUserinfoEndpoint
+            } ->
+                Configuration2#oidcc_provider_configuration{
+                    userinfo_endpoint = MtlsUserinfoEndpoint
+                };
+            _ ->
+                Configuration2
+        end,
+    %% If the introspection endpoint is present in the mTLS aliases, use that as the default
+    Configuration4 =
+        case Configuration3#oidcc_provider_configuration.mtls_endpoint_aliases of
+            #{
+                <<"introspection_endpoint">> := MtlsIntrospectionEndpoint
+            } ->
+                Configuration3#oidcc_provider_configuration{
+                    introspection_endpoint = MtlsIntrospectionEndpoint
+                };
+            _ ->
+                Configuration3
+        end,
+    ClientContext1 = ClientContext0#oidcc_client_context{
+        provider_configuration = Configuration4
+    },
+    Opts1 = Opts0#{profiles := RestProfiles},
+    apply_profiles(ClientContext1, Opts1);
 apply_profiles(#oidcc_client_context{}, #{profiles := [UnknownProfile | _]}) ->
     {error, {unknown_profile, UnknownProfile}};
 apply_profiles(#oidcc_client_context{} = ClientContext, #{profiles := []} = Opts0) ->

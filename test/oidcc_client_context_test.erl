@@ -163,6 +163,38 @@ apply_profiles_fapi2_message_signing_test() ->
 
     ok.
 
+apply_profiles_mtls_constrain_test() ->
+    ClientContext0 = client_context_fixture(),
+    Opts0 = #{
+        profiles => [mtls_constrain]
+    },
+
+    ProfileResult = oidcc_client_context:apply_profiles(ClientContext0, Opts0),
+
+    ?assertMatch(
+        {ok, #oidcc_client_context{}, #{}},
+        ProfileResult
+    ),
+
+    {ok, ClientContext, Opts} = ProfileResult,
+
+    ?assertMatch(
+        #oidcc_client_context{
+            provider_configuration = #oidcc_provider_configuration{
+                token_endpoint = <<"https://my.provider/tls/token">>,
+                userinfo_endpoint = <<"https://my.provider/tls/userinfo">>
+            }
+        },
+        ClientContext
+    ),
+
+    ?assertEqual(
+        #{},
+        Opts
+    ),
+
+    ok.
+
 apply_profiles_fapi2_connectid_au_test() ->
     ClientContext0 = client_context_fixture(),
     Opts0 = #{

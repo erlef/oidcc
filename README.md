@@ -115,10 +115,10 @@ The refactoring for `v3` and the certification is funded as an
 
 ```erlang
 {ok, Pid} =
-  oidcc_provider_configuration_worker:start_link(#{
-    issuer => <<"https://accounts.google.com">>,
-    name => {local, google_config_provider}
-  }).
+    oidcc_provider_configuration_worker:start_link(#{
+        issuer => <<"https://accounts.google.com">>,
+        name => {local, google_config_provider}
+    }).
 ```
 
 **via `supervisor`**
@@ -129,14 +129,21 @@ The refactoring for `v3` and the certification is funded as an
 %% ...
 
 init(_Args) ->
-  SupFlags = #{strategy => one_for_one},
-  ChildSpecs = [#{id => oidcc_provider_configuration_worker,
-                  start => {oidcc_provider_configuration_worker, start_link, [
-                    #{issuer => "https://accounts.google.com",
-                      name => {local, myapp_oidcc_config_provider}}
-                  ]},
-                  shutdown => brutal_kill}],
-  {ok, {SupFlags, ChildSpecs}}.
+    SupFlags = #{strategy => one_for_one},
+    ChildSpecs = [
+        #{
+            id => oidcc_provider_configuration_worker,
+            start =>
+                {oidcc_provider_configuration_worker, start_link, [
+                    #{
+                        issuer => "https://accounts.google.com",
+                        name => {local, myapp_oidcc_config_provider}
+                    }
+                ]},
+            shutdown => brutal_kill
+        }
+    ],
+    {ok, {SupFlags, ChildSpecs}}.
 ```
 
 ### Elixir
@@ -146,20 +153,24 @@ init(_Args) ->
 ```elixir
 {:ok, _pid} =
   Oidcc.ProviderConfiguration.Worker.start_link(%{
-  issuer: "https://accounts.google.com",
-  name: Myapp.OidccConfigProvider
-})
+    issuer: "https://accounts.google.com",
+    name: Myapp.OidccConfigProvider
+  })
 ```
 
 **via `Supervisor`**
 
 ```elixir
-Supervisor.init([
-  {Oidcc.ProviderConfiguration.Worker, %{
-    issuer: "https://accounts.google.com",
-    name: Myapp.OidccConfigProvider
-  }}
-], strategy: :one_for_one)
+Supervisor.init(
+  [
+    {Oidcc.ProviderConfiguration.Worker,
+     %{
+       issuer: "https://accounts.google.com",
+       name: Myapp.OidccConfigProvider
+     }}
+  ],
+  strategy: :one_for_one
+)
 ```
 
 ## Usage
@@ -184,11 +195,12 @@ Supervisor.init([
 
 ```erlang
 %% Create redirect URI for authorization
-{ok, RedirectUri} =
-  oidcc:create_redirect_url(myapp_oidcc_config_provider,
-                            <<"client_id">>,
-                            <<"client_secret">>
-                            #{redirect_uri: <<"https://example.com/callback"}),
+{ok, RedirectUri} = oidcc:create_redirect_url(
+    myapp_oidcc_config_provider,
+    <<"client_id">>,
+    <<"client_secret">>,
+    #{redirect_uri => <<"https://example.com/callback">>}
+),
 
 %% Redirect user to `RedirectUri`
 
@@ -196,35 +208,43 @@ Supervisor.init([
 
 %% Exchange code for token
 {ok, Token} =
-  oidcc:retrieve_token(AuthCode,
-                       myapp_oidcc_config_provider,
-                       <<"client_id">>,
-                       <<"client_secret">>,
-                       #{redirect_uri => <<"https://example.com/callback">>}),
+    oidcc:retrieve_token(
+        AuthCode,
+        myapp_oidcc_config_provider,
+        <<"client_id">>,
+        <<"client_secret">>,
+        #{redirect_uri => <<"https://example.com/callback">>}
+    ),
 
 %% Load userinfo for token
 {ok, Claims} =
-  oidcc:retrieve_userinfo(Token,
-                          myapp_oidcc_config_provider,
-                          <<"client_id">>,
-                          <<"client_secret">>,
-                          #{}),
+    oidcc:retrieve_userinfo(
+        Token,
+        myapp_oidcc_config_provider,
+        <<"client_id">>,
+        <<"client_secret">>,
+        #{}
+    ),
 
 %% Load introspection for access token
 {ok, Introspection} =
-  oidcc:introspect_token(Token,
-                         myapp_oidcc_config_provider,
-                         <<"client_id">>,
-                         <<"client_secret">>,
-                         #{}),
+    oidcc:introspect_token(
+        Token,
+        myapp_oidcc_config_provider,
+        <<"client_id">>,
+        <<"client_secret">>,
+        #{}
+    ),
 
 %% Refresh token when it expires
 {ok, RefreshedToken} =
-  oidcc:refresh_token(Token,
-                      myapp_oidcc_config_provider,
-                      <<"client_id">>,
-                      <<"client_secret">>,
-                      #{}).
+    oidcc:refresh_token(
+        Token,
+        myapp_oidcc_config_provider,
+        <<"client_id">>,
+        <<"client_secret">>,
+        #{}
+    ).
 ```
 
 for more details, see https://hexdocs.pm/oidcc/oidcc.html
@@ -246,38 +266,42 @@ for more details, see https://hexdocs.pm/oidcc/oidcc.html
 # Retrieve `code` query / form param from redirect back
 
 # Exchange code for token
-{:ok, token} = Oidcc.retrieve_token(
-  auth_code,
+{:ok, token} =
+  Oidcc.retrieve_token(
+    auth_code,
     Myapp.OidccConfigProvider,
-  "client_id",
-  "client_secret",
-  %{redirect_uri: "https://example.com/callback"}
-)
+    "client_id",
+    "client_secret",
+    %{redirect_uri: "https://example.com/callback"}
+  )
 
 # Load userinfo for token
-{:ok, claims} = Oidcc.retrieve_userinfo(
-  token,
-  Myapp.OidccConfigProvider,
-  "client_id",
-  "client_secret",
-  %{expected_subject: "sub"}
-)
+{:ok, claims} =
+  Oidcc.retrieve_userinfo(
+    token,
+    Myapp.OidccConfigProvider,
+    "client_id",
+    "client_secret",
+    %{expected_subject: "sub"}
+  )
 
 # Load introspection for access token
-{:ok, introspection} = Oidcc.introspect_token(
-  token,
-  Myapp.OidccConfigProvider,
-  "client_id",
-  "client_secret"
-)
+{:ok, introspection} =
+  Oidcc.introspect_token(
+    token,
+    Myapp.OidccConfigProvider,
+    "client_id",
+    "client_secret"
+  )
 
 # Refresh token when it expires
-{:ok, refreshed_token} = Oidcc.refresh_token(
-  token,
-  Myapp.OidccConfigProvider,
-  "client_id",
-  "client_secret"
-)
+{:ok, refreshed_token} =
+  Oidcc.refresh_token(
+    token,
+    Myapp.OidccConfigProvider,
+    "client_id",
+    "client_secret"
+  )
 ```
 
 for more details, see https://hexdocs.pm/oidcc/Oidcc.html

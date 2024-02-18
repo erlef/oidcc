@@ -90,15 +90,6 @@ load_well_known_openid_introspections(_Config) ->
         )
     ),
 
-    %% Taken Over from v1
-    ?assertMatch(
-        {ok, {#oidcc_provider_configuration{}, _}},
-        oidcc_provider_configuration:load_configuration(
-            <<"https://services.humanbrainproject.eu/oidc/">>,
-            #{}
-        )
-    ),
-
     %% Test Instance of Zitadel
     ?assertMatch(
         {ok, {#oidcc_provider_configuration{}, _}},

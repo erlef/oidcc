@@ -17,6 +17,8 @@
 %%%-------------------------------------------------------------------
 -module(oidcc_client_context).
 
+-feature(maybe_expr, enable).
+
 -include("oidcc_client_context.hrl").
 -include("oidcc_provider_configuration.hrl").
 
@@ -129,14 +131,22 @@ from_configuration_worker(ProviderName, ClientId, ClientSecret) ->
         ClientSecret :: unauthenticated,
         Opts :: unauthenticated_opts().
 from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts) when is_pid(ProviderName) ->
-    {ok,
-        from_manual(
-            oidcc_provider_configuration_worker:get_provider_configuration(ProviderName),
-            oidcc_provider_configuration_worker:get_jwks(ProviderName),
-            ClientId,
-            ClientSecret,
-            Opts
-        )};
+    maybe
+        #oidcc_provider_configuration{} =
+            ProviderConfiguration ?=
+                oidcc_provider_configuration_worker:get_provider_configuration(ProviderName),
+        #jose_jwk{} = Jwks ?= oidcc_provider_configuration_worker:get_jwks(ProviderName),
+        {ok,
+            from_manual(
+                ProviderConfiguration,
+                Jwks,
+                ClientId,
+                ClientSecret,
+                Opts
+            )}
+    else
+        undefined -> {error, provider_not_ready}
+    end;
 from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts) ->
     case erlang:whereis(ProviderName) of
         undefined ->

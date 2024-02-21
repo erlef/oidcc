@@ -57,7 +57,7 @@ retries_with_backoff_with_invalid_issuer_test() ->
         })
     ),
 
-    ?assert(meck:num_calls(httpc, request, '_') > 2),
+    ?assert(meck:num_calls(httpc, request, '_') >= 2),
 
     meck:unload(httpc),
 

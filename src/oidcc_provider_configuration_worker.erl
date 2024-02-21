@@ -34,18 +34,29 @@
 
 -export_type([opts/0]).
 
+-type opts() :: #{
+    name => gen_server:server_name(),
+    issuer := uri_string:uri_string(),
+    provider_configuration_opts => oidcc_provider_configuration:opts(),
+    backoff_min => oidcc_backoff:min(),
+    backoff_max => oidcc_backoff:max(),
+    backoff_type => oidcc_backoff:type()
+}.
 %% Configuration Options
 %%
 %% <ul>
 %%   <li>`name' - The gen_server name of the provider.</li>
 %%   <li>`issuer' - The issuer URI.</li>
-%%   <li>`provider_configuration_opts' - Options for the provider configuration fetching.</li>
+%%   <li>`provider_configuration_opts' - Options for the provider configuration
+%%     fetching.</li>
+%%   <li>`backoff_min' - The minimum backoff interval in ms
+%%     (default: `1_000`)</li>
+%%   <li>`backoff_max' - The maximum backoff interval in ms
+%%     (default: `30_000`)</li>
+%%   <li>`backoff_type' - The backoff strategy, `stop' for no backoff and
+%%     to stop, `exponential' for exponential, `random' for random and
+%%     `random_exponential' for random exponential (default: `stop')</li>
 %% </ul>
--type opts() :: #{
-    name => gen_server:server_name(),
-    issuer := uri_string:uri_string(),
-    provider_configuration_opts => oidcc_provider_configuration:opts()
-}.
 
 -record(state, {
     provider_configuration = undefined :: #oidcc_provider_configuration{} | undefined,
@@ -54,8 +65,14 @@
     provider_configuration_opts :: oidcc_provider_configuration:opts(),
     configuration_refresh_timer = undefined :: timer:tref() | undefined,
     jwks_refresh_timer = undefined :: timer:tref() | undefined,
-    ets_table = undefined :: ets:table() | undefined
+    ets_table = undefined :: ets:table() | undefined,
+    backoff_min = 1000 :: oidcc_backoff:min(),
+    backoff_max = 30000 :: oidcc_backoff:max(),
+    backoff_type = stop :: oidcc_backoff:type(),
+    backoff_state = undefined :: oidcc_backoff:state() | undefined
 }).
+
+-type state() :: #state{}.
 
 %% @doc Start Configuration Provider
 %%
@@ -110,7 +127,10 @@ init(Opts) ->
             #state{
                 issuer = Issuer,
                 provider_configuration_opts = ProviderConfigurationOpts,
-                ets_table = EtsTable
+                ets_table = EtsTable,
+                backoff_min = maps:get(backoff_min, Opts, 1000),
+                backoff_max = maps:get(backoff_max, Opts, 30000),
+                backoff_type = maps:get(backoff_type, Opts, stop)
             },
             {continue, load_configuration}}
     end.
@@ -161,12 +181,12 @@ handle_continue(
         ok = store_in_ets(EtsTable, provider_configuration, Configuration),
         {noreply,
             State#state{
-                provider_configuration = Configuration, configuration_refresh_timer = NewTimer
+                provider_configuration = Configuration,
+                configuration_refresh_timer = NewTimer
             },
             {continue, load_jwks}}
     else
-        {error, Reason} ->
-            {stop, {configuration_load_failed, Reason}, State}
+        {error, Reason} -> handle_backoff_retry(configuration_load_failed, Reason, State)
     end;
 handle_continue(
     load_jwks,
@@ -187,13 +207,18 @@ handle_continue(
             oidcc_provider_configuration:load_jwks(JwksUri, ProviderConfigurationOpts),
         {ok, NewTimer} = timer:send_after(Expiry, jwks_expired),
         ok = store_in_ets(EtsTable, jwks, Jwks),
-        {noreply, State#state{jwks = Jwks, jwks_refresh_timer = NewTimer}}
+        {noreply, State#state{
+            jwks = Jwks,
+            jwks_refresh_timer = NewTimer,
+            backoff_state = undefined
+        }}
     else
-        {error, Reason} ->
-            {stop, {jwks_load_failed, Reason}, State}
+        {error, Reason} -> handle_backoff_retry(jwks_load_failed, Reason, State)
     end.
 
 %% @private
+handle_info(backoff_retry, State) ->
+    {noreply, State, {continue, load_configuration}};
 handle_info(configuration_expired, State) ->
     {noreply, State#state{configuration_refresh_timer = undefined, jwks_refresh_timer = undefined},
         {continue, load_configuration}};
@@ -202,12 +227,12 @@ handle_info(jwks_expired, State) ->
 
 %% @doc Get Configuration
 -spec get_provider_configuration(Name :: gen_server:server_ref()) ->
-    oidcc_provider_configuration:t().
+    oidcc_provider_configuration:t() | undefined.
 get_provider_configuration(Name) ->
     lookup_in_ets_or_call(Name, provider_configuration, get_provider_configuration).
 
 %% @doc Get Parsed Jwks
--spec get_jwks(Name :: gen_server:server_ref()) -> jose_jwk:key().
+-spec get_jwks(Name :: gen_server:server_ref()) -> jose_jwk:key() | undefined.
 get_jwks(Name) ->
     lookup_in_ets_or_call(Name, jwks, get_jwks).
 
@@ -365,4 +390,37 @@ register_ets_table(Opts) ->
             ets:new(Name, [named_table, bag, protected, {read_concurrency, true}]);
         _OtherName ->
             undefined
+    end.
+
+-spec handle_backoff_retry(ErrorType, Reason, State) ->
+    {stop, {ErrorType, Reason}, State} | {noreply, State}
+when
+    ErrorType :: jwks_load_failed | configuration_load_failed,
+    Reason :: term(),
+    State :: state().
+handle_backoff_retry(
+    ErrorType,
+    Reason,
+    #state{
+        issuer = Issuer,
+        backoff_min = BackoffMin,
+        backoff_max = BackoffMax,
+        backoff_type = BackoffType,
+        backoff_state = BackoffState
+    } = State
+) ->
+    ErrorDetails = {ErrorType, Reason},
+    case oidcc_backoff:handle_retry(BackoffType, BackoffMin, BackoffMax, BackoffState) of
+        stop ->
+            {stop, ErrorDetails, State};
+        {Wait, NewBackoffState} ->
+            logger:error(
+                "Metadata load failed for issuer ~s. Retrying in ~w ms. Error Details: ~w",
+                [Issuer, Wait, ErrorDetails],
+                #{error => ErrorDetails}
+            ),
+            timer:send_after(Wait, backoff_retry),
+            {noreply, State#state{
+                backoff_state = NewBackoffState
+            }}
     end.

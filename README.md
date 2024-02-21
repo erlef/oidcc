@@ -46,7 +46,7 @@ OpenID Certified by [Jonatan Männchen](https://github.com/maennchen) at the
 [Erlang Ecosystem Foundation](https://github.com/erlef) of multiple Relaying
 Party conformance profiles of the OpenID Connect protocol:
 For details, check the
-[Conformance Documentation](https://github.com/erlef/oidcc/tree/openid-foundation-certification).
+[Conformance Test Suite](https://github.com/erlef/oidcc_conformance).
 
 <br clear="left"/>
 

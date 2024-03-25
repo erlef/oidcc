@@ -148,6 +148,11 @@ handle_cast(refresh_configuration, State) ->
     {noreply, State, {continue, load_configuration}};
 handle_cast(refresh_jwks, State) ->
     {noreply, State, {continue, load_jwks}};
+handle_cast(
+    {refresh_jwks_for_unknown_kid, _Kid},
+    #state{jwks = #jose_jwk{keys = {jose_jwk_set, []}}} = State
+) ->
+    {noreply, State, {continue, load_jwks}};
 handle_cast({refresh_jwks_for_unknown_kid, Kid}, #state{jwks = Jwks} = State) ->
     case has_kid(Jwks, Kid) of
         false ->

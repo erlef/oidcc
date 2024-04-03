@@ -352,16 +352,15 @@ lookup_in_ets_or_call(Name, Key, Call) ->
 
 -spec get_ets_table_name(WorkerRef :: gen_server:server_ref()) ->
     {ok, gen_server:server_ref()} | error.
-get_ets_table_name(WorkerName) when is_atom(WorkerName) ->
-    {ok, erlang:list_to_atom(erlang:atom_to_list(WorkerName) ++ "_table")};
+get_ets_table_name(Name) when is_atom(Name) ->
+    {ok, Name};
 get_ets_table_name(_Ref) ->
     error.
 
 -spec register_ets_table(Opts :: opts()) -> ets:table() | undefined.
 register_ets_table(Opts) ->
     case maps:get(name, Opts, undefined) of
-        {local, WorkerName} ->
-            Name = erlang:list_to_atom(erlang:atom_to_list(WorkerName) ++ "_table"),
+        {local, Name} ->
             ets:new(Name, [named_table, bag, protected, {read_concurrency, true}]);
         _OtherName ->
             undefined

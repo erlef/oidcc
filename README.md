@@ -77,6 +77,32 @@ The refactoring for `v3` and the certification is funded as an
 
 <br clear="left"/>
 
+
+<picture style="margin-right: 15px; float: left;">
+  <source
+    media="(prefers-color-scheme: dark)"
+    srcset="https://security-audit-logo.s3.eu-central-1.amazonaws.com/image_safe_logo_dark.png"
+    width="170px"
+    align="left"
+  />
+  <source
+    media="(prefers-color-scheme: light)"
+    srcset="https://security-audit-logo.s3.eu-central-1.amazonaws.com/image_safe_logo_light.png"
+    width="170px"
+    align="left"
+  />
+  <img
+    src="https://security-audit-logo.s3.eu-central-1.amazonaws.com/image_safe_logo_light.png"
+    alt="Security Audit For Erlang and Elixir"
+    width="170px"
+    align="left"
+  />
+</picture>
+
+A security audit was performed by [SAFE-Erlang-Elixir](https://github.com/SAFE-Erlang-Elixir) more info [HERE](https://www.erlang-solutions.com/landings/security-audit-for-erlang-2/).
+
+<br clear="left"/>
+
 ## Supported Features
 
 * [Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html)

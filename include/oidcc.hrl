@@ -5,6 +5,6 @@
 -include("oidcc_client_registration.hrl").
 -include("oidcc_token.hrl").
 
--defined(OIDCC_HRL, 1).
+-define(OIDCC_HRL, 1).
 
 -endif.

@@ -439,10 +439,10 @@ encrypt(Jwt, Jwk, [Algorithm | _RestAlgorithms] = SupportedAlgorithms, Supported
 -spec thumbprint(Jwk :: jose_jwk:key()) -> {ok, binary()} | error.
 thumbprint(Jwk) ->
     evaluate_for_all_keys(Jwk, fun
-        (#jose_jwk{fields = #{<<"use">> := <<"sig">>}} = Key) ->
-            {ok, jose_jwk:thumbprint(Key)};
-        (_Key) ->
-            error
+        (#jose_jwk{fields = #{<<"use">> := Use}}) when Use =/= <<"sig">> ->
+            error;
+        (Key) ->
+            {ok, jose_jwk:thumbprint(Key)}
     end).
 
 %% @private
@@ -450,13 +450,13 @@ thumbprint(Jwk) ->
     {ok, binary()} | {error, no_supported_alg_or_key}.
 sign_dpop(Jwt, Jwk, SigningAlgSupported) ->
     evaluate_for_all_keys(Jwk, fun
-        (#jose_jwk{fields = #{<<"use">> := <<"sig">>}} = Key) ->
+        (#jose_jwk{fields = #{<<"use">> := Use}}) when Use =/= <<"sig">> ->
+            error;
+        (Key) ->
             {_, PublicJwk} = jose_jwk:to_public_map(Key),
             sign(Jwt, Key, SigningAlgSupported, #{
                 <<"typ">> => <<"dpop+jwt">>, <<"jwk">> => PublicJwk
-            });
-        (_Key) ->
-            error
+            })
     end).
 
 %% @private

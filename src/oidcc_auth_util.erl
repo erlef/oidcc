@@ -383,18 +383,8 @@ dpop_proof(Method, Endpoint, Claims0, #oidcc_client_context{
         <<"nbf">> => os:system_time(seconds) - MaxClockSkew
     },
     Jwt = jose_jwt:from(Claims),
-    {_, PublicJwk} = jose_jwk:to_public_map(ClientJwks),
 
-    case
-        oidcc_jwt_util:sign(Jwt, ClientJwks, SigningAlgSupported, #{
-            <<"typ">> => <<"dpop+jwt">>, <<"jwk">> => PublicJwk
-        })
-    of
-        {ok, SignedRequestObject} ->
-            {ok, SignedRequestObject};
-        {error, no_supported_alg_or_key} ->
-            error
-    end;
+    oidcc_jwt_util:sign_dpop(Jwt, ClientJwks, SigningAlgSupported);
 dpop_proof(_Method, _Endpoint, _Claims, _ClientContext) ->
     error.
 

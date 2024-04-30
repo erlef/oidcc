@@ -620,16 +620,17 @@ dpop_proof_test() ->
         dpop_signing_alg_values_supported = [<<"RS256">>]
     },
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
-
     ClientJwk = Jwks#jose_jwk{
         fields = #{<<"kid">> => <<"private_kid">>, <<"use">> => <<"sig">>}
     },
+
+    ClientJwks = #jose_jwk{keys = {jose_jwk_set, [ClientJwk]}},
 
     ClientId = <<"client_id">>,
     ClientSecret = <<"client_secret">>,
 
     ClientContext = oidcc_client_context:from_manual(
-        Configuration, Jwks, ClientId, ClientSecret, #{client_jwks => ClientJwk}
+        Configuration, Jwks, ClientId, ClientSecret, #{client_jwks => ClientJwks}
     ),
 
     HttpBody = <<"{\"name\":\"joe\", \"sub\":\"123456\"}">>,

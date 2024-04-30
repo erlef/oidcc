@@ -1137,11 +1137,7 @@ private_key_jwt_fixture() ->
         dpop_signing_alg_values_supported = [<<"RS256">>]
     },
 
-    Jwks0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
-
-    Jwks = Jwks0#jose_jwk{
-        fields = #{<<"kid">> => <<"private_kid">>, <<"use">> => <<"sig">>}
-    },
+    Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 
     ClientId = <<"client_id">>,
 

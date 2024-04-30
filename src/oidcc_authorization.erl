@@ -60,6 +60,27 @@
     | no_supported_code_challenge
     | oidcc_http_util:error().
 
+-telemetry_event(#{
+    event => [oidcc, par_request, start],
+    description => <<"Emitted at the start of executing a PAR request">>,
+    measurements => <<"#{system_time => non_neg_integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, par_request, stop],
+    description => <<"Emitted at the end of executing a PAR request">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
+-telemetry_event(#{
+    event => [oidcc, par_request, exception],
+    description => <<"Emitted at the end of executing a PAR request">>,
+    measurements => <<"#{duration => integer(), monotonic_time => integer()}">>,
+    metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
+}).
+
 %% @doc
 %% Create Auth Redirect URL
 %%

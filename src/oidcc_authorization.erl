@@ -237,15 +237,18 @@ when
 maybe_append_dpop_jkt(
     QueryParams,
     #oidcc_client_context{
-        client_jwks = #jose_jwk{},
+        client_jwks = #jose_jwk{} = ClientJwks,
         provider_configuration = #oidcc_provider_configuration{
             dpop_signing_alg_values_supported = [_ | _]
         }
-    } = ClientContext
+    }
 ) ->
-    #oidcc_client_context{client_jwks = ClientJwks} = ClientContext,
-    Thumbprint = jose_jwk:thumbprint(ClientJwks),
-    [{"dpop_jkt", Thumbprint} | QueryParams];
+    case oidcc_jwt_util:thumbprint(ClientJwks) of
+        {ok, Thumbprint} ->
+            [{<<"dpop_jkt">>, Thumbprint} | QueryParams];
+        error ->
+            QueryParams
+    end;
 maybe_append_dpop_jkt(QueryParams, _ClientContext) ->
     QueryParams.
 

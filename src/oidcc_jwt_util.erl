@@ -21,6 +21,8 @@
 -export([refresh_jwks_fun/1]).
 -export([sign/3]).
 -export([sign/4]).
+-export([sign_dpop/3]).
+-export([thumbprint/1]).
 -export([verify_claims/2]).
 -export([verify_not_none_alg/1]).
 -export([verify_signature/3]).
@@ -376,6 +378,7 @@ verify_decrypted_token(Jwt, SigningAlgs, Jwe, Jwks) ->
         {error, Reason} ->
             {error, Reason}
     end.
+
 %% @private
 -spec encrypt(
     Jwt :: binary(),
@@ -431,6 +434,30 @@ encrypt(Jwt, Jwk, [Algorithm | _RestAlgorithms] = SupportedAlgorithms, Supported
         {ok, Token} -> {ok, Token};
         error -> encrypt(Jwt, Jwk, SupportedAlgorithms, SupportedEncValues, RestEncValues)
     end.
+
+%% @private
+-spec thumbprint(Jwk :: jose_jwk:key()) -> {ok, binary()} | error.
+thumbprint(Jwk) ->
+    evaluate_for_all_keys(Jwk, fun
+        (#jose_jwk{fields = #{<<"use">> := Use}}) when Use =/= <<"sig">> ->
+            error;
+        (Key) ->
+            {ok, jose_jwk:thumbprint(Key)}
+    end).
+
+%% @private
+-spec sign_dpop(Jwt :: #jose_jwt{}, Jwk :: jose_jwk:key(), SigningAlgSupported :: [binary()]) ->
+    {ok, binary()} | {error, no_supported_alg_or_key}.
+sign_dpop(Jwt, Jwk, SigningAlgSupported) ->
+    evaluate_for_all_keys(Jwk, fun
+        (#jose_jwk{fields = #{<<"use">> := Use}}) when Use =/= <<"sig">> ->
+            error;
+        (Key) ->
+            {_, PublicJwk} = jose_jwk:to_public_map(Key),
+            sign(Jwt, Key, SigningAlgSupported, #{
+                <<"typ">> => <<"dpop+jwt">>, <<"jwk">> => PublicJwk
+            })
+    end).
 
 %% @private
 -spec evaluate_for_all_keys(Jwk :: jose_jwk:key(), fun((jose_jwk:key()) -> {ok, Result} | error)) ->

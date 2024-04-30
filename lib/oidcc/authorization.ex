@@ -1,6 +1,33 @@
 defmodule Oidcc.Authorization do
+  use TelemetryRegistry
+
+  telemetry_event(%{
+    event: [:oidcc, :par_request, :start],
+    description: "Emitted at the start of executing a PAR request",
+    measurements: "%{system_time: non_neg_integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :par_request, :stop],
+    description: "Emitted at the end of executing a PAR request",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
+  telemetry_event(%{
+    event: [:oidcc, :par_request, :exception],
+    description: "Emitted at the end of executing a PAR request",
+    measurements: "%{duration: integer(), monotonic_time: integer()}",
+    metadata: "%{issuer: :uri_string.uri_string(), client_id: String.t()}"
+  })
+
   @moduledoc """
   Functions to start an OpenID Connect Authorization
+
+  ## Telemetry
+
+  #{telemetry_docs()}
   """
   @moduledoc since: "3.0.0"
 

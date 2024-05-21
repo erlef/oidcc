@@ -201,7 +201,16 @@ when
     Issuer :: uri_string:uri_string(),
     Opts :: opts().
 load_configuration(Issuer0, Opts) ->
-    Issuer = binary:list_to_bin([Issuer0]),
+    Issuer = iolist_to_binary(Issuer0),
+    % Accept issuer with and without trailing "/"
+    Issuer1 = case binary:last(Issuer) of
+        $/ ->
+            <<X:(size(Issuer)-1)/binary, $/>> = Issuer,
+            X;
+        _ ->
+            <<Issuer/binary, $/>>
+    end,
+
     TelemetryOpts = #{topic => [oidcc, load_configuration], extra_meta => #{issuer => Issuer}},
     RequestOpts = maps:get(request_opts, Opts, #{}),
 
@@ -221,7 +230,10 @@ load_configuration(Issuer0, Opts) ->
         case ConfigIssuer of
             Issuer ->
                 {ok, {Configuration, Expiry}};
-            _DifferentIssuer when AllowIssuerMismatch -> {ok, {Configuration, Expiry}};
+            Issuer1 ->
+                {ok, {Configuration, Expiry}};
+            _DifferentIssuer when AllowIssuerMismatch ->
+                {ok, {Configuration, Expiry}};
             DifferentIssuer when not AllowIssuerMismatch ->
                 {error, {issuer_mismatch, DifferentIssuer}}
         end

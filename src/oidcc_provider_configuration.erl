@@ -203,13 +203,14 @@ when
 load_configuration(Issuer0, Opts) ->
     Issuer = iolist_to_binary(Issuer0),
     % Accept issuer with and without trailing "/"
-    Issuer1 = case binary:last(Issuer) of
-        $/ ->
-            <<X:(size(Issuer)-1)/binary, $/>> = Issuer,
-            X;
-        _ ->
-            <<Issuer/binary, $/>>
-    end,
+    Issuer1 =
+        case binary:last(Issuer) of
+            $/ ->
+                <<X:(size(Issuer) - 1)/binary, $/>> = Issuer,
+                X;
+            _ ->
+                <<Issuer/binary, $/>>
+        end,
 
     TelemetryOpts = #{topic => [oidcc, load_configuration], extra_meta => #{issuer => Issuer}},
     RequestOpts = maps:get(request_opts, Opts, #{}),

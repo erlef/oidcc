@@ -161,6 +161,8 @@ extract_successful_response({{_HttpVersion, StatusCode, _HttpStatusName}, Header
 -spec fetch_content_type(Headers) -> json | jwt | unknown when Headers :: [http_header()].
 fetch_content_type(Headers) ->
     case proplists:lookup("content-type", Headers) of
+        {"content-type", "application/jwk-set+json" ++ _Rest} ->
+            json;
         {"content-type", "application/json" ++ _Rest} ->
             json;
         {"content-type", "application/jwt" ++ _Rest} ->

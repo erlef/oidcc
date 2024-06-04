@@ -19,7 +19,7 @@
 %%
 %% <ul>
 %%   <li>`max_clock_skew' (default `0') - Maximum allowed clock skew for JWT
-%%     `exp' / `nbf' validation</li>
+%%     `exp' / `nbf' validation, in seconds</li>
 %% </ul>
 %% @end
 %% @since 3.0.0

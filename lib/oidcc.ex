@@ -19,7 +19,7 @@ defmodule Oidcc do
   ## Global Configuration
 
   * `max_clock_skew` (default `0`) - Maximum allowed clock skew for JWT
-    `exp` / `nbf` validation
+    `exp` / `nbf` validation, in seconds
   """
   @moduledoc since: "3.0.0"
 

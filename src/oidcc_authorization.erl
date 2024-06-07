@@ -117,8 +117,7 @@ create_redirect_url(#oidcc_client_context{} = ClientContext, Opts) ->
 
     maybe
         true ?= lists:member(<<"authorization_code">>, GrantTypesSupported),
-        {ok, QueryParams0} ?= redirect_params(ClientContext, Opts),
-        QueryParams = QueryParams0 ++ maps:get(url_extension, Opts, []),
+        {ok, QueryParams} ?= redirect_params(ClientContext, Opts),
         QueryString = uri_string:compose_query(QueryParams),
         {ok, [AuthEndpoint, <<"?">>, QueryString]}
     else
@@ -132,6 +131,7 @@ create_redirect_url(#oidcc_client_context{} = ClientContext, Opts) ->
     ClientContext :: oidcc_client_context:t(),
     Opts :: opts().
 redirect_params(#oidcc_client_context{client_id = ClientId} = ClientContext, Opts) ->
+    UrlExtension = maps:get(url_extension, Opts, []),
     QueryParams0 =
         [
             {<<"response_type">>, maps:get(response_type, Opts, <<"code">>)},
@@ -158,7 +158,7 @@ redirect_params(#oidcc_client_context{client_id = ClientId} = ClientContext, Opt
             maps:get(scopes, Opts, [openid]), QueryParams5
         ),
         QueryParams7 = maybe_append_dpop_jkt(QueryParams6, ClientContext),
-        {ok, QueryParams} ?= attempt_request_object(QueryParams7, ClientContext),
+        {ok, QueryParams} ?= attempt_request_object(QueryParams7, ClientContext, UrlExtension),
         attempt_par(QueryParams, ClientContext, Opts)
     end.
 
@@ -252,25 +252,30 @@ maybe_append_dpop_jkt(
 maybe_append_dpop_jkt(QueryParams, _ClientContext) ->
     QueryParams.
 
--spec attempt_request_object(QueryParams, ClientContext) ->
+-spec attempt_request_object(QueryParams, ClientContext, UrlExtension) ->
     {ok, QueryParams} | {error, error()}
 when
     QueryParams :: oidcc_http_util:query_params(),
+    UrlExtension :: oidcc_http_util:query_params(),
     ClientContext :: oidcc_client_context:t().
-attempt_request_object(QueryParams, #oidcc_client_context{
-    client_id = ClientId,
-    client_secret = ClientSecret,
-    client_jwks = ClientJwks,
-    provider_configuration = #oidcc_provider_configuration{
-        issuer = Issuer,
-        request_parameter_supported = true,
-        require_signed_request_object = RequireSignedRequestObject,
-        request_object_signing_alg_values_supported = SigningAlgSupported0,
-        request_object_encryption_alg_values_supported = EncryptionAlgSupported0,
-        request_object_encryption_enc_values_supported = EncryptionEncSupported0
+attempt_request_object(
+    QueryParams,
+    #oidcc_client_context{
+        client_id = ClientId,
+        client_secret = ClientSecret,
+        client_jwks = ClientJwks,
+        provider_configuration = #oidcc_provider_configuration{
+            issuer = Issuer,
+            request_parameter_supported = true,
+            require_signed_request_object = RequireSignedRequestObject,
+            request_object_signing_alg_values_supported = SigningAlgSupported0,
+            request_object_encryption_alg_values_supported = EncryptionAlgSupported0,
+            request_object_encryption_enc_values_supported = EncryptionEncSupported0
+        },
+        jwks = Jwks
     },
-    jwks = Jwks
-}) when ClientSecret =/= unauthenticated ->
+    UrlExtension
+) when ClientSecret =/= unauthenticated ->
     SigningAlgSupported =
         case SigningAlgSupported0 of
             undefined -> [];
@@ -315,7 +320,7 @@ attempt_request_object(QueryParams, #oidcc_client_context{
             <<"exp">> => os:system_time(seconds) + 30,
             <<"nbf">> => os:system_time(seconds) - MaxClockSkew
         },
-        maps:from_list(QueryParams)
+        maps:from_list(QueryParams ++ UrlExtension)
     ),
     Jwt = jose_jwt:from(Claims),
 
@@ -334,17 +339,25 @@ attempt_request_object(QueryParams, #oidcc_client_context{
                 )
             of
                 {ok, EncryptedRequestObject} ->
-                    {ok, [{<<"request">>, EncryptedRequestObject} | essential_params(QueryParams)]};
+                    {ok,
+                        [{<<"request">>, EncryptedRequestObject} | essential_params(QueryParams)] ++
+                            UrlExtension};
                 {error, no_supported_alg_or_key} ->
-                    {ok, [{<<"request">>, SignedRequestObject} | essential_params(QueryParams)]}
+                    {ok,
+                        [{<<"request">>, SignedRequestObject} | essential_params(QueryParams)] ++
+                            UrlExtension}
             end
     end;
-attempt_request_object(_QueryParams, #oidcc_client_context{
-    provider_configuration = #oidcc_provider_configuration{require_signed_request_object = true}
-}) ->
+attempt_request_object(
+    _QueryParams,
+    #oidcc_client_context{
+        provider_configuration = #oidcc_provider_configuration{require_signed_request_object = true}
+    },
+    _UrlExtension
+) ->
     {error, request_object_required};
-attempt_request_object(QueryParams, _ClientContext) ->
-    {ok, QueryParams}.
+attempt_request_object(QueryParams, _ClientContext, UrlExtension) ->
+    {ok, QueryParams ++ UrlExtension}.
 
 -spec attempt_par(QueryParams, ClientContext, Opts) ->
     {ok, QueryParams} | {error, error()}

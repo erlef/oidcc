@@ -34,13 +34,13 @@ retrieves_jwt_profile_token(_Config) ->
 
     {ok, SalesforceClientContext} = oidcc_client_context:from_configuration_worker(
         SalesforceConfigurationPid,
-        <<"client_id">>,
+        <<"231391584430604723">>,
         <<"client_secret">>
     ),
 
     {ok, ZitadelClientContext} = oidcc_client_context:from_configuration_worker(
         ZitadelConfigurationPid,
-        <<"client_id">>,
+        <<"231391584430604723">>,
         <<"client_secret">>
     ),
 
@@ -53,7 +53,7 @@ retrieves_jwt_profile_token(_Config) ->
     ?assertMatch(
         {ok, #oidcc_token{}},
         oidcc_token:jwt_profile(<<"231391584430604723">>, ZitadelClientContext, Key, #{
-            scope => [<<"urn:zitadel:iam:org:project:id:zitadel:aud">>],
+            scope => [<<"openid">>, <<"urn:zitadel:iam:org:project:id:zitadel:aud">>],
             kid => maps:get(<<"keyId">>, KeyMap)
         })
     ),

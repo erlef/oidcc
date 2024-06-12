@@ -283,10 +283,10 @@ defmodule Oidcc do
       ...>   Oidcc.jwt_profile_token(
       ...>     subject,
       ...>     pid,
-      ...>     "client_id",
+      ...>     System.fetch_env!("CLIENT_ID"),
       ...>     "client_secret",
       ...>     jwk,
-      ...>     %{scope: ["urn:zitadel:iam:org:project:id:zitadel:aud"], kid: kid}
+      ...>     %{scope: ["openid", "urn:zitadel:iam:org:project:id:zitadel:aud"], kid: kid}
       ...>   )
 
   """
@@ -331,7 +331,7 @@ defmodule Oidcc do
       ...>     pid,
       ...>     System.fetch_env!("CLIENT_CREDENTIALS_CLIENT_ID"),
       ...>     System.fetch_env!("CLIENT_CREDENTIALS_CLIENT_SECRET"),
-      ...>     %{scope: ["scope"]}
+      ...>     %{scope: ["openid"]}
       ...>   )
 
   """

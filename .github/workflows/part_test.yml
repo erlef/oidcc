@@ -175,6 +175,7 @@ jobs:
       matrix:
         include:
           - elixir: "1.14.5"
+            otp: "26.2.5"
             unstable: false
           - elixir: "1.15.8"
             otp: "26.2.5"

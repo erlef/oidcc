@@ -166,11 +166,11 @@ retrieve_jwt_profile_token(_Config) ->
         oidcc:jwt_profile_token(
             <<"231391584430604723">>,
             ZitadelConfigurationPid,
-            <<"client_id">>,
+            <<"231391584430604723">>,
             <<"client_secret">>,
             Key,
             #{
-                scope => [<<"urn:zitadel:iam:org:project:id:zitadel:aud">>],
+                scope => [<<"openid">>, <<"urn:zitadel:iam:org:project:id:zitadel:aud">>],
                 kid => maps:get(<<"keyId">>, KeyMap)
             }
         )

@@ -100,6 +100,7 @@ retrieves_client_credentials_token(_Config) ->
         ZitadelClientCredentialsClientSecret
     ),
 
+    application:set_env(oidcc, max_clock_skew, 10),
     ?assertMatch(
         {error, {grant_type_not_supported, client_credentials}},
         oidcc_token:client_credentials(SalesforceClientContext, #{})
@@ -111,6 +112,7 @@ retrieves_client_credentials_token(_Config) ->
             scope => [<<"openid">>, <<"profile">>]
         })
     ),
+    application:unset_env(oidcc, max_clock_skew),
 
     ok.
 
@@ -137,6 +139,7 @@ validates_access_token(_Config) ->
         ZitadelClientCredentialsClientSecret
     ),
 
+    application:set_env(oidcc, max_clock_skew, 10),
     {ok, Token} = oidcc_token:client_credentials(ZitadelClientContext, #{
         scope => [<<"openid">>, <<"profile">>]
     }),
@@ -149,5 +152,6 @@ validates_access_token(_Config) ->
         }},
         oidcc_token:validate_jwt(AccessToken, ZitadelClientContext, #{signing_algs => [<<"RS256">>]})
     ),
+    application:unset_env(oidcc, max_clock_skew),
 
     ok.

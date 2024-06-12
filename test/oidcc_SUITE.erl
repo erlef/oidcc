@@ -161,6 +161,7 @@ retrieve_jwt_profile_token(_Config) ->
     KeyMap = jose:decode(KeyJson),
     Key = jose_jwk:from_pem(maps:get(<<"key">>, KeyMap)),
 
+    application:set_env(oidcc, max_clock_skew, 10),
     ?assertMatch(
         {ok, _},
         oidcc:jwt_profile_token(
@@ -175,6 +176,7 @@ retrieve_jwt_profile_token(_Config) ->
             }
         )
     ),
+    application:unset_env(oidcc, max_clock_skew),
 
     ok.
 

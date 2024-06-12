@@ -46,6 +46,9 @@ defmodule Oidcc.TokenTest do
     System.put_env("CLIENT_CREDENTIALS_CLIENT_SECRET", @client_credentials_client_secret)
     System.put_env("JWT_PROFILE", @jwt_profile)
 
+    # Allow minimal clock skew for Zitadel
+    Application.put_env(:oidcc, :max_clock_skew, 5)
+
     :ok
   end
 

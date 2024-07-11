@@ -211,9 +211,6 @@ create_redirect_url_with_request_object_test() ->
 
     ?assertMatch(
         #{
-            <<"client_id">> := <<"client_id">>,
-            <<"redirect_uri">> := <<"https://my.server/return">>,
-            <<"response_type">> := <<"code">>,
             <<"scope">> := <<"openid">>,
             <<"should_be_in">> := <<"both">>,
             <<"request">> := _

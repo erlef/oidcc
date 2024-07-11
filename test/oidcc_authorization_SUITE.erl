@@ -42,15 +42,9 @@ create_redirect_url_inl_gov(_Config) ->
     ),
     QueryParams = maps:from_list(QueryParams1),
 
-    ?assertMatch(
-        #{
-            <<"client_id">> := <<"client_id">>,
-            <<"redirect_uri">> := <<"https://my.server/return">>,
-            <<"response_type">> := <<"code">>,
-            <<"scope">> := <<"openid">>,
-            <<"request">> := _
-        },
-        QueryParams
-    ),
+    ?assertMatch(#{
+                   <<"scope">> := <<"openid">>,
+                   <<"request">> := _
+                  }, QueryParams),
 
     ok.

@@ -169,12 +169,14 @@ handle_continue(
     #state{
         issuer = Issuer,
         provider_configuration_opts = ProviderConfigurationOpts,
-        configuration_refresh_timer = OldTimer,
+        configuration_refresh_timer = OldConfigurationRefreshTimer,
+        jwks_refresh_timer = OldJwksRefreshTimer,
         ets_table = EtsTable
     } =
         State
 ) ->
-    maybe_cancel_timer(OldTimer),
+    maybe_cancel_timer(OldConfigurationRefreshTimer),
+    maybe_cancel_timer(OldJwksRefreshTimer),
 
     maybe
         {ok, {Configuration, Expiry}} ?=

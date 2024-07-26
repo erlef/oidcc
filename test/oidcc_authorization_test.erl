@@ -197,7 +197,7 @@ create_redirect_url_with_request_object_test() ->
 
     {ok, Url} = oidcc_authorization:create_redirect_url(ClientContext, #{
         redirect_uri => RedirectUri,
-        url_extension => [{<<"should_be_in">>, <<"query_string">>}]
+        url_extension => [{<<"should_be_in">>, <<"both">>}]
     }),
 
     ?assertMatch(<<"https://my.provider/auth?request=", _/binary>>, iolist_to_binary(Url)),
@@ -215,7 +215,7 @@ create_redirect_url_with_request_object_test() ->
             <<"redirect_uri">> := <<"https://my.server/return">>,
             <<"response_type">> := <<"code">>,
             <<"scope">> := <<"openid">>,
-            <<"should_be_in">> := <<"query_string">>,
+            <<"should_be_in">> := <<"both">>,
             <<"request">> := _
         },
         QueryParams
@@ -241,7 +241,8 @@ create_redirect_url_with_request_object_test() ->
                 <<"nbf">> := _,
                 <<"redirect_uri">> := RedirectUri,
                 <<"response_type">> := <<"code">>,
-                <<"scope">> := <<"openid">>
+                <<"scope">> := <<"openid">>,
+                <<"should_be_in">> := <<"both">>
             }
         },
         Jwt

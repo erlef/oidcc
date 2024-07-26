@@ -94,7 +94,9 @@ jobs:
         include:
           - otp: "26.0"
             unstable: false
-          - otp: "26.2"
+          - otp: "26.2.5"
+            unstable: false
+          - otp: "27.0"
             unstable: false
           - otp: "master"
             unstable: true
@@ -116,6 +118,7 @@ jobs:
       - run: rebar3 eunit --cover --cover_export_name "eunit-${{ steps.setupBEAM.outputs.otp-version }}"
         continue-on-error: ${{ matrix.unstable }}
       - uses: actions/upload-artifact@v4
+        if: "${{ matrix.otp == needs.detectToolVersions.outputs.otpVersion }}"
         with:
           name: eunit-coverage-${{ matrix.otp }}
           path: "_build/test/cover/eunit-${{ steps.setupBEAM.outputs.otp-version }}.coverdata"
@@ -133,7 +136,9 @@ jobs:
         include:
           - otp: "26.0"
             unstable: false
-          - otp: "26.2"
+          - otp: "26.2.5"
+            unstable: false
+          - otp: "27.0"
             unstable: false
           - otp: "master"
             unstable: true
@@ -155,6 +160,7 @@ jobs:
       - run: rebar3 ct --cover --cover_export_name "ct-${{ steps.setupBEAM.outputs.otp-version }}"
         continue-on-error: ${{ matrix.unstable }}
       - uses: actions/upload-artifact@v4
+        if: "${{ matrix.otp == needs.detectToolVersions.outputs.otpVersion }}"
         with:
           name: ct-coverage-${{ matrix.otp }}
           path: _build/test/cover/ct-${{ steps.setupBEAM.outputs.otp-version }}.coverdata
@@ -171,12 +177,19 @@ jobs:
       matrix:
         include:
           - elixir: "1.14.5"
+            otp: "26.2.5"
             unstable: false
-          - elixir: "1.15.7"
+          - elixir: "1.15.8"
+            otp: "26.2.5"
             unstable: false
-          - elixir: "1.16.0"
+          - elixir: "1.16.3"
+            otp: "26.2.5"
+            unstable: false
+          - elixir: "1.17.0"
+            otp: "27.0"
             unstable: false
           - elixir: "main"
+            otp: "${{ needs.detectToolVersions.outputs.otpVersion }}"
             unstable: true
 
     steps:
@@ -184,7 +197,7 @@ jobs:
       - uses: erlef/setup-beam@v1
         id: setupBEAM
         with:
-          otp-version: "${{ needs.detectToolVersions.outputs.otpVersion }}"
+          otp-version: "${{ matrix.otp }}"
           rebar3-version: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
           elixir-version: "${{ matrix.elixir }}"
           version-type: strict
@@ -204,6 +217,7 @@ jobs:
       - run: mix test --cover --export-coverage "mix_test-${{ steps.setupBEAM.outputs.elixir-version }}"
         continue-on-error: ${{ matrix.unstable }}
       - uses: actions/upload-artifact@v4
+        if: "${{ matrix.otp == needs.detectToolVersions.outputs.otpVersion }}"
         with:
           name: mix_test-coverage-${{ matrix.elixir }}
           path: cover/mix_test-${{ steps.setupBEAM.outputs.elixir-version }}.coverdata

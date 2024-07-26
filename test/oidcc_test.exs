@@ -8,7 +8,8 @@ defmodule OidccTest do
 
   %{
     "clientId" => client_credentials_client_id,
-    "clientSecret" => client_credentials_client_secret
+    "clientSecret" => client_credentials_client_secret,
+    "project" => project
   } =
     :oidcc
     |> Application.app_dir("priv/test/fixtures/zitadel-client-credentials.json")
@@ -17,6 +18,7 @@ defmodule OidccTest do
 
   @client_credentials_client_id client_credentials_client_id
   @client_credentials_client_secret client_credentials_client_secret
+  @project project
 
   @jwt_profile :oidcc
                |> Application.app_dir("priv/test/fixtures/zitadel-jwt-profile.json")
@@ -26,9 +28,13 @@ defmodule OidccTest do
 
   setup_all do
     # Used in doctests
+    System.put_env("CLIENT_ID", @project)
     System.put_env("CLIENT_CREDENTIALS_CLIENT_ID", @client_credentials_client_id)
     System.put_env("CLIENT_CREDENTIALS_CLIENT_SECRET", @client_credentials_client_secret)
     System.put_env("JWT_PROFILE", @jwt_profile)
+
+    # Allow minimal clock skew for Zitadel
+    Application.put_env(:oidcc, :max_clock_skew, 5)
 
     :ok
   end
@@ -159,10 +165,10 @@ defmodule OidccTest do
                Oidcc.jwt_profile_token(
                  subject,
                  pid,
-                 "client_id",
+                 @project,
                  "client_secret",
                  jwk,
-                 %{scope: ["urn:zitadel:iam:org:project:id:zitadel:aud"], kid: kid}
+                 %{scope: ["openid", "urn:zitadel:iam:org:project:id:zitadel:aud"], kid: kid}
                )
     end
   end
@@ -179,7 +185,7 @@ defmodule OidccTest do
                  pid,
                  @client_credentials_client_id,
                  @client_credentials_client_secret,
-                 %{scope: ["scope"]}
+                 %{scope: ["openid"]}
                )
     end
   end

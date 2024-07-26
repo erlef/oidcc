@@ -161,20 +161,22 @@ retrieve_jwt_profile_token(_Config) ->
     KeyMap = jose:decode(KeyJson),
     Key = jose_jwk:from_pem(maps:get(<<"key">>, KeyMap)),
 
+    application:set_env(oidcc, max_clock_skew, 10),
     ?assertMatch(
         {ok, _},
         oidcc:jwt_profile_token(
             <<"231391584430604723">>,
             ZitadelConfigurationPid,
-            <<"client_id">>,
+            <<"231391584430604723">>,
             <<"client_secret">>,
             Key,
             #{
-                scope => [<<"urn:zitadel:iam:org:project:id:zitadel:aud">>],
+                scope => [<<"openid">>, <<"urn:zitadel:iam:org:project:id:zitadel:aud">>],
                 kid => maps:get(<<"keyId">>, KeyMap)
             }
         )
     ),
+    application:unset_env(oidcc, max_clock_skew),
 
     ok.
 

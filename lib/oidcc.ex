@@ -19,7 +19,7 @@ defmodule Oidcc do
   ## Global Configuration
 
   * `max_clock_skew` (default `0`) - Maximum allowed clock skew for JWT
-    `exp` / `nbf` validation
+    `exp` / `nbf` validation, in seconds
   """
   @moduledoc since: "3.0.0"
 
@@ -50,7 +50,7 @@ defmodule Oidcc do
           opts :: :oidcc_authorization.opts() | :oidcc_client_context.opts()
         ) ::
           {:ok, :uri_string.uri_string()}
-          | {:error, :oidcc_client_context.error() | :oidcc_client_context.error()}
+          | {:error, :oidcc_client_context.error()}
   def create_redirect_url(provider_configuration_name, client_id, client_secret, opts),
     do: :oidcc.create_redirect_url(provider_configuration_name, client_id, client_secret, opts)
 
@@ -283,10 +283,10 @@ defmodule Oidcc do
       ...>   Oidcc.jwt_profile_token(
       ...>     subject,
       ...>     pid,
-      ...>     "client_id",
+      ...>     System.fetch_env!("CLIENT_ID"),
       ...>     "client_secret",
       ...>     jwk,
-      ...>     %{scope: ["urn:zitadel:iam:org:project:id:zitadel:aud"], kid: kid}
+      ...>     %{scope: ["openid", "urn:zitadel:iam:org:project:id:zitadel:aud"], kid: kid}
       ...>   )
 
   """
@@ -331,7 +331,7 @@ defmodule Oidcc do
       ...>     pid,
       ...>     System.fetch_env!("CLIENT_CREDENTIALS_CLIENT_ID"),
       ...>     System.fetch_env!("CLIENT_CREDENTIALS_CLIENT_SECRET"),
-      ...>     %{scope: ["scope"]}
+      ...>     %{scope: ["openid"]}
       ...>   )
 
   """

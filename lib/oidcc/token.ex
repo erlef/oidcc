@@ -367,7 +367,7 @@ defmodule Oidcc.Token do
       ...> {:ok, client_context} =
       ...>   Oidcc.ClientContext.from_configuration_worker(
       ...>     pid,
-      ...>     "client_id",
+      ...>     System.fetch_env!("CLIENT_ID"),
       ...>     "client_secret"
       ...>   )
       ...>
@@ -382,7 +382,7 @@ defmodule Oidcc.Token do
       ...>     subject,
       ...>     client_context,
       ...>     jwk,
-      ...>     %{scope: ["urn:zitadel:iam:org:project:id:zitadel:aud"], kid: kid}
+      ...>     %{scope: ["openid", "urn:zitadel:iam:org:project:id:zitadel:aud"], kid: kid}
       ...>   )
 
   """
@@ -427,7 +427,7 @@ defmodule Oidcc.Token do
       ...> {:ok, %Oidcc.Token{}} =
       ...>   Oidcc.Token.client_credentials(
       ...>     client_context,
-      ...>     %{scope: ["scope"]}
+      ...>     %{scope: ["openid"]}
       ...>   )
 
   """

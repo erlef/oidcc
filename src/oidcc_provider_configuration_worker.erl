@@ -189,7 +189,8 @@ handle_continue(
         {noreply,
             State#state{
                 provider_configuration = Configuration,
-                configuration_refresh_timer = NewTimer
+                configuration_refresh_timer = NewTimer,
+                jwks_refresh_timer = undefined
             },
             {continue, load_jwks}}
     else
@@ -227,8 +228,7 @@ handle_continue(
 handle_info(backoff_retry, State) ->
     {noreply, State, {continue, load_configuration}};
 handle_info(configuration_expired, State) ->
-    {noreply, State#state{configuration_refresh_timer = undefined, jwks_refresh_timer = undefined},
-        {continue, load_configuration}};
+    {noreply, State#state{jwks_refresh_timer = undefined}, {continue, load_configuration}};
 handle_info(jwks_expired, State) ->
     {noreply, State#state{jwks_refresh_timer = undefined}, {continue, load_jwks}}.
 

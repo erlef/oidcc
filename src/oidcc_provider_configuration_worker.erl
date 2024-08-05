@@ -168,15 +168,14 @@ handle_continue(
     load_configuration,
     #state{
         issuer = Issuer,
+        provider_configuration = OldProviderConfiguration,
         provider_configuration_opts = ProviderConfigurationOpts,
-        configuration_refresh_timer = OldConfigurationRefreshTimer,
-        jwks_refresh_timer = OldJwksRefreshTimer,
+        configuration_refresh_timer = RefreshTimer,
         ets_table = EtsTable
     } =
         State
 ) ->
-    maybe_cancel_timer(OldConfigurationRefreshTimer),
-    maybe_cancel_timer(OldJwksRefreshTimer),
+    maybe_cancel_timer(RefreshTimer),
 
     maybe
         {ok, {Configuration, Expiry}} ?=
@@ -184,14 +183,18 @@ handle_continue(
                 Issuer,
                 ProviderConfigurationOpts
             ),
+        #oidcc_provider_configuration{jwks_uri = JwksUri} = Configuration,
         {ok, NewTimer} = timer:send_after(Expiry, configuration_expired),
         ok = store_in_ets(EtsTable, provider_configuration, Configuration),
-        {noreply,
-            State#state{
-                provider_configuration = Configuration,
-                configuration_refresh_timer = NewTimer
-            },
-            {continue, load_jwks}}
+        NewState = State#state{
+            provider_configuration = Configuration,
+            configuration_refresh_timer = NewTimer
+        },
+        case OldProviderConfiguration of
+            undefined -> {noreply, NewState, {continue, load_jwks}};
+            #oidcc_provider_configuration{jwks_uri = JwksUri} -> {noreply, NewState};
+            #oidcc_provider_configuration{} -> {noreply, NewState, {continue, load_jwks}}
+        end
     else
         {error, Reason} -> handle_backoff_retry(configuration_load_failed, Reason, State)
     end;
@@ -227,8 +230,7 @@ handle_continue(
 handle_info(backoff_retry, State) ->
     {noreply, State, {continue, load_configuration}};
 handle_info(configuration_expired, State) ->
-    {noreply, State#state{configuration_refresh_timer = undefined, jwks_refresh_timer = undefined},
-        {continue, load_configuration}};
+    {noreply, State#state{jwks_refresh_timer = undefined}, {continue, load_configuration}};
 handle_info(jwks_expired, State) ->
     {noreply, State#state{jwks_refresh_timer = undefined}, {continue, load_jwks}}.
 

@@ -37,7 +37,8 @@
     client_id :: binary(),
     exp :: pos_integer(),
     scope :: oidcc_scope:scopes(),
-    username :: binary()
+    username :: binary(),
+    iss :: binary()
 }.
 %% Introspection Result
 %%
@@ -46,7 +47,8 @@
 -type opts() :: #{
     preferred_auth_methods => [oidcc_auth_util:auth_method(), ...],
     request_opts => oidcc_http_util:request_opts(),
-    dpop_nonce => binary()
+    dpop_nonce => binary(),
+    client_self_only => boolean()
 }.
 
 -type error() :: client_id_mismatch | introspection_not_supported | oidcc_http_util:error().
@@ -158,7 +160,10 @@ introspect(AccessToken, ClientContext, Opts) ->
                         uri_string:compose_query(Body)},
                 {ok, {{json, Token}, _Headers}} ?=
                     oidcc_http_util:request(post, Request, TelemetryOpts, RequestOpts),
-                extract_response(Token, ClientContext)
+                client_match(
+                  extract_response(Token),
+                  ClientContext,
+                  maps:get(client_self_only, Opts, true))
             else
                 {error, {use_dpop_nonce, NewDpopNonce, _}} when
                     DpopOpts =:= #{}
@@ -175,12 +180,27 @@ introspect(AccessToken, ClientContext, Opts) ->
             end
     end.
 
--spec extract_response(TokenMap, ClientContext) ->
-    {ok, t()} | {error, error()}
+-spec client_match({ok, Token}, ClientContext, ClientSelfOnly) ->
+{ok, t()}
+| {error, error()}
 when
-    TokenMap :: map(),
-    ClientContext :: oidcc_client_context:t().
-extract_response(TokenMap, #oidcc_client_context{client_id = ClientId}) ->
+      Token :: t(),
+      ClientContext :: oidcc_client_context:t(),
+      ClientSelfOnly :: boolean().
+client_match({ok,Token},_,false) ->
+    {ok, Token};
+client_match({ok, #oidcc_token_introspection{client_id = ClientId} = Token},
+             #oidcc_client_context{client_id = ClientId},
+             true) ->
+    {ok, Token};
+client_match(_,_,true) ->
+    {error, client_id_mismatch}.
+
+-spec extract_response(TokenMap) ->
+    {ok, t()}
+when
+    TokenMap :: map().
+extract_response(TokenMap) ->
     Active =
         case maps:get(<<"active">>, TokenMap, undefined) of
             true ->
@@ -198,14 +218,11 @@ extract_response(TokenMap, #oidcc_client_context{client_id = ClientId}) ->
     Aud = maps:get(<<"aud">>, TokenMap, undefined),
     Iss = maps:get(<<"iss">>, TokenMap, undefined),
     Jti = maps:get(<<"jti">>, TokenMap, undefined),
-    case maps:get(<<"client_id">>, TokenMap, undefined) of
-        IntrospectionClientId when
-            IntrospectionClientId == ClientId; IntrospectionClientId == undefined
-        ->
-            {ok, #oidcc_token_introspection{
+    Cid = maps:get(<<"client_id">>, TokenMap, undefined),
+    {ok, #oidcc_token_introspection{
                 active = Active,
                 scope = oidcc_scope:parse(Scope),
-                client_id = ClientId,
+                client_id = Cid,
                 username = Username,
                 exp = Exp,
                 token_type = TokenType,
@@ -232,7 +249,4 @@ extract_response(TokenMap, #oidcc_client_context{client_id = ClientId}) ->
                     ],
                     TokenMap
                 )
-            }};
-        _ ->
-            {error, client_id_mismatch}
-    end.
+            }}.

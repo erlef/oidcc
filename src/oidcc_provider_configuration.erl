@@ -33,6 +33,7 @@
 -export_type([t/0]).
 
 -type quirks() :: #{
+    allow_issuer_mismatch => boolean(),
     allow_unsafe_http => boolean(),
     document_overrides => map()
 }.

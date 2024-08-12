@@ -212,10 +212,12 @@ load_configuration(Issuer0, Opts) ->
     % this quirk is deprecated, but we keep the support for backwards compatibility.
     AllowIssuerMismatch = maps:get(allow_issuer_mismatch, Quirks, false),
 
+    DefaultExpiry = maps:get(fallback_expiry, Opts, ?DEFAULT_CONFIG_EXPIRY),
+
     maybe
         {ok, {{json, ConfigurationMap}, Headers}} ?=
             oidcc_http_util:request(get, Request, TelemetryOpts, RequestOpts),
-        Expiry = headers_to_deadline(Headers, Opts),
+        Expiry = oidcc_http_util:headers_to_cache_deadline(Headers, DefaultExpiry),
         {ok, #oidcc_provider_configuration{issuer = ConfigIssuer} = Configuration} ?=
             decode_configuration(ConfigurationMap, #{quirks => Quirks}),
         case ConfigIssuer of
@@ -259,10 +261,12 @@ load_jwks(JwksUri, Opts) ->
     TelemetryOpts = #{topic => [oidcc, load_jwks], extra_meta => #{jwks_uri => JwksUri}},
     RequestOpts = maps:get(request_opts, Opts, #{}),
 
+    DefaultExpiry = maps:get(fallback_expiry, Opts, ?DEFAULT_CONFIG_EXPIRY),
+
     maybe
         {ok, {{json, JwksBinary}, Headers}} ?=
             oidcc_http_util:request(get, {JwksUri, []}, TelemetryOpts, RequestOpts),
-        Expiry = headers_to_deadline(Headers, Opts),
+        Expiry = oidcc_http_util:headers_to_cache_deadline(Headers, DefaultExpiry),
         Jwks = jose_jwk:from(JwksBinary),
         {ok, {Jwks, Expiry}}
     else
@@ -568,39 +572,6 @@ decode_configuration(Configuration0, Opts) ->
 -spec decode_configuration(Configuration) -> {ok, t()} | {error, error()} when
     Configuration :: map().
 decode_configuration(Configuration) -> decode_configuration(Configuration, #{}).
-
--spec headers_to_deadline(Headers, Opts) -> pos_integer() when
-    Headers :: [{Header :: binary(), Value :: binary()}], Opts :: opts().
-headers_to_deadline(Headers, Opts) ->
-    DefaultExpiry = maps:get(fallback_expiry, Opts, ?DEFAULT_CONFIG_EXPIRY),
-    case proplists:lookup("cache-control", Headers) of
-        {"cache-control", Cache} ->
-            try
-                cache_deadline(Cache, DefaultExpiry)
-            catch
-                _:_ ->
-                    DefaultExpiry
-            end;
-        none ->
-            DefaultExpiry
-    end.
-
--spec cache_deadline(Cache :: iodata(), Fallback :: pos_integer()) -> pos_integer().
-cache_deadline(Cache, Fallback) ->
-    Entries =
-        binary:split(iolist_to_binary(Cache), [<<",">>, <<"=">>, <<" ">>], [global, trim_all]),
-    MaxAge =
-        fun
-            (<<"0">>, Res) ->
-                Res;
-            (Entry, true) ->
-                erlang:convert_time_unit(binary_to_integer(Entry), second, millisecond);
-            (<<"max-age">>, _) ->
-                true;
-            (_, Res) ->
-                Res
-        end,
-    lists:foldl(MaxAge, Fallback, Entries).
 
 -spec parse_scopes_supported(Setting :: term(), Field :: atom()) ->
     {ok, [binary()]} | {error, error()}.

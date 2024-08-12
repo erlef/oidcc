@@ -8,6 +8,7 @@
 
 -export([basic_auth_header/2]).
 -export([bearer_auth_header/1]).
+-export([headers_to_cache_deadline/2]).
 -export([request/4]).
 
 -export_type([
@@ -170,3 +171,35 @@ fetch_content_type(Headers) ->
         _Other ->
             unknown
     end.
+
+-spec headers_to_cache_deadline(Headers, DefaultExpiry) -> pos_integer() when
+    Headers :: [{Header :: binary(), Value :: binary()}], DefaultExpiry :: non_neg_integer().
+headers_to_cache_deadline(Headers, DefaultExpiry) ->
+    case proplists:lookup("cache-control", Headers) of
+        {"cache-control", Cache} ->
+            try
+                cache_deadline(Cache, DefaultExpiry)
+            catch
+                _:_ ->
+                    DefaultExpiry
+            end;
+        none ->
+            DefaultExpiry
+    end.
+
+-spec cache_deadline(Cache :: iodata(), Fallback :: pos_integer()) -> pos_integer().
+cache_deadline(Cache, Fallback) ->
+    Entries =
+        binary:split(iolist_to_binary(Cache), [<<",">>, <<"=">>, <<" ">>], [global, trim_all]),
+    MaxAge =
+        fun
+            (<<"0">>, true) ->
+                Fallback;
+            (Entry, true) ->
+                erlang:convert_time_unit(binary_to_integer(Entry), second, millisecond);
+            (<<"max-age">>, _) ->
+                true;
+            (_, Res) ->
+                Res
+        end,
+    lists:foldl(MaxAge, Fallback, Entries).

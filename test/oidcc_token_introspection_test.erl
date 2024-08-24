@@ -204,9 +204,9 @@ introspection_issuer_client_id_test() ->
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok,
         #oidcc_provider_configuration{
-           introspection_endpoint = IntrospectionEndpoint,
-           issuer = Issuer
-          } =
+            introspection_endpoint = IntrospectionEndpoint,
+            issuer = Issuer
+        } =
             Configuration} =
         oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
 
@@ -230,7 +230,13 @@ introspection_issuer_client_id_test() ->
             _RequestOpts
         ) ->
             IntrospectionEndpoint = ReqEndpoint,
-            {ok, {{json, #{<<"active">> => true, <<"client_id">> => OtherClientId, <<"iss">> => Issuer}}, []}}
+            {ok,
+                {
+                    {json, #{
+                        <<"active">> => true, <<"client_id">> => OtherClientId, <<"iss">> => Issuer
+                    }},
+                    []
+                }}
         end,
     ok = meck:expect(oidcc_http_util, request, HttpFun),
 

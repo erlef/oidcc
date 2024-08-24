@@ -1,25 +1,26 @@
-%%%-------------------------------------------------------------------
-%% @doc OAuth Token Introspection
-%%
-%% See [https://datatracker.ietf.org/doc/html/rfc7662]
-%%
-%% <h2>Records</h2>
-%%
-%% To use the records, import the definition:
-%%
-%% ```
-%% -include_lib(["oidcc/include/oidcc_token_introspection.hrl"]).
-%% '''
-%%
-%% <h2>Telemetry</h2>
-%%
-%% See {@link 'Elixir.Oidcc.TokenIntrospection'}
-%% @end
-%% @since 3.0.0
-%%%-------------------------------------------------------------------
 -module(oidcc_token_introspection).
 
 -feature(maybe_expr, enable).
+
+-include("internal/doc.hrl").
+?MODULEDOC("""
+OAuth Token Introspection.
+
+See https://datatracker.ietf.org/doc/html/rfc7662.
+
+## Records
+
+To use the records, import the definition:
+
+```erlang
+-include_lib(["oidcc/include/oidcc_token_introspection.hrl"]).
+```
+
+## Telemetry
+
+See [`Oidcc.TokenIntrospection`](`m:'Elixir.Oidcc.TokenIntrospection'`).
+""").
+?MODULEDOC(#{since => <<"3.0.0">>}).
 
 -include("oidcc_client_context.hrl").
 -include("oidcc_provider_configuration.hrl").
@@ -32,6 +33,12 @@
 -export_type([opts/0]).
 -export_type([t/0]).
 
+?DOC("""
+Introspection Result.
+
+See https://datatracker.ietf.org/doc/html/rfc7662#section-2.2.
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -type t() :: #oidcc_token_introspection{
     active :: boolean(),
     client_id :: binary(),
@@ -39,16 +46,16 @@
     scope :: oidcc_scope:scopes(),
     username :: binary()
 }.
-%% Introspection Result
-%%
-%% See [https://datatracker.ietf.org/doc/html/rfc7662#section-2.2]
 
+
+?DOC(#{since => <<"3.0.0">>}).
 -type opts() :: #{
     preferred_auth_methods => [oidcc_auth_util:auth_method(), ...],
     request_opts => oidcc_http_util:request_opts(),
     dpop_nonce => binary()
 }.
 
+?DOC(#{since => <<"3.0.0">>}).
 -type error() :: client_id_mismatch | introspection_not_supported | oidcc_http_util:error().
 
 -telemetry_event(#{
@@ -72,27 +79,27 @@
     metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
 }).
 
-%% @doc
-%% Introspect the given access token
-%%
-%% For a high level interface using {@link oidcc_provider_configuration_worker}
-%% see {@link oidcc:introspect_token/5}.
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, ClientContext} =
-%%   oidcc_client_context:from_configuration_worker(provider_name,
-%%                                                  <<"client_id">>,
-%%                                                  <<"client_secret">>),
-%%
-%% %% Get AccessToken
-%%
-%% {ok, #oidcc_token_introspection{active = True}} =
-%%   oidcc_token_introspection:introspect(AccessToken, ClientContext, #{}).
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Introspect the given access token.
+
+For a high level interface using `m:oidcc_provider_configuration_worker`
+see `oidcc:introspect_token/5`.
+
+## Examples
+
+```erlang
+{ok, ClientContext} =
+  oidcc_client_context:from_configuration_worker(provider_name,
+                                                 <<"client_id">>,
+                                                 <<"client_secret">>),
+
+%% Get AccessToken
+
+{ok, #oidcc_token_introspection{active = True}} =
+  oidcc_token_introspection:introspect(AccessToken, ClientContext, #{}).
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec introspect(Token, ClientContext, Opts) ->
     {ok, t()}
     | {error, error()}

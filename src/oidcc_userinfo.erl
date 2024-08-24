@@ -1,17 +1,18 @@
-%%%-------------------------------------------------------------------
-%% @doc OpenID Connect Userinfo
-%%
-%% See [https://openid.net/specs/openid-connect-core-1_0.html#UserInfo]
-%%
-%% <h2>Telemetry</h2>
-%%
-%% See {@link 'Elixir.Oidcc.Userinfo'}
-%% @end
-%% @since 3.0.0
-%%%-------------------------------------------------------------------
 -module(oidcc_userinfo).
 
 -feature(maybe_expr, enable).
+
+-include("internal/doc.hrl").
+?MODULEDOC("""
+OpenID Connect Userinfo
+
+See https://openid.net/specs/openid-connect-core-1_0.html#UserInfo
+
+## Telemetry
+
+See [`Oidcc.Userinfo`](`m:'Elixir.Oidcc.Userinfo'`).
+""").
+?MODULEDOC(#{since => <<"3.0.0">>}).
 
 -include("oidcc_client_context.hrl").
 -include("oidcc_provider_configuration.hrl").
@@ -28,34 +29,37 @@
 -export_type([retrieve_opts/0]).
 -export_type([retrieve_opts_no_sub/0]).
 
+?DOC("See `t:retrieve_opts/0`.").
+?DOC(#{since => <<"3.0.0">>}).
 -type retrieve_opts_no_sub() ::
     #{
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
         dpop_nonce => binary()
     }.
-%% See {@link retrieve_opts()}
 
+?DOC("""
+Configure userinfo request
+
+See https://openid.net/specs/openid-connect-core-1_0.html#UserInfoRequest
+
+## Parameters
+
+* `refresh_jwks` - How to handle tokens with an unknown `kid`.
+  See `t:oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun/0`
+* `expected_subject` - expected subject for the userinfo
+  (`sub` from id token)
+* `dpop_nonce` - if using DPoP, the `nonce` value to use in the
+    proof claim
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -type retrieve_opts() ::
     #{
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
         expected_subject => binary() | any,
         dpop_nonce => binary()
     }.
-%% Configure userinfo request
-%%
-%% See [https://openid.net/specs/openid-connect-core-1_0.html#UserInfoRequest]
-%%
-%% <h2>Parameters</h2>
-%%
-%% <ul>
-%%   <li>`refresh_jwks' - How to handle tokens with an unknown `kid'.
-%%     See {@link oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun()}</li>
-%%   <li>`expected_subject' - expected subject for the userinfo
-%%     (`sub' from id token)</li>
-%%   <li>`dpop_nonce' - if using DPoP, the `nonce' value to use in the
-%%     proof claim</li>
-%% </ul>
 
+?DOC(#{since => <<"3.0.0">>}).
 -type error() ::
     {distributed_claim_not_found, {ClaimSource :: binary(), ClaimName :: binary()}}
     | no_access_token
@@ -85,27 +89,27 @@
     metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
 }).
 
-%% @doc
-%% Load userinfo for the given token
-%%
-%% For a high level interface using {@link oidcc_provider_configuration_worker}
-%% see {@link oidcc:retrieve_userinfo/5}.
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, ClientContext} =
-%%   oidcc_client_context:from_configuration_worker(provider_name,
-%%                                                  <<"client_id">>,
-%%                                                  <<"client_secret">>),
-%%
-%% %% Get Token
-%%
-%% {ok, #{<<"sub">> => Sub}} =
-%%   oidcc_userinfo:retrieve(Token, ClientContext, #{}).
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Load userinfo for the given token
+
+For a high level interface using `m:oidcc_provider_configuration_worker`, see
+`oidcc:retrieve_userinfo/5`.
+
+## Examples
+
+```erlang
+{ok, ClientContext} =
+  oidcc_client_context:from_configuration_worker(provider_name,
+                                                 <<"client_id">>,
+                                                 <<"client_secret">>),
+
+%% Get Token
+
+{ok, #{<<"sub">> => Sub}} =
+  oidcc_userinfo:retrieve(Token, ClientContext, #{}).
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec retrieve
     (Token, ClientContext, Opts) -> {ok, oidcc_jwt_util:claims()} | {error, error()} when
         Token :: oidcc_token:t(),

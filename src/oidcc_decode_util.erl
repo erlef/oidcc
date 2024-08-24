@@ -1,9 +1,8 @@
-%%%-------------------------------------------------------------------
-%% @doc Response Decoding Utils
-%% @end
-%% @since 3.0.0
-%%%-------------------------------------------------------------------
 -module(oidcc_decode_util).
+
+-include("internal/doc.hrl").
+?MODULEDOC("Response Decoding Utils").
+?MODULEDOC(#{since => <<"3.0.0">>}).
 
 -export([extract/3]).
 -export([parse_setting_binary/2]).
@@ -18,6 +17,7 @@
 
 -export_type([error/0]).
 
+?DOC(#{since => <<"3.0.0">>}).
 -type error() ::
     {missing_config_property, Key :: atom()}
     | {invalid_config_property, {
@@ -34,7 +34,7 @@
         Field :: atom()
     }}.
 
-%% @private
+?DOC(false).
 -spec extract(
     Map :: #{binary() => term()},
     Keys :: [{required, Key, ParseFn} | {optional, Key, Default, ParseFn}],
@@ -74,7 +74,7 @@ extract(Map1, [{optional, Key, Default, ParseFn} | RestKeys], Acc) ->
 extract(Map, [], Acc) ->
     {ok, {Acc, Map}}.
 
-%% @private
+?DOC(false).
 -spec parse_setting_uri(Setting :: term(), Field :: atom()) ->
     {ok, uri_string:uri_string()} | {error, error()}.
 parse_setting_uri(Setting, _Field) when is_binary(Setting) ->
@@ -82,7 +82,7 @@ parse_setting_uri(Setting, _Field) when is_binary(Setting) ->
 parse_setting_uri(_Setting, Field) ->
     {error, {invalid_config_property, {uri, Field}}}.
 
-%% @private
+?DOC(false).
 -spec parse_setting_uri_https(Setting :: term(), Field :: atom()) ->
     {ok, uri_string:uri_string()} | {error, error()}.
 parse_setting_uri_https(Setting, Field) when is_binary(Setting) ->
@@ -95,13 +95,13 @@ parse_setting_uri_https(Setting, Field) when is_binary(Setting) ->
 parse_setting_uri_https(_Setting, Field) ->
     {error, {invalid_config_property, {uri_https, Field}}}.
 
-%% @private
+?DOC(false).
 -spec parse_setting_uri_map(Setting :: term(), Field :: atom()) ->
     {ok, #{binary() => uri_string:uri_string()}} | {error, error()}.
 parse_setting_uri_map(Setting, Field) ->
     do_parse_setting_uri_map(Setting, Field, fun parse_setting_uri/2).
 
-%% @private
+?DOC(false).
 -spec parse_setting_uri_https_map(Setting :: term(), Field :: atom()) ->
     {ok, #{binary() => uri_string:uri_string()}} | {error, error()}.
 parse_setting_uri_https_map(Setting, Field) ->
@@ -137,7 +137,7 @@ do_parse_setting_uri_map(#{} = Setting, Field, Parser) ->
 do_parse_setting_uri_map(_Setting, Field, _Parser) ->
     {error, {invalid_config_property, {uri_map, Field}}}.
 
-%% @private
+?DOC(false).
 -spec parse_setting_binary(Setting :: term(), Field :: atom()) ->
     {ok, binary()} | {error, error()}.
 parse_setting_binary(Setting, _Field) when is_binary(Setting) ->
@@ -145,7 +145,7 @@ parse_setting_binary(Setting, _Field) when is_binary(Setting) ->
 parse_setting_binary(_Setting, Field) ->
     {error, {invalid_config_property, {binary, Field}}}.
 
-%% @private
+?DOC(false).
 -spec parse_setting_binary_list(Setting :: term(), Field :: atom()) ->
     {ok, [binary()]} | {error, error()}.
 parse_setting_binary_list(Setting, Field) when is_list(Setting) ->
@@ -158,7 +158,7 @@ parse_setting_binary_list(Setting, Field) when is_list(Setting) ->
 parse_setting_binary_list(_Setting, Field) ->
     {error, {invalid_config_property, {list_of_binaries, Field}}}.
 
-%% @private
+?DOC(false).
 -spec parse_setting_number(Setting :: term(), Field :: atom()) ->
     {ok, integer()} | {error, error()}.
 parse_setting_number(Setting, _Field) when is_integer(Setting) ->
@@ -166,7 +166,7 @@ parse_setting_number(Setting, _Field) when is_integer(Setting) ->
 parse_setting_number(_Setting, Field) ->
     {error, {invalid_config_property, {number, Field}}}.
 
-%% @private
+?DOC(false).
 -spec parse_setting_boolean(Setting :: term(), Field :: atom()) ->
     {ok, boolean()} | {error, error()}.
 parse_setting_boolean(Setting, _Field) when is_boolean(Setting) ->
@@ -174,7 +174,7 @@ parse_setting_boolean(Setting, _Field) when is_boolean(Setting) ->
 parse_setting_boolean(_Setting, Field) ->
     {error, {invalid_config_property, {boolean, Field}}}.
 
-%% @private
+?DOC(false).
 -spec parse_setting_list_enum(
     Setting :: term(),
     Field :: atom(),

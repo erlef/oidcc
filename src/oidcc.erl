@@ -1,32 +1,31 @@
-%%%-------------------------------------------------------------------
-%% @doc OpenID Connect High Level Interface
-%%
-%% <h2>Setup</h2>
-%%
-%% ```
-%% {ok, Pid} =
-%%   oidcc_provider_configuration_worker:start_link(#{
-%%     issuer => <<"https://accounts.google.com">>,
-%%     name => {local, google_config_provider}
-%%   }).
-%% '''
-%%
-%% (or via a `supervisor')
-%%
-%% See {@link oidcc_provider_configuration_worker} for details
-%%
-%% <h2>Global Configuration</h2>
-%%
-%% <ul>
-%%   <li>`max_clock_skew' (default `0') - Maximum allowed clock skew for JWT
-%%     `exp' / `nbf' validation, in seconds</li>
-%% </ul>
-%% @end
-%% @since 3.0.0
-%%%-------------------------------------------------------------------
 -module(oidcc).
 
 -feature(maybe_expr, enable).
+
+-include("internal/doc.hrl").
+?MODULEDOC("""
+OpenID Connect High Level Interface
+
+## Setup
+
+```erlang
+{ok, Pid} =
+  oidcc_provider_configuration_worker:start_link(#{
+    issuer => <<"https://accounts.google.com">>,
+    name => {local, google_config_provider}
+  }).
+```
+
+(or via a `m:supervisor`)
+
+See `m:oidcc_provider_configuration_worker` for details
+
+## Global Configuration
+
+* `max_clock_skew` (default `0`) - Maximum allowed clock skew for JWT
+  `exp` / `nbf` validation, in seconds
+""").
+?MODULEDOC(#{since => <<"3.0.0">>}).
 
 -export([client_credentials_token/4]).
 -export([create_redirect_url/4]).
@@ -37,24 +36,24 @@
 -export([retrieve_token/5]).
 -export([retrieve_userinfo/5]).
 
-%% @doc
-%% Create Auth Redirect URL
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, RedirectUri} =
-%%   oidcc:create_redirect_url(
-%%     provider_name,
-%%     <<"client_id">>,
-%%     <<"client_secret">>
-%%     #{redirect_uri: <<"https://my.server/return"}
-%%   ),
-%%
-%% %% RedirectUri = https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Create Auth Redirect URL
+
+## Examples
+
+```erlang
+{ok, RedirectUri} =
+      oidcc:create_redirect_url(
+    provider_name,
+    <<"client_id">>,
+    <<"client_secret">>
+    #{redirect_uri: <<"https://my.server/return"}
+  ),
+
+%% RedirectUri = https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec create_redirect_url(
     ProviderConfigurationWorkerName,
     ClientId,
@@ -82,29 +81,29 @@ create_redirect_url(ProviderConfigurationWorkerName, ClientId, ClientSecret, Opt
         oidcc_authorization:create_redirect_url(ClientContext, OtherOpts)
     end.
 
-%% @doc
-%% retrieve the token using the authcode received before and directly validate
-%% the result.
-%%
-%% the authcode was sent to the local endpoint by the OpenId Connect provider,
-%% using redirects
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% %% Get AuthCode from Redirect
-%%
-%% {ok, #oidcc_token{}} =
-%%   oidcc:retrieve_token(
-%%     AuthCode,
-%%     provider_name,
-%%     <<"client_id">>,
-%%     <<"client_secret">>,
-%%     #{redirect_uri => <<"https://example.com/callback">>}
-%%   ).
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Retrieve the token using the authcode received before and directly validate
+the result.
+
+The authcode was sent to the local endpoint by the OpenId Connect provider,
+using redirects.
+
+## Examples
+
+```erlang
+%% Get AuthCode from Redirect
+
+{ok, #oidcc_token{}} =
+  oidcc:retrieve_token(
+    AuthCode,
+    provider_name,
+    <<"client_id">>,
+    <<"client_secret">>,
+    #{redirect_uri => <<"https://example.com/callback">>}
+  ).
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec retrieve_token(
     AuthCode,
     ProviderConfigurationWorkerName,
@@ -145,25 +144,25 @@ retrieve_token(
         oidcc_token:retrieve(AuthCode, ClientContext, OptsWithRefresh)
     end.
 
-%% @doc
-%% Load userinfo for the given token
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% %% Get Token
-%%
-%% {ok, #{<<"sub">> => Sub}} =
-%%   oidcc:retrieve_userinfo(
-%%     Token,
-%%     provider_name,
-%%     <<"client_id">>,
-%%     <<"client_secret">>,
-%%     #{}
-%%   ).
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Load userinfo for the given token.
+
+## Examples
+
+```erlang
+%% Get Token
+
+{ok, #{<<"sub">> => Sub}} =
+  oidcc:retrieve_userinfo(
+    Token,
+    provider_name,
+    <<"client_id">>,
+    <<"client_secret">>,
+    #{}
+  ).
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec retrieve_userinfo
     (
         Token,
@@ -208,24 +207,25 @@ retrieve_userinfo(
         oidcc_userinfo:retrieve(Token, ClientContext, OtherOpts)
     end.
 
-%% @doc Refresh Token
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% %% Get Token and wait for its expiry
-%%
-%% {ok, #oidcc_token{}} =
-%%   oidcc:refresh_token(
-%%     Token,
-%%     provider_name,
-%%     <<"client_id">>,
-%%     <<"client_secret">>,
-%%     #{expected_subject => <<"sub_from_initial_id_token>>}
-%%   ).
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Refresh Token.
+
+## Examples
+
+```erlang
+%% Get Token and wait for its expiry
+
+{ok, #oidcc_token{}} =
+  oidcc:refresh_token(
+    Token,
+    provider_name,
+    <<"client_id">>,
+    <<"client_secret">>,
+    #{expected_subject => <<"sub_from_initial_id_token">>}
+  ).
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec refresh_token
     (
         RefreshToken,
@@ -281,25 +281,25 @@ refresh_token(
         oidcc_token:refresh(RefreshToken, ClientContext, OptsWithRefresh)
     end.
 
-%% @doc
-%% Introspect the given access token
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% %% Get AccessToken
-%%
-%% {ok, #oidcc_token_introspection{active = True}} =
-%%   oidcc:introspect_token(
-%%     AccessToken,
-%%     provider_name,
-%%     <<"client_id">>,
-%%     <<"client_secret">>,
-%%     #{}
-%%   ).
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Introspect the given access token.
+
+## Examples
+
+```erlang
+%% Get AccessToken
+
+{ok, #oidcc_token_introspection{active = True}} =
+  oidcc:introspect_token(
+    AccessToken,
+    provider_name,
+    <<"client_id">>,
+    <<"client_secret">>,
+    #{}
+  ).
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec introspect_token(
     Token,
     ProviderConfigurationWorkerName,
@@ -336,32 +336,33 @@ introspect_token(
         oidcc_token_introspection:introspect(Token, ClientContext, OtherOpts)
     end.
 
-%% @doc Retrieve JSON Web Token (JWT) Profile Token
-%%
-%% See [https://datatracker.ietf.org/doc/html/rfc7523#section-4]
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, KeyJson} = file:read_file("jwt-profile.json"),
-%% KeyMap = jose:decode(KeyJson),
-%% Key = jose_jwk:from_pem(maps:get(<<"key">>, KeyMap)),
-%%
-%% {ok, #oidcc_token{}} =
-%%   oidcc_token:jwt_profile(
-%%     <<"subject">>,
-%%     provider_name,
-%%     <<"client_id">>,
-%%     <<"client_secret">>,
-%%     Key,
-%%     #{
-%%      scope => [<<"scope">>],
-%%      kid => maps:get(<<"keyId">>, KeyMap)
-%%     }
-%%   ).
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Retrieve JSON Web Token (JWT) Profile Token.
+
+See https://datatracker.ietf.org/doc/html/rfc7523#section-4.
+
+## Examples
+
+```erlang
+{ok, KeyJson} = file:read_file("jwt-profile.json"),
+KeyMap = jose:decode(KeyJson),
+Key = jose_jwk:from_pem(maps:get(<<"key">>, KeyMap)),
+
+{ok, #oidcc_token{}} =
+  oidcc_token:jwt_profile(
+    <<"subject">>,
+    provider_name,
+    <<"client_id">>,
+    <<"client_secret">>,
+    Key,
+    #{
+     scope => [<<"scope">>],
+     kid => maps:get(<<"keyId">>, KeyMap)
+    }
+  ).
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec jwt_profile_token(
     Subject,
     ProviderConfigurationWorkerName,
@@ -396,23 +397,24 @@ jwt_profile_token(Subject, ProviderConfigurationWorkerName, ClientId, ClientSecr
         oidcc_token:jwt_profile(Subject, ClientContext, Jwk, OptsWithRefresh)
     end.
 
-%% @doc Retrieve Client Credential Token
-%%
-%% See [https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.4]
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, #oidcc_token{}} =
-%%   oidcc:client_credentials_token(
-%%     provider_name,
-%%     <<"client_id">>,
-%%     <<"client_secret">>,
-%%     #{scope => [<<"scope">>]}
-%%   ).
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Retrieve Client Credential Token.
+
+See https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.4.
+
+## Examples
+
+```erlang
+{ok, #oidcc_token{}} =
+  oidcc:client_credentials_token(
+    provider_name,
+    <<"client_id">>,
+    <<"client_secret">>,
+    #{scope => [<<"scope">>]}
+  ).
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec client_credentials_token(
     ProviderConfigurationWorkerName,
     ClientId,
@@ -443,28 +445,28 @@ client_credentials_token(ProviderConfigurationWorkerName, ClientId, ClientSecret
         oidcc_token:client_credentials(ClientContext, OptsWithRefresh)
     end.
 
-%% @doc
-%% Create Initiate URI for Relaying Party initiated Logout
-%%
-%% See [https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout]
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% %% Get `Token` from `oidcc_token`
-%%
-%% {ok, RedirectUri} =
-%%   oidcc:initiate_logout_url(
-%%     Token,
-%%     provider_name,
-%%     <<"client_id">>,
-%%     #{post_logout_redirect_uri: <<"https://my.server/return"}
-%% ),
-%%
-%% %% RedirectUri = https://my.provider/logout?id_token_hint=IDToken&client_id=ClientId&post_logout_redirect_uri=https%3A%2F%2Fmy.server%2Freturn
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Create Initiate URI for Relaying Party initiated Logout.
+
+See https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout.
+
+## Examples
+
+```erlang
+%% Get `Token` from `oidcc_token`
+
+{ok, RedirectUri} =
+  oidcc:initiate_logout_url(
+    Token,
+    provider_name,
+    <<"client_id">>,
+    #{post_logout_redirect_uri: <<"https://my.server/return"}}
+  ).
+
+%% RedirectUri = https://my.provider/logout?id_token_hint=IDToken&client_id=ClientId&post_logout_redirect_uri=https%3A%2F%2Fmy.server%2Freturn
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec initiate_logout_url(
     Token,
     ProviderConfigurationWorkerName,

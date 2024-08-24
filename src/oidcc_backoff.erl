@@ -1,12 +1,13 @@
-%%%-------------------------------------------------------------------
-%% @doc Backoff Handling
-%%
-%% Based on `db_connection':
-%% [https://github.com/elixir-ecto/db_connection/blob/8ef1f2ea54922873590b8939f2dad6b031c5b49c/lib/db_connection/backoff.ex#L24]
-%% @end
-%% @since 3.2.0
-%%%-------------------------------------------------------------------
 -module(oidcc_backoff).
+
+-include("internal/doc.hrl").
+?MODULEDOC("""
+Backoff Handling
+
+Based on [`db_connection`](https://github.com/elixir-ecto/db_connection/blob/8ef1f2ea54922873590b8939f2dad6b031c5b49c/lib/db_connection/backoff.ex#L24)
+""").
+?MODULEDOC(#{since => <<"3.2.0">>}).
+
 
 -export_type([type/0]).
 -export_type([min/0]).
@@ -15,15 +16,19 @@
 
 -export([handle_retry/4]).
 
+?DOC(#{since => <<"3.2.0">>}).
 -type type() :: stop | exponential | random | random_exponential.
 
+?DOC(#{since => <<"3.2.0">>}).
 -type min() :: pos_integer().
 
+?DOC(#{since => <<"3.2.0">>}).
 -type max() :: pos_integer().
 
+?DOC(#{since => <<"3.2.0">>}).
 -opaque state() :: pos_integer() | {pos_integer(), pos_integer()}.
 
-%% @private
+?DOC(false).
 -spec handle_retry(Type, Min, Max, State) -> stop | {Wait, State} when
     Type :: type(), Min :: min(), Max :: max(), State :: undefined | state(), Wait :: pos_integer().
 handle_retry(Type, Min, Max, State) when Min > 0, Max > 0, Max >= Min ->

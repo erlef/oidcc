@@ -1,25 +1,26 @@
-%%%-------------------------------------------------------------------
-%% @doc Dynamic Client Registration Utilities
-%%
-%% See [https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata]
-%%
-%% <h2>Records</h2>
-%%
-%% To use the record, import the definition:
-%%
-%% ```
-%% -include_lib(["oidcc/include/oidcc_client_registration.hrl"]).
-%% '''
-%%
-%% <h2>Telemetry</h2>
-%%
-%% See {@link 'Elixir.Oidcc.ClientRegistration'}
-%% @end
-%% @since 3.0.0
-%%%-------------------------------------------------------------------
 -module(oidcc_client_registration).
 
 -feature(maybe_expr, enable).
+
+-include("internal/doc.hrl").
+?MODULEDOC("""
+Dynamic Client Registration Utilities.
+
+See https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata.
+
+## Records
+
+To use the record, import the definition:
+
+```erlang
+-include_lib(["oidcc/include/oidcc_client_registration.hrl"]).
+```
+
+## Telemetry
+
+See [`Oidcc.ClientRegistration`](`m:'Elixir.Oidcc.ClientRegistration'`).
+""").
+?MODULEDOC(#{since => <<"3.0.0">>}).
 
 -include("oidcc_client_registration.hrl").
 -include("oidcc_provider_configuration.hrl").
@@ -31,19 +32,29 @@
 -export_type([response/0]).
 -export_type([t/0]).
 
+?DOC("""
+Configure configuration loading / parsing.
+
+## Parameters
+
+* `initial_access_token` - Access Token for registration
+* `request_opts` - config for HTTP request
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -type opts() :: #{
     initial_access_token => binary() | undefined,
     request_opts => oidcc_http_util:request_opts()
 }.
-% Configure configuration loading / parsing
-%
-% <h2>Parameters</h2>
-%
-% <ul>
-%   <li>`initial_access_token' - Access Token for registration</li>
-%   <li>`request_opts' - config for HTTP request</li>
-% </ul>
 
+?DOC("""
+Record containing Client Registration Metadata.
+
+See https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata and
+https://openid.net/specs/openid-connect-rpinitiated-1_0.html#ClientMetadata.
+
+All unrecognized fields are stored in `extra_fields`.
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -type t() ::
     #oidcc_client_registration{
         %% OpenID Connect Dynamic Client Registration 1.0
@@ -115,13 +126,15 @@
         %% Unknown Fields
         extra_fields :: #{binary() => term()}
     }.
-%% Record containing Client Registration Metadata
-%%
-%% See [https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata] and
-%% [https://openid.net/specs/openid-connect-rpinitiated-1_0.html#ClientMetadata]
-%%
-%% All unrecognized fields are stored in `extra_fields'.
 
+?DOC("""
+Record containing Client Registration Response.
+
+See https://openid.net/specs/openid-connect-registration-1_0.html#RegistrationResponse.
+
+All unrecognized fields are stored in `extra_fields`.
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -type response() ::
     #oidcc_client_registration_response{
         client_id :: erlang:binary(),
@@ -133,12 +146,9 @@
         %% Unknown Fields
         extra_fields :: #{binary() => term()}
     }.
-%% Record containing Client Registration Response
-%%
-%% See [https://openid.net/specs/openid-connect-registration-1_0.html#RegistrationResponse]
-%%
-%% All unrecognized fields are stored in `extra_fields'.
 
+
+?DOC(#{since => <<"3.0.0">>}).
 -type error() ::
     registration_not_supported
     | invalid_content_type
@@ -166,28 +176,29 @@
     metadata => <<"#{issuer => uri_string:uri_string()}">>
 }).
 
-%% @doc Register Client
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, ProviderConfiguration} =
-%%   oidcc_provider_configuration:load_configuration("https://your.issuer"),
-%%
-%% {ok, #oidcc_client_registration_response{
-%%   client_id = ClientId,
-%%   client_secret = ClientSecret
-%% }} =
-%%   oidcc_client_registration:register(
-%%     ProviderConfiguration,
-%%     #oidcc_client_registration{
-%%       redirect_uris = ["https://your.application.com/oidcc/callback"]
-%%     },
-%%     #{initial_access_token => <<"optional token you got from the provider">>}
-%%   ).
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Register Client.
+
+## Examples
+
+```erlang
+{ok, ProviderConfiguration} =
+  oidcc_provider_configuration:load_configuration("https://your.issuer"),
+
+{ok, #oidcc_client_registration_response{
+  client_id = ClientId,
+  client_secret = ClientSecret
+}} =
+  oidcc_client_registration:register(
+    ProviderConfiguration,
+    #oidcc_client_registration{
+      redirect_uris = ["https://your.application.com/oidcc/callback"]
+    },
+    #{initial_access_token => <<"optional token you got from the provider">>}
+  ).
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec register(ProviderConfiguration, Registration, Opts) ->
     {ok, response()} | {error, error()}
 when

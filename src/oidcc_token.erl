@@ -1,23 +1,24 @@
-%%%-------------------------------------------------------------------
-%% @doc Facilitate OpenID Code/Token Exchanges
-%%
-%% <h2>Records</h2>
-%%
-%% To use the records, import the definition:
-%%
-%% ```
-%% -include_lib(["oidcc/include/oidcc_token.hrl"]).
-%% '''
-%%
-%% <h2>Telemetry</h2>
-%%
-%% See {@link 'Elixir.Oidcc.Token'}
-%% @end
-%% @since 3.0.0
-%%%-------------------------------------------------------------------
 -module(oidcc_token).
 
 -feature(maybe_expr, enable).
+
+-include("internal/doc.hrl").
+?MODULEDOC("""
+Facilitate OpenID Code/Token Exchanges.
+
+## Records
+
+To use the records, import the definition:
+
+```erlang
+-include_lib(["oidcc/include/oidcc_token.hrl"]).
+```
+
+## Telemetry
+
+See [`Oidcc.Token`](`m:'Elixir.Oidcc.Token'`).
+""").
+?MODULEDOC(#{since => <<"3.0.0">>}).
 
 -include("oidcc_client_context.hrl").
 -include("oidcc_provider_configuration.hrl").
@@ -52,37 +53,51 @@
 -export_type([validate_jwt_opts/0]).
 -export_type([t/0]).
 
+?DOC("""
+ID Token Wrapper.
+
+## Fields
+
+* `token` - The retrieved token.
+* `claims` - Unpacked claims of the verified token.
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -type id() :: #oidcc_token_id{token :: binary(), claims :: oidcc_jwt_util:claims()}.
 
-%% ID Token Wrapper
-%%
-%% <h2>Fields</h2>
-%%
-%% <ul>
-%%   <li>`token' - The retrieved token</li>
-%%   <li>`claims' - Unpacked claims of the verified token</li>
-%% </ul>
 
+?DOC("""
+Access Token Wrapper.
+
+## Fields
+
+* `token` - The retrieved token.
+* `expires` - Number of seconds the token is valid.
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -type access() ::
     #oidcc_token_access{token :: binary(), expires :: pos_integer() | undefined, type :: binary()}.
-%% Access Token Wrapper
-%%
-%% <h2>Fields</h2>
-%%
-%% <ul>
-%%   <li>`token' - The retrieved token</li>
-%%   <li>`expires' - Number of seconds the token is valid</li>
-%% </ul>
 
+?DOC("""
+Refresh Token Wrapper.
+
+## Fields
+
+* `token` - The retrieved token.
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -type refresh() :: #oidcc_token_refresh{token :: binary()}.
-%% Refresh Token Wrapper
-%%
-%% <h2>Fields</h2>
-%%
-%% <ul>
-%%   <li>`token' - The retrieved token</li>
-%% </ul>
 
+?DOC("""
+Token Response Wrapper.
+
+## Fields
+
+* `id` - `t:id/0`.
+* `access` - `t:access/0`.
+* `refresh` - `t:refresh/0`.
+* `scope` - `t:oidcc_scope:scopes/0`.
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -type t() ::
     #oidcc_token{
         id :: oidcc_token:id() | none,
@@ -90,17 +105,28 @@
         refresh :: oidcc_token:refresh() | none,
         scope :: oidcc_scope:scopes()
     }.
-%% Token Response Wrapper
-%%
-%% <h2>Fields</h2>
-%%
-%% <ul>
-%%   <li>`id' - {@link id()}</li>
-%%   <li>`access' - {@link access()}</li>
-%%   <li>`refresh' - {@link refresh()}</li>
-%%   <li>`scope' - {@link oidcc_scope:scopes()}</li>
-%% </ul>
 
+?DOC("""
+Options for retrieving a token.
+
+See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
+
+## Fields
+
+* `pkce_verifier` - PKCE verifier (random string previously given to
+  `m:oidcc_authorization`), see
+  https://datatracker.ietf.org/doc/html/rfc7636#section-4.1.
+* `require_pkce` - whether to require PKCE when getting the token.
+* `nonce` - Nonce to check.
+* `scope` - Scope to store with the token.
+* `refresh_jwks` - How to handle tokens with an unknown `kid`.
+  See `t:oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun/0`.
+* `redirect_uri` - Redirect URI given to `oidcc_authorization:create_redirect_url/2`.
+* `dpop_nonce` - if using DPoP, the `nonce` value to use in the proof claim.
+* `trusted_audiences` - if present, a list of additional audience values to
+  accept. Defaults to `any` which allows any additional values.
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -type retrieve_opts() ::
     #{
         pkce_verifier => binary(),
@@ -116,28 +142,9 @@
         dpop_nonce => binary(),
         trusted_audiences => [binary()] | any
     }.
-%% Options for retrieving a token
-%%
-%% See [https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3]
-%%
-%% <h2>Fields</h2>
-%%
-%% <ul>
-%%   <li>`pkce_verifier' - pkce verifier (random string previously given to
-%%     `oidcc_authorization'), see
-%%     [https://datatracker.ietf.org/doc/html/rfc7636#section-4.1]</li>
-%%   <li>`require_pkce' - whether to require PKCE when getting the token</li>
-%%   <li>`nonce' - Nonce to check</li>
-%%   <li>`scope' - Scope to store with the token</li>
-%%   <li>`refresh_jwks' - How to handle tokens with an unknown `kid'.
-%%     See {@link oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun()}</li>
-%%   <li>`redirect_uri' - Redirect uri given to {@link oidcc_authorization:create_redirect_url/2}</li>
-%%   <li>`dpop_nonce' - if using DPoP, the `nonce' value to use in the
-%%     proof claim</li>
-%%   <li>`trusted_audiences' - if present, a list of additional audience values to
-%%     accept. Defaults to `any' which allows any additional values</li>
-%% </ul>
 
+?DOC("See `t:refresh_opts_no_sub/0`.").
+?DOC(#{since => <<"3.0.0">>}).
 -type refresh_opts_no_sub() ::
     #{
         scope => oidcc_scope:scopes(),
@@ -146,8 +153,9 @@
         url_extension => oidcc_http_util:query_params(),
         body_extension => oidcc_http_util:query_params()
     }.
-%% See {@link refresh_opts_no_sub()}
 
+
+?DOC(#{since => <<"3.0.0">>}).
 -type refresh_opts() ::
     #{
         scope => oidcc_scope:scopes(),
@@ -158,23 +166,26 @@
         body_extension => oidcc_http_util:query_params()
     }.
 
+?DOC("""
+Options for refreshing a token.
+
+See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
+
+## Fields
+
+* `scope` - Scope to store with the token.
+* `refresh_jwks` - How to handle tokens with an unknown `kid`.
+  See `t:oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun/0`.
+* `expected_subject` - `sub` of the original token.
+""").
+?DOC(#{since => <<"3.2.0">>}).
 -type validate_jarm_opts() ::
     #{
         trusted_audiences => [binary()] | any
     }.
-%% Options for refreshing a token
-%%
-%% See [https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3]
-%%
-%% <h2>Fields</h2>
-%%
-%% <ul>
-%%   <li>`scope' - Scope to store with the token</li>
-%%   <li>`refresh_jwks' - How to handle tokens with an unknown `kid'.
-%%     See {@link oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun()}</li>
-%%   <li>`expected_subject' - `sub' of the original token</li>
-%% </ul>
 
+
+?DOC(#{since => <<"3.0.0">>}).
 -type jwt_profile_opts() :: #{
     scope => oidcc_scope:scopes(),
     refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
@@ -184,6 +195,7 @@
     body_extension => oidcc_http_util:query_params()
 }.
 
+?DOC(#{since => <<"3.0.0">>}).
 -type client_credentials_opts() :: #{
     scope => oidcc_scope:scopes(),
     refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
@@ -192,10 +204,12 @@
     body_extension => oidcc_http_util:query_params()
 }.
 
+?DOC(#{since => <<"3.0.0">>}).
 -type authorization_headers_opts() :: #{
     dpop_nonce => binary()
 }.
 
+?DOC(#{since => <<"3.2.0">>}).
 -type validate_jwt_opts() ::
     #{
         signing_algs => [binary()] | undefined,
@@ -203,6 +217,7 @@
         encryption_encs => [binary()] | undefined
     }.
 
+?DOC(#{since => <<"3.0.0">>}).
 -type error() ::
     {missing_claim, MissingClaim :: binary(), Claims :: oidcc_jwt_util:claims()}
     | pkce_verifier_required
@@ -305,32 +320,32 @@
     metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
 }).
 
-%% @doc
-%% retrieve the token using the authcode received before and directly validate
-%% the result.
-%%
-%% the authcode was sent to the local endpoint by the OpenId Connect provider,
-%% using redirects
-%%
-%% For a high level interface using {@link oidcc_provider_configuration_worker}
-%% see {@link oidcc:retrieve_token/5}.
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, ClientContext} =
-%%   oidcc_client_context:from_configuration_worker(provider_name,
-%%                                                  <<"client_id">>,
-%%                                                  <<"client_secret">>),
-%%
-%% %% Get AuthCode from Redirect
-%%
-%% {ok, #oidcc_token{}} =
-%%   oidcc:retrieve(AuthCode, ClientContext, #{
-%%     redirect_uri => <<"https://example.com/callback">>}).
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Retrieve the token using the authcode received before and directly validate
+the result.
+
+The authcode was sent to the local endpoint by the OpenId Connect provider,
+using redirects.
+
+For a high level interface using `m:oidcc_provider_configuration_worker`
+see `oidcc:retrieve_token/5`.
+
+## Examples
+
+```erlang
+{ok, ClientContext} =
+  oidcc_client_context:from_configuration_worker(provider_name,
+                                                 <<"client_id">>,
+                                                 <<"client_secret">>),
+
+%% Get AuthCode from Redirect
+
+{ok, #oidcc_token{}} =
+  oidcc:retrieve(AuthCode, ClientContext, #{
+    redirect_uri => <<"https://example.com/callback">>}).
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec retrieve(AuthCode, ClientContext, Opts) ->
     {ok, t()} | {error, error()}
 when
@@ -371,30 +386,30 @@ retrieve(AuthCode, ClientContext, Opts) ->
             {error, {grant_type_not_supported, authorization_code}}
     end.
 
-%% @doc
-%% Validate the JARM response, returning the valid claims as a map.
-%%
-%% The response was sent to the local endpoint by the OpenId Connect provider,
-%% using redirects
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, ClientContext} =
-%%   oidcc_client_context:from_configuration_worker(provider_name,
-%%                                                  <<"client_id">>,
-%%                                                  <<"client_secret">>),
-%%
-%% %% Get Response from Redirect
-%%
-%% {ok, #{<<"code">> := AuthCode}} =
-%%   oidcc:validate_jarm(Response, ClientContext, #{}),
-%%
-%% {ok, #oidcc_token{}} = oidcc:retrieve(AuthCode, ClientContext,
-%%   #{redirect_uri => <<"https://redirect.example/">>}.
-%% '''
-%% @end
-%% @since 3.2.0
+?DOC("""
+Validate the JARM response, returning the valid claims as a map.
+
+The response was sent to the local endpoint by the OpenId Connect provider,
+using redirects.
+
+## Examples
+
+```erlang
+{ok, ClientContext} =
+  oidcc_client_context:from_configuration_worker(provider_name,
+                                                 <<"client_id">>,
+                                                 <<"client_secret">>),
+
+%% Get Response from Redirect
+
+{ok, #{<<"code">> := AuthCode}} =
+  oidcc:validate_jarm(Response, ClientContext, #{}),
+
+{ok, #oidcc_token{}} = oidcc:retrieve(AuthCode, ClientContext,
+  #{redirect_uri => <<"https://redirect.example/">>}).
+```
+""").
+?DOC(#{since => <<"3.2.0">>}).
 -spec validate_jarm(Response, ClientContext, Opts) ->
     {ok, oidcc_jwt_util:claims()} | {error, error()}
 when
@@ -449,34 +464,35 @@ validate_jarm(Response, ClientContext, Opts) ->
         {ok, Claims}
     end.
 
-%% @doc Refresh Token
-%%
-%% For a high level interface using {@link oidcc_provider_configuration_worker}
-%% see {@link oidcc:refresh_token/5}.
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, ClientContext} =
-%%   oidcc_client_context:from_configuration_worker(provider_name,
-%%                                                  <<"client_id">>,
-%%                                                  <<"client_secret">>),
-%%
-%% %% Get AuthCode from Redirect
-%%
-%% {ok, Token} =
-%%   oidcc_token:retrieve(AuthCode, ClientContext, #{
-%%     redirect_uri => <<"https://example.com/callback">>}).
-%%
-%% %% Later
-%%
-%% {ok, #oidcc_token{}} =
-%%   oidcc_token:refresh(Token,
-%%                       ClientContext,
-%%                       #{expected_subject => <<"sub_from_initial_id_token>>}).
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Refresh Token
+
+For a high level interface using `m:oidcc_provider_configuration_worker`
+see `oidcc:refresh_token/5`.
+
+## Examples
+
+```erlang
+{ok, ClientContext} =
+  oidcc_client_context:from_configuration_worker(provider_name,
+                                                 <<"client_id">>,
+                                                 <<"client_secret">>),
+
+%% Get AuthCode from Redirect
+
+{ok, Token} =
+  oidcc_token:retrieve(AuthCode, ClientContext, #{
+    redirect_uri => <<"https://example.com/callback">>}).
+
+%% Later
+
+{ok, #oidcc_token{}} =
+  oidcc_token:refresh(Token,
+                      ClientContext,
+                      #{expected_subject => <<"sub_from_initial_id_token">>}).
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec refresh
     (RefreshToken, ClientContext, Opts) ->
         {ok, t()} | {error, error()}
@@ -536,34 +552,35 @@ refresh(RefreshToken, ClientContext, Opts) ->
             {error, {grant_type_not_supported, refresh_token}}
     end.
 
-%% @doc Retrieve JSON Web Token (JWT) Profile Token
-%%
-%% See [https://datatracker.ietf.org/doc/html/rfc7523#section-4]
-%%
-%% For a high level interface using {@link oidcc_provider_configuration_worker}
-%% see {@link oidcc:jwt_profile_token/6}.
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, ClientContext} =
-%%   oidcc_client_context:from_configuration_worker(provider_name,
-%%                                                  <<"client_id">>,
-%%                                                  <<"client_secret">>),
-%%
-%% {ok, KeyJson} = file:read_file("jwt-profile.json"),
-%% KeyMap = jose:decode(KeyJson),
-%% Key = jose_jwk:from_pem(maps:get(<<"key">>, KeyMap)),
-%%
-%% {ok, #oidcc_token{}} =
-%%   oidcc_token:jwt_profile(<<"subject">>,
-%%                           ClientContext,
-%%                           Key,
-%%                           #{scope => [<<"scope">>],
-%%                             kid => maps:get(<<"keyId">>, KeyMap)}).
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Retrieve JSON Web Token (JWT) Profile Token
+
+See [https://datatracker.ietf.org/doc/html/rfc7523#section-4]
+
+For a high level interface using {@link oidcc_provider_configuration_worker}
+see {@link oidcc:jwt_profile_token/6}.
+
+## Examples
+
+```erlang
+{ok, ClientContext} =
+  oidcc_client_context:from_configuration_worker(provider_name,
+                                                 <<"client_id">>,
+                                                 <<"client_secret">>),
+
+{ok, KeyJson} = file:read_file("jwt-profile.json"),
+KeyMap = jose:decode(KeyJson),
+Key = jose_jwk:from_pem(maps:get(<<"key">>, KeyMap)),
+
+{ok, #oidcc_token{}} =
+  oidcc_token:jwt_profile(<<"subject">>,
+                          ClientContext,
+                          Key,
+                          #{scope => [<<"scope">>],
+                            kid => maps:get(<<"keyId">>, KeyMap)}).
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec jwt_profile(Subject, ClientContext, Jwk, Opts) -> {ok, t()} | {error, error()} when
     Subject :: binary(),
     ClientContext :: oidcc_client_context:t(),
@@ -935,27 +952,26 @@ validate_id_token(IdToken, ClientContext, Opts) when is_map(Opts) ->
         end
     end.
 
-%% @doc Validate JWT
-%%
-%% Validates a generic JWT (such as an access token) from the given provider.
-%% Useful if the issuer is shared between multiple applications, and the access token
-%% generated for a user at one client is used to validate their access at another client.
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, ClientContext} =
-%%   oidcc_client_context:from_configuration_worker(provider_name,
-%%                                                  <<"client_id">>,
-%%                                                  <<"client_secret">>),
-%%
-%% %% Get Jwt from Authorization header
-%%
-%% {ok, Claims} =
-%%   oidcc:validate_jwt(Jwt, ClientContext, Opts).
-%% '''
-%% @end
-%% @since 3.2.0
+?DOC("""
+Validate JWT
+
+Validates a generic JWT (such as an access token) from the given provider.
+Useful if the issuer is shared between multiple applications, and the access token
+generated for a user at one client is used to validate their access at another client.
+
+## Examples
+
+```erlang
+{ok, ClientContext} =
+    oidcc_client_context:from_configuration_worker(provider_name,
+                                                <<"client_id">>,
+                                                <<"client_secret">>),
+%% Get Jwt from Authorization header
+{ok, Claims} =
+    oidcc:validate_jwt(Jwt, ClientContext, Opts).
+```
+""").
+?DOC(#{since => <<"3.2.0">>}).
 -spec validate_jwt(Jwt, ClientContext, Opts) ->
     {ok, Claims} | {error, error()}
 when
@@ -1003,26 +1019,25 @@ validate_jwt(Jwt, ClientContext, Opts) when is_map(Opts) ->
         {ok, Claims}
     end.
 
-%% @doc Authorization headers
-%%
-%%   Generate a map of authorization headers to use when using the given
-%%   access token to access an API endpoint.
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, ClientContext} =
-%%   oidcc_client_context:from_configuration_worker(provider_name,
-%%                                                  <<"client_id">>,
-%%                                                  <<"client_secret">>),
-%%
-%% %% Get Access Token record from somewhere
-%%
-%% Headers =
-%%   oidcc:authorization_headers(AccessTokenRecord, :get, Url, ClientContext).
-%% '''
-%% @end
-%% @since 3.2.0
+?DOC("""
+Authorization headers
+
+Generate a map of authorization headers to use when using the given
+access token to access an API endpoint.
+
+## Examples
+
+```erlang
+{ok, ClientContext} =
+    oidcc_client_context:from_configuration_worker(provider_name,
+                                                    <<"client_id">>,
+                                                    <<"client_secret">>),
+%% Get Access Token record from somewhere
+Headers =
+    oidcc:authorization_headers(AccessTokenRecord, :get, Url, ClientContext).
+```
+""").
+?DOC(#{since => "3.2.0"}).
 -spec authorization_headers(AccessTokenRecord, Method, Endpoint, ClientContext) -> HeaderMap when
     AccessTokenRecord :: access(),
     Method :: post | get,

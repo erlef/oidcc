@@ -1,11 +1,10 @@
-%%%-------------------------------------------------------------------
-%% @doc Functions to start an OpenID Connect Authorization
-%% @end
-%% @since 3.0.0
-%%%-------------------------------------------------------------------
 -module(oidcc_authorization).
 
 -feature(maybe_expr, enable).
+
+-include("internal/doc.hrl").
+?MODULEDOC("Functions to start an OpenID Connect Authorization").
+?MODULEDOC(#{since => <<"3.0.0">>}).
 
 -include("oidcc_client_context.hrl").
 -include("oidcc_provider_configuration.hrl").
@@ -17,6 +16,25 @@
 -export_type([error/0]).
 -export_type([opts/0]).
 
+?DOC("""
+Configure authorization redirect URL.
+
+See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
+
+## Parameters
+
+* `scopes` - list of scopes to request (defaults to `[<<"openid">>]`)
+* `state` - state to pass to the provider
+* `nonce` - nonce to pass to the provider
+* `purpose` - purpose of the authorization request, see [https://cdn.connectid.com.au/specifications/oauth2-purpose-01.html]
+* `require_purpose` - whether to require a `purpose` value
+* `pkce_verifier` - PKCE verifier (random string), see [https://datatracker.ietf.org/doc/html/rfc7636#section-4.1]
+* `require_pkce` - whether to require PKCE when getting the token
+* `redirect_uri` - redirect target after authorization is completed
+* `url_extension` - add custom query parameters to the authorization URL
+* `response_mode` - response mode to use (defaults to `<<"query">>`)
+""").
+?MODULEDOC(#{since => <<"3.0.0">>}).
 -type opts() ::
     #{
         scopes => oidcc_scope:scopes(),
@@ -30,27 +48,8 @@
         url_extension => oidcc_http_util:query_params(),
         response_mode => binary()
     }.
-%% Configure authorization redirect url
-%%
-%% See [https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest]
-%%
-%% <h2>Parameters</h2>
-%%
-%% <ul>
-%%   <li>`scopes' - list of scopes to request (defaults to `[<<"openid">>]')</li>
-%%   <li>`state' - state to pass to the provider</li>
-%%   <li>`nonce' - nonce to pass to the provider</li>
-%%   <li>`purpose' - purpose of the authorization request, see
-%%     [https://cdn.connectid.com.au/specifications/oauth2-purpose-01.html]</li>
-%%   <li>`require_purpose' - whether to require a `purpose' value</li>
-%%   <li>`pkce_verifier' - pkce verifier (random string), see
-%%     [https://datatracker.ietf.org/doc/html/rfc7636#section-4.1]</li>
-%%   <li>`require_pkce' - whether to require PKCE when getting the token</li>
-%%   <li>`redirect_uri' - redirect target after authorization is completed</li>
-%%   <li>`url_extension' - add custom query parameters to the authorization url</li>
-%%   <li>`response_mode' - response mode to use (defaults to `<<"query">>')</li>
-%% </ul>
 
+?MODULEDOC(#{since => <<"3.0.0">>}).
 -type error() ::
     {grant_type_not_supported, authorization_code}
     | par_required
@@ -81,28 +80,28 @@
     metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
 }).
 
-%% @doc
-%% Create Auth Redirect URL
-%%
-%% For a high level interface using {@link oidcc_provider_configuration_worker}
-%% see {@link oidcc:create_redirect_url/4}.
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, ClientContext} =
-%%     oidcc_client_context:from_configuration_worker(provider_name,
-%%                                                    <<"client_id">>,
-%%                                                    <<"client_secret">>),
-%%
-%% {ok, RedirectUri} =
-%%     oidcc_authorization:create_redirect_url(ClientContext,
-%%                                             #{redirect_uri: <<"https://my.server/return"}),
-%%
-%% %% RedirectUri = https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Create Auth Redirect URL.
+
+For a high level interface using `m:oidcc_provider_configuration_worker`
+see `oidcc:create_redirect_url/4`.
+
+## Examples
+
+```erlang
+{ok, ClientContext} =
+    oidcc_client_context:from_configuration_worker(provider_name,
+                                                   <<"client_id">>,
+                                                   <<"client_secret">>),
+
+{ok, RedirectUri} =
+    oidcc_authorization:create_redirect_url(ClientContext,
+                                            #{redirect_uri: <<"https://my.server/return">}),
+
+%% RedirectUri = https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec create_redirect_url(ClientContext, Opts) -> {ok, Uri} | {error, error()} when
     ClientContext :: oidcc_client_context:t(),
     Opts :: opts(),

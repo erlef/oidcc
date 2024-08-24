@@ -1,10 +1,10 @@
-%%%-------------------------------------------------------------------
-%% @doc Authentication Utilities
-%% @end
-%%%-------------------------------------------------------------------
 -module(oidcc_auth_util).
 
 -feature(maybe_expr, enable).
+
+-include("internal/doc.hrl").
+?MODULEDOC("Authentication Utilities").
+?MODULEDOC(#{since => <<"3.2.0">>}).
 
 -include("oidcc_client_context.hrl").
 -include("oidcc_provider_configuration.hrl").
@@ -13,6 +13,7 @@
 
 -export_type([auth_method/0, error/0]).
 
+?DOC(#{since => <<"3.2.0">>}).
 -type auth_method() ::
     none
     | client_secret_basic
@@ -21,6 +22,7 @@
     | private_key_jwt
     | tls_client_auth.
 
+?DOC(#{since => <<"3.2.0">>}).
 -type error() :: no_supported_auth_method.
 
 -export([add_client_authentication/6]).
@@ -28,7 +30,7 @@
 -export([add_authorization_header/6]).
 -export([maybe_mtls_endpoint/4]).
 
-%% @private
+?DOC(false).
 -spec add_client_authentication(
     QueryList, Header, SupportedAuthMethods, AllowAlgorithms, Opts, ClientContext
 ) ->
@@ -276,7 +278,7 @@ add_jwt_bearer_assertion(ClientAssertion, Body, Header, ClientContext) ->
         Header
     }.
 
-%% @private
+?DOC(false).
 -spec add_dpop_proof_header(Header, Method, Endpoint, Opts, ClientContext) -> Header when
     Header :: [oidcc_http_util:http_header()],
     Method :: post | get,
@@ -298,7 +300,7 @@ add_dpop_proof_header(Header, Method, Endpoint, Opts, ClientContext) ->
             Header
     end.
 
-%% @private
+?DOC(false).
 -spec add_authorization_header(
     AccessToken, AccessTokenType, Method, Endpoint, Opts, ClientContext
 ) ->
@@ -338,7 +340,7 @@ add_authorization_header(
             [oidcc_http_util:bearer_auth_header(AccessToken)]
     end.
 
-%% @private
+?DOC(false).
 -spec maybe_mtls_endpoint(
     Endpoint, auth_method(), MtlsEndpointName, ClientContext
 ) -> Endpoint when

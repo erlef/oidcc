@@ -18,7 +18,6 @@ defmodule Oidcc.Mixfile do
       docs: &docs/0,
       description: to_string(@props[:description]),
       package: package(),
-      aliases: [docs: ["compile", &edoc_chunks/1, "docs"]],
       test_coverage: [ignore_modules: [Oidcc.RecordStruct]]
     ]
   end
@@ -79,18 +78,5 @@ defmodule Oidcc.Mixfile do
       logo: "assets/logo.svg",
       assets: %{"assets" => "assets"}
     ]
-  end
-
-  defp edoc_chunks(_args) do
-    base_path = Path.dirname(__ENV__.file)
-    doc_chunk_path = Application.app_dir(:oidcc, "doc")
-
-    :ok =
-      :edoc.application(:oidcc, String.to_charlist(base_path),
-        doclet: :edoc_doclet_chunks,
-        layout: :edoc_layout_chunks,
-        preprocess: true,
-        dir: String.to_charlist(doc_chunk_path)
-      )
   end
 end

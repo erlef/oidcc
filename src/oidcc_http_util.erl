@@ -1,10 +1,9 @@
-%%%-------------------------------------------------------------------
-%% @doc HTTP Client Utilities
-%% @end
-%%%-------------------------------------------------------------------
 -module(oidcc_http_util).
 
 -feature(maybe_expr, enable).
+
+-include("internal/doc.hrl").
+?MODULEDOC("HTTP Client Utilities").
 
 -export([basic_auth_header/2]).
 -export([bearer_auth_header/1]).
@@ -15,38 +14,47 @@
     http_header/0, error/0, httpc_error/0, query_params/0, telemetry_opts/0, request_opts/0
 ]).
 
+?DOC("See `uri_string:compose_query/1`.").
+?DOC(#{since => <<"3.0.0">>}).
 -type query_params() :: [{unicode:chardata(), unicode:chardata() | true}].
-%% See {@link uri_string:compose_query/1}
+
+?DOC("See `httpc:request/5`.").
+?DOC(#{since => <<"3.0.0">>}).
 -type http_header() :: {Field :: [byte()] | binary(), Value :: iodata()}.
-%% See {@link httpc:request/5}
+
+?DOC(#{since => <<"3.0.0">>}).
 -type error() ::
     {http_error, StatusCode :: pos_integer(), HttpBodyResult :: binary() | map()}
     | {use_dpop_nonce, Nonce :: binary(), HttpBodyResult :: binary() | map()}
     | invalid_content_type
     | httpc_error().
--type httpc_error() :: term().
-%% See {@link httpc:request/5} for additional errors
 
+?DOC("See `httpc:request/5` for additional errors.").
+?DOC(#{since => <<"3.0.0">>}).
+-type httpc_error() :: term().
+
+?DOC("""
+See `httpc:request/5`.
+
+## Parameters
+
+* `timeout` - timeout for request
+* `ssl` - TLS config
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -type request_opts() :: #{
     timeout => timeout(),
     ssl => [ssl:tls_option()],
     httpc_profile => atom() | pid()
 }.
-%% See {@link httpc:request/5}
-%%
-%% <h2>Parameters</h2>
-%%
-%% <ul>
-%%   <li>`timeout' - timeout for request</li>
-%%   <li>`ssl' - TLS config</li>
-%% </ul>
 
+?DOC(#{since => <<"3.0.0">>}).
 -type telemetry_opts() :: #{
     topic := [atom()],
     extra_meta => map()
 }.
 
-%% @private
+?DOC(false).
 -spec basic_auth_header(User, Secret) -> http_header() when
     User :: binary(),
     Secret :: binary().
@@ -57,12 +65,12 @@ basic_auth_header(User, Secret) ->
     AuthData = base64:encode(RawAuth),
     {"authorization", [<<"Basic ">>, AuthData]}.
 
-%% @private
+?DOC(false).
 -spec bearer_auth_header(Token) -> http_header() when Token :: binary().
 bearer_auth_header(Token) ->
     {"authorization", [<<"Bearer ">>, Token]}.
 
-%% @private
+?DOC(false).
 -spec request(Method, Request, TelemetryOpts, RequestOpts) ->
     {ok, {{json, term()} | {jwt, binary()}, [http_header()]}}
     | {error, error()}

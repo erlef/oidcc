@@ -1,23 +1,24 @@
-%%%-------------------------------------------------------------------
-%% @doc Tooling to load and parse Openid Configuration
-%%
-%% <h2>Records</h2>
-%%
-%% To use the record, import the definition:
-%%
-%% ```
-%% -include_lib(["oidcc/include/oidcc_provider_configuration.hrl"]).
-%% '''
-%%
-%% <h2>Telemetry</h2>
-%%
-%% See {@link 'Elixir.Oidcc.ProviderConfiguration'}
-%% @end
-%% @since 3.0.0
-%%%-------------------------------------------------------------------
 -module(oidcc_provider_configuration).
 
 -feature(maybe_expr, enable).
+
+-include("internal/doc.hrl").
+?MODULEDOC("""
+Tooling to load and parse Openid Configuration.
+
+## Records
+
+To use the record, import the definition:
+
+```erlang
+-include_lib(["oidcc/include/oidcc_provider_configuration.hrl"]).
+```
+
+## Telemetry
+
+See [`Oidcc.ProviderConfiguration`](`m:'Elixir.Oidcc.ProviderConfiguration'`).
+""").
+?MODULEDOC(#{since => <<"3.0.0">>}).
 
 -include("oidcc_provider_configuration.hrl").
 
@@ -32,35 +33,48 @@
 -export_type([quirks/0]).
 -export_type([t/0]).
 
+?DOC("""
+Allow Specification Non-compliance.
+
+## Exceptions
+
+* `allow_unsafe_http` - Allow unsafe HTTP. Use this for development
+  providers and **never in production**.
+* `document_overrides` - a map to merge with the real OIDD document,
+  in case the OP left out some values.
+""").
+?DOC(#{since => <<"3.1.0">>}).
 -type quirks() :: #{
     allow_unsafe_http => boolean(),
     document_overrides => map()
 }.
-%% Allow Specification Non-compliance
-%%
-%% <h2>Exceptions</h2>
-%%
-%% <ul>
-%%   <li>`allow_unsafe_http' - Allow unsafe HTTP. Use this for development
-%%     providers and <strong>never in production</strong>.</li>
-%%   <li>`document_overrides' - a map to merge with the real OIDD document,
-%%     in case the OP left out some values.</li>
-%% </ul>
 
+?DOC("""
+Configure configuration loading / parsing.
+
+## Parameters
+
+* `fallback_expiry` - How long to keep configuration cached if the server doesn't specify expiry.
+* `request_opts` - config for HTTP request.
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -type opts() :: #{
     fallback_expiry => timeout(),
     request_opts => oidcc_http_util:request_opts(),
     quirks => quirks()
 }.
-%% Configure configuration loading / parsing
-%%
-%% <h2>Parameters</h2>
-%%
-%% <ul>
-%%   <li>`fallback_expiry' - How long to keep configuration cached if the server doesn't specify expiry</li>
-%%   <li>`request_opts' - config for HTTP request</li>
-%% </ul>
 
+?DOC("""
+Record containing OpenID and OAuth 2.0 Configuration.
+
+See:
+* https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata
+* https://datatracker.ietf.org/doc/html/draft-jones-oauth-discovery-01#section-4.1
+* https://openid.net/specs/openid-connect-rpinitiated-1_0.html#OPMetadata
+
+All unrecognized fields are stored in `extra_fields`.
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -type t() ::
     #oidcc_provider_configuration{
         issuer :: uri_string:uri_string(),
@@ -127,14 +141,8 @@
         mtls_endpoint_aliases :: #{binary() => uri_string:uri_string()},
         extra_fields :: #{binary() => term()}
     }.
-%% Record containing OpenID and OAuth 2.0 Configuration
-%%
-%% See [https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata],
-%% [https://datatracker.ietf.org/doc/html/draft-jones-oauth-discovery-01#section-4.1] and
-%% [https://openid.net/specs/openid-connect-rpinitiated-1_0.html#OPMetadata]
-%%
-%% All unrecognized fields are stored in `extra_fields'.
 
+?DOC(#{since => <<"3.0.0">>}).
 -type error() ::
     invalid_content_type
     | {issuer_mismatch, Issuer :: binary()}
@@ -185,16 +193,17 @@
     metadata => <<"#{jwks_uri => uri_string:uri_string()}">>
 }).
 
-%% @doc Load OpenID Configuration into a {@link oidcc_provider_configuration:t()} record
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, #oidcc_provider_configuration{}} =
-%%   oidcc_provider_configuration:load_configuration("https://accounts.google.com").
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Load OpenID Configuration into a `t:oidcc_provider_configuration:t/0` record.
+
+## Examples
+
+```erlang
+{ok, #oidcc_provider_configuration{}} =
+  oidcc_provider_configuration:load_configuration("https://accounts.google.com").
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec load_configuration(Issuer, Opts) ->
     {ok, {Configuration :: t(), Expiry :: pos_integer()}} | {error, error()}
 when
@@ -234,24 +243,25 @@ load_configuration(Issuer0, Opts) ->
             {error, invalid_content_type}
     end.
 
-%% @see load_configuration/2
-%% @since 3.1.0
+?DOC("See `load_configuration/2`.").
+?DOC(#{since => <<"3.1.0">>}).
 -spec load_configuration(Issuer) ->
     {ok, {Configuration :: t(), Expiry :: pos_integer()}} | {error, error()}
 when
     Issuer :: uri_string:uri_string().
 load_configuration(Issuer) -> load_configuration(Issuer, #{}).
 
-%% @doc Load JWKs into a {@link jose_jwk:key()} record
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, #jose_jwk{}} =
-%%   oidcc_provider_configuration:load_jwks("https://www.googleapis.com/oauth2/v3/certs").
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Load JWKs into a `t:jose_jwk:key/0` record.
+
+## Examples
+
+```erlang
+{ok, #jose_jwk{}} =
+  oidcc_provider_configuration:load_jwks("https://www.googleapis.com/oauth2/v3/certs").
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec load_jwks(JwksUri, Opts) ->
     {ok, {Jwks :: jose_jwk:key(), Expiry :: pos_integer()}} | {error, term()}
 when
@@ -274,21 +284,22 @@ load_jwks(JwksUri, Opts) ->
         {ok, {{_Format, _Body}, _Headers}} -> {error, invalid_content_type}
     end.
 
-%% @doc Decode JSON into a {@link oidcc_provider_configuration:t()} record
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, {{"HTTP/1.1",200,"OK"}, _Headers, Body}} =
-%%   httpc:request("https://accounts.google.com/.well-known/openid-configuration"),
-%%
-%% {ok, DecodedJson} = your_json_lib:decode(Body),
-%%
-%% {ok, #oidcc_provider_configuration{}} =
-%%   oidcc_provider_configuration:decode_configuration(DecodedJson).
-%% '''
-%% @end
-%% @since 3.1.0
+?DOC("""
+Decode JSON into a `t:oidcc_provider_configuration:t/0` record.
+
+## Examples
+
+```erlang
+{ok, {{"HTTP/1.1",200,"OK"}, _Headers, Body}} =
+  httpc:request("https://accounts.google.com/.well-known/openid-configuration"),
+
+{ok, DecodedJson} = your_json_lib:decode(Body),
+
+{ok, #oidcc_provider_configuration{}} =
+  oidcc_provider_configuration:decode_configuration(DecodedJson).
+```
+""").
+?DOC(#{since => <<"3.1.0">>}).
 -spec decode_configuration(Configuration, Opts) -> {ok, t()} | {error, error()} when
     Configuration :: map(), Opts :: opts().
 decode_configuration(Configuration0, Opts) ->
@@ -567,8 +578,8 @@ decode_configuration(Configuration0, Opts) ->
         }}
     end.
 
-%% @see decode_configuration/2
-%% @since 3.0.0
+?DOC("See `decode_configuration/2`.").
+?DOC(#{since => <<"3.0.0">>}).
 -spec decode_configuration(Configuration) -> {ok, t()} | {error, error()} when
     Configuration :: map().
 decode_configuration(Configuration) -> decode_configuration(Configuration, #{}).

@@ -447,6 +447,8 @@ essential_params(QueryParams) ->
     lists:filter(
         fun
             ({<<"scope">>, _Value}) -> true;
+            ({<<"response_type">>, _Value}) -> true;
+            ({<<"client_id">>, _Value}) -> true;
             (_Other) -> false
         end,
         QueryParams

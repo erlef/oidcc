@@ -44,6 +44,8 @@ create_redirect_url_inl_gov(_Config) ->
 
     ?assertMatch(
         #{
+            <<"client_id">> := <<"client_id">>,
+            <<"response_type">> := <<"code">>,
             <<"scope">> := <<"openid">>,
             <<"request">> := _
         },

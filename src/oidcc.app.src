@@ -1,6 +1,6 @@
 {application, oidcc, [
     {description, "OpenID Connect client library for the BEAM."},
-    {vsn, "3.2.2"},
+    {vsn, "3.2.3"},
     {registered, []},
     {applications, [kernel, stdlib, inets, ssl, public_key, telemetry, jose]},
     {env, []},

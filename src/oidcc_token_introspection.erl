@@ -48,7 +48,6 @@ See https://datatracker.ietf.org/doc/html/rfc7662#section-2.2.
     iss :: binary()
 }.
 
-
 ?DOC(#{since => <<"3.0.0">>}).
 -type opts() :: #{
     preferred_auth_methods => [oidcc_auth_util:auth_method(), ...],
@@ -225,33 +224,33 @@ extract_response(TokenMap) ->
     Jti = maps:get(<<"jti">>, TokenMap, undefined),
     ClientId = maps:get(<<"client_id">>, TokenMap, undefined),
     {ok, #oidcc_token_introspection{
-                active = Active,
-                scope = oidcc_scope:parse(Scope),
-                client_id = ClientId,
-                username = Username,
-                exp = Exp,
-                token_type = TokenType,
-                iat = Iat,
-                nbf = Nbf,
-                sub = Sub,
-                aud = Aud,
-                iss = Iss,
-                jti = Jti,
-                extra = maps:without(
-                    [
-                        <<"scope">>,
-                        <<"active">>,
-                        <<"username">>,
-                        <<"exp">>,
-                        <<"client_id">>,
-                        <<"token_type">>,
-                        <<"iat">>,
-                        <<"nbf">>,
-                        <<"sub">>,
-                        <<"aud">>,
-                        <<"iss">>,
-                        <<"jti">>
-                    ],
-                    TokenMap
-                )
-            }}.
+        active = Active,
+        scope = oidcc_scope:parse(Scope),
+        client_id = ClientId,
+        username = Username,
+        exp = Exp,
+        token_type = TokenType,
+        iat = Iat,
+        nbf = Nbf,
+        sub = Sub,
+        aud = Aud,
+        iss = Iss,
+        jti = Jti,
+        extra = maps:without(
+            [
+                <<"scope">>,
+                <<"active">>,
+                <<"username">>,
+                <<"exp">>,
+                <<"client_id">>,
+                <<"token_type">>,
+                <<"iat">>,
+                <<"nbf">>,
+                <<"sub">>,
+                <<"aud">>,
+                <<"iss">>,
+                <<"jti">>
+            ],
+            TokenMap
+        )
+    }}.

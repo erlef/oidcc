@@ -147,7 +147,6 @@ All unrecognized fields are stored in `extra_fields`.
         extra_fields :: #{binary() => term()}
     }.
 
-
 ?DOC(#{since => <<"3.0.0">>}).
 -type error() ::
     registration_not_supported

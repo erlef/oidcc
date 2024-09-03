@@ -2,7 +2,6 @@
 
 -feature(maybe_expr, enable).
 
-
 -include("internal/doc.hrl").
 ?MODULEDOC("Logout from the OpenID Provider.").
 ?MODULEDOC(#{since => <<"3.0.0">>}).

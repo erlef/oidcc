@@ -64,7 +64,6 @@ ID Token Wrapper.
 ?DOC(#{since => <<"3.0.0">>}).
 -type id() :: #oidcc_token_id{token :: binary(), claims :: oidcc_jwt_util:claims()}.
 
-
 ?DOC("""
 Access Token Wrapper.
 
@@ -154,7 +153,6 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
         body_extension => oidcc_http_util:query_params()
     }.
 
-
 ?DOC(#{since => <<"3.0.0">>}).
 -type refresh_opts() ::
     #{
@@ -183,7 +181,6 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
     #{
         trusted_audiences => [binary()] | any
     }.
-
 
 ?DOC(#{since => <<"3.0.0">>}).
 -type jwt_profile_opts() :: #{

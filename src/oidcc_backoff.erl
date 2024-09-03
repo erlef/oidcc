@@ -8,7 +8,6 @@ Based on [`db_connection`](https://github.com/elixir-ecto/db_connection/blob/8ef
 """).
 ?MODULEDOC(#{since => <<"3.2.0">>}).
 
-
 -export_type([type/0]).
 -export_type([min/0]).
 -export_type([max/0]).

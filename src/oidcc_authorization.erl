@@ -327,7 +327,7 @@ attempt_request_object(
         {error, no_supported_alg_or_key} when RequireSignedRequestObject =:= true ->
             {error, request_object_required};
         {error, no_supported_alg_or_key} ->
-            {ok, QueryParams};
+            {ok, QueryParams ++ UrlExtension};
         {ok, SignedRequestObject} ->
             case
                 oidcc_jwt_util:encrypt(

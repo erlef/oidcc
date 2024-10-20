@@ -5,18 +5,25 @@ on:
 
 name: "Main Branch"
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: "Test"
+
+    permissions:
+      contents: read
+      security-events: write
 
     uses: ./.github/workflows/part_test.yml
 
   docs:
     name: "Docs"
 
+    permissions:
+      id-token: write
+      contents: read
+      attestations: write
+
     uses: ./.github/workflows/part_docs.yml
-
-  publish:
-    name: "Publish"
-
-    uses: ./.github/workflows/part_publish.yml

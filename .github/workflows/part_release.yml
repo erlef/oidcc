@@ -11,11 +11,12 @@ on:
 
 name: "Release"
 
-jobs:
-  create_prerelease:
-    name: Create Prerelease
+permissions:
+  contents: read
 
-    if: ${{ !inputs.stable }}
+jobs:
+  create:
+    name: Create Release
 
     runs-on: ubuntu-latest
 
@@ -24,6 +25,7 @@ jobs:
 
     steps:
       - name: Create draft prerelease
+        if: ${{ !inputs.stable }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -33,19 +35,8 @@ jobs:
             --prerelease \
             --generate-notes \
             ${{ inputs.releaseName }}
-
-  create_stable:
-    name: Create Stable
-
-    if: ${{ inputs.stable }}
-
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
-
-    steps:
-      - name: Create draft release
+      - name: Create release
+        if: ${{ inputs.stable }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -54,3 +45,15 @@ jobs:
             --title ${{ inputs.releaseName }} \
             --generate-notes \
             ${{ inputs.releaseName }}
+            
+      - name: "Download Docs Artifact"
+        uses: actions/download-artifact@v4
+        with:
+          name: docs
+          path: .
+      - name: Upload Docs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload --clobber "${{ inputs.releaseName }}" \
+            docs.tar.gz*

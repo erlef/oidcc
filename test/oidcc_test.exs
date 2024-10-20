@@ -28,7 +28,6 @@ defmodule OidccTest do
 
   setup_all do
     # Used in doctests
-    System.put_env("CLIENT_ID", @project)
     System.put_env("CLIENT_CREDENTIALS_CLIENT_ID", @client_credentials_client_id)
     System.put_env("CLIENT_CREDENTIALS_CLIENT_SECRET", @client_credentials_client_secret)
     System.put_env("JWT_PROFILE", @jwt_profile)
@@ -165,7 +164,7 @@ defmodule OidccTest do
                Oidcc.jwt_profile_token(
                  subject,
                  pid,
-                 @project,
+                 "JWT Profile Test",
                  "client_secret",
                  jwk,
                  %{scope: ["openid", "urn:zitadel:iam:org:project:id:zitadel:aud"], kid: kid}

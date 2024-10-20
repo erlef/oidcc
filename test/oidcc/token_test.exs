@@ -41,7 +41,6 @@ defmodule Oidcc.TokenTest do
 
   setup_all do
     # Used in doctests
-    System.put_env("CLIENT_ID", @project)
     System.put_env("CLIENT_CREDENTIALS_CLIENT_ID", @client_credentials_client_id)
     System.put_env("CLIENT_CREDENTIALS_CLIENT_SECRET", @client_credentials_client_secret)
     System.put_env("JWT_PROFILE", @jwt_profile)
@@ -191,7 +190,7 @@ defmodule Oidcc.TokenTest do
       {:ok, client_context} =
         ClientContext.from_configuration_worker(
           pid,
-          @project,
+          "JWT Profile Test",
           "client_secret"
         )
 

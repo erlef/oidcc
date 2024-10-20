@@ -367,7 +367,7 @@ defmodule Oidcc.Token do
       ...> {:ok, client_context} =
       ...>   Oidcc.ClientContext.from_configuration_worker(
       ...>     pid,
-      ...>     System.fetch_env!("CLIENT_ID"),
+      ...>     "JWT Profile Test",
       ...>     "client_secret"
       ...>   )
       ...>

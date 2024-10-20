@@ -283,7 +283,7 @@ defmodule Oidcc do
       ...>   Oidcc.jwt_profile_token(
       ...>     subject,
       ...>     pid,
-      ...>     System.fetch_env!("CLIENT_ID"),
+      ...>     "JWT Profile Test",
       ...>     "client_secret",
       ...>     jwk,
       ...>     %{scope: ["openid", "urn:zitadel:iam:org:project:id:zitadel:aud"], kid: kid}

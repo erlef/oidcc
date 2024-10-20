@@ -167,7 +167,7 @@ retrieve_jwt_profile_token(_Config) ->
         oidcc:jwt_profile_token(
             <<"231391584430604723">>,
             ZitadelConfigurationPid,
-            <<"231391584430604723">>,
+            <<"JWT Profile Test">>,
             <<"client_secret">>,
             Key,
             #{

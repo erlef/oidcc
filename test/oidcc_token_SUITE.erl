@@ -40,7 +40,7 @@ retrieves_jwt_profile_token(_Config) ->
 
     {ok, ZitadelClientContext} = oidcc_client_context:from_configuration_worker(
         ZitadelConfigurationPid,
-        <<"231391584430604723">>,
+        <<"JWT Profile Test">>,
         <<"client_secret">>
     ),
 

@@ -1,0 +1,9 @@
+annotations:
+  - checks:
+      - fuzzing
+    reasons:
+      - reason: not-applicable # Erlang / Elixir is memory safe
+  - checks:
+      - packaging
+    reasons:
+      - reason: not-supported # Using Hex.pm

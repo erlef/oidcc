@@ -18,7 +18,6 @@ defmodule OidccTest do
 
   @client_credentials_client_id client_credentials_client_id
   @client_credentials_client_secret client_credentials_client_secret
-  @project project
 
   @jwt_profile :oidcc
                |> Application.app_dir("priv/test/fixtures/zitadel-jwt-profile.json")

@@ -18,6 +18,7 @@ OpenID Connect client library for Erlang.
 [![License](https://img.shields.io/hexpm/l/oidcc.svg)](https://github.com/erlef/oidcc/blob/main/LICENSE)
 [![Last Updated](https://img.shields.io/github/last-commit/erlef/oidcc.svg)](https://github.com/erlef/oidcc/commits/master)
 [![Coverage Status](https://coveralls.io/repos/github/erlef/oidcc/badge.svg?branch=main)](https://coveralls.io/github/erlef/oidcc?branch=main)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/erlef/oidcc/badge)](https://scorecard.dev/viewer/?uri=github.com/erlef/oidcc)
 
 <br clear="left"/>
 

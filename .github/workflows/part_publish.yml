@@ -10,6 +10,9 @@ on:
 
 name: "Publish"
 
+permissions:
+  contents: read
+
 jobs:
   hex_publish:
     name: mix hex.publish
@@ -41,59 +44,3 @@ jobs:
       - run: mix hex.publish --yes
         env:
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
-
-  hex_build:
-    name: mix hex.build
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
-        id: setupBEAM
-        with:
-          version-file: .tool-versions
-          version-type: strict
-      - uses: actions/cache@v4
-        with:
-          path: _build
-          key: mix_hex_build-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
-          restore-keys: |
-            mix_hex_build-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
-      - uses: actions/cache@v4
-        with:
-          path: deps
-          key: mix_hex_build-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
-          restore-keys: |
-            mix_hex_build-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
-      - run: mix deps.get
-      - run: mix hex.build --output package.tar
-      - uses: actions/upload-artifact@v4
-        with:
-          name: package
-          path: package.tar
-
-  upload:
-    name: "Upload"
-
-    runs-on: ubuntu-latest
-
-    if: ${{ inputs.releaseName }}
-
-    needs: ["hex_build"]
-
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: package
-          path: .
-      - name: Upload
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          gh release upload --clobber "${{ inputs.releaseName }}" \
-            package.tar

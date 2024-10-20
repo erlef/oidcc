@@ -6,6 +6,9 @@ name: "Test"
 env:
   ERL_AFLAGS: "-enable-feature all"
 
+permissions:
+  contents: read
+
 jobs:
   detectToolVersions:
     name: "Detect Tool Versions"
@@ -321,6 +324,10 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      security-events: write
+
     steps:
       - uses: actions/checkout@v4
       - uses: erlef/setup-beam@v1
@@ -341,7 +348,12 @@ jobs:
           restore-keys: |
             credo-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
       - run: mix deps.get
-      - run: mix credo
+      - run: mix credo --format sarif > results.sarif
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
+          category: credo
 
   dialyxir:
     name: mix dialyzer

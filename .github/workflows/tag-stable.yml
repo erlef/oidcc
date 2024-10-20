@@ -5,31 +5,33 @@ on:
 
 name: "Stable Tag"
 
+permissions:
+  contents: read
+
 jobs:
-  release:
-    name: "Release"
-
-    uses: ./.github/workflows/part_release.yml
-    with:
-      releaseName: "${{ github.ref_name }}"
-      stable: true
-
   docs:
     name: "Docs"
 
-    needs: ["release"]
-
     uses: ./.github/workflows/part_docs.yml
-    with:
-      releaseName: "${{ github.ref_name }}"
 
   publish:
     name: "Publish"
-
-    needs: ["release"]
 
     uses: ./.github/workflows/part_publish.yml
     with:
       releaseName: "${{ github.ref_name }}"
     secrets:
       HEX_API_KEY: "${{ secrets.HEX_API_KEY }}"
+
+  release:
+    name: "Release"
+
+    needs: ["docs"]
+
+    permissions:
+      contents: write
+
+    uses: ./.github/workflows/part_release.yml
+    with:
+      releaseName: "${{ github.ref_name }}"
+      stable: true

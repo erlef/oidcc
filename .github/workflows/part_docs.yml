@@ -1,17 +1,21 @@
 on:
-  workflow_call:
-    inputs:
-      releaseName:
-        required: false
-        type: string
+  workflow_call: {}
 
 name: "Documentation"
+
+permissions:
+  contents: read
 
 jobs:
   generate:
     name: "Generate"
 
     runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+      attestations: write
 
     steps:
       - uses: actions/checkout@v4
@@ -34,34 +38,22 @@ jobs:
             docs-bdepsuild-{{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-
       - run: mix deps.get
       - run: mix docs
+
+      - name: "Create Docs Archive"
+        run: |
+          tar -czvf docs.tar.gz doc
+      
+      - name: "Attest docs provenance"
+        uses: actions/attest-build-provenance@v1
+        id: attest-docs-provenance
+        with:
+          subject-path: 'docs.tar.gz'
+      - name: "Copy docs provenance"
+        run: cp "$ATTESTATION" docs.tar.gz.sigstore
+        env:
+          ATTESTATION: "${{ steps.attest-docs-provenance.outputs.bundle-path }}"
+
       - uses: actions/upload-artifact@v4
         with:
           name: docs
-          path: doc
-
-  upload:
-    name: "Upload"
-
-    runs-on: ubuntu-latest
-
-    if: ${{ inputs.releaseName }}
-
-    needs: ["generate"]
-
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: docs
-          path: docs
-      - run: |
-          tar -czvf docs.tar.gz docs
-      - name: Upload
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          gh release upload --clobber "${{ inputs.releaseName }}" \
-            docs.tar.gz
+          path: docs.tar.gz*

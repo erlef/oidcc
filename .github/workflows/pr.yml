@@ -28,4 +28,6 @@ jobs:
       attestations: write
 
     uses: ./.github/workflows/part_docs.yml
+    with:
+      attest: false
 

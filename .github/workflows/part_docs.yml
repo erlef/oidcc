@@ -60,6 +60,7 @@ jobs:
         with:
           subject-path: 'docs.tar.gz'
       - name: "Copy docs provenance"
+        if: "${{ github.event.inputs.attest }}"
         run: cp "$ATTESTATION" docs.tar.gz.sigstore
         env:
           ATTESTATION: "${{ steps.attest-docs-provenance.outputs.bundle-path }}"

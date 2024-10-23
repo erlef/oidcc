@@ -25,7 +25,7 @@ defmodule Oidcc.ClientContext do
           jwks: JOSE.JWK.t(),
           client_id: String.t(),
           client_secret: String.t(),
-          client_jwks: JOSE.JWK.t() | none
+          client_jwks: JOSE.JWK.t() | :none
         }
 
   @typedoc since: "3.0.0"
@@ -69,13 +69,13 @@ defmodule Oidcc.ClientContext do
           client_id :: String.t(),
           client_secret :: String.t(),
           opts :: :oidcc_client_context.authenticated_opts()
-        ) :: {:ok, authenticated_t()} | {:error, :oidcc_client_context.t()}
+        ) :: {:ok, authenticated_t()} | {:error, :oidcc_client_context.error()}
   @spec from_configuration_worker(
           provider_name :: GenServer.name(),
           client_id :: String.t(),
           client_secret :: :unauthenticated,
           opts :: :oidcc_client_context.unauthenticated_opts()
-        ) :: {:ok, unauthenticated_t()} | {:error, :oidcc_client_context.t()}
+        ) :: {:ok, unauthenticated_t()} | {:error, :oidcc_client_context.error()}
   def from_configuration_worker(provider_name, client_id, client_secret, opts \\ %{}) do
     opts = Map.update(opts, :client_jwks, :none, &JOSE.JWK.to_record/1)
 

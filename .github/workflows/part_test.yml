@@ -332,7 +332,7 @@ jobs:
       - name: Unpack Artifacts
         run: |
           mkdir -p _build/test/cover/
-          mv artifacts/*/*.coverdata _build/test/cover/
+          mv -f artifacts/*/*.coverdata _build/test/cover/
           rm -rf artifacts
       - run: rebar3 as test compile
       - run: rebar3 as test coveralls send
@@ -398,6 +398,7 @@ jobs:
           restore-keys: |
             credo-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
       - run: mix deps.get
+      - run: mix deps.compile
       - run: mix credo --format sarif > results.sarif
       - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@662472033e021d55d94146f66f6058822b0b39fd # v3.27.0

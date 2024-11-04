@@ -61,4 +61,5 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           gh release upload --clobber "${{ inputs.releaseName }}" \
+            --repo ${{ github.repository }} \
             docs.tar.gz*

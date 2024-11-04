@@ -12,6 +12,11 @@ jobs:
   docs:
     name: "Docs"
 
+    permissions:
+      id-token: write
+      contents: read
+      attestations: write
+
     uses: ./.github/workflows/part_docs.yml
 
   publish:

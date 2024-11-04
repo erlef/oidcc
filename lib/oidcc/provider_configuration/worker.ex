@@ -23,7 +23,10 @@ defmodule Oidcc.ProviderConfiguration.Worker do
   @type opts() :: %{
           optional(:name) => GenServer.name(),
           required(:issuer) => :uri_string.uri_string(),
-          optional(:provider_configuration_opts) => :oidcc_provider_configuration.opts()
+          optional(:provider_configuration_opts) => :oidcc_provider_configuration.opts(),
+          optional(:backoff_min) => :oidcc_backoff.min(),
+          optional(:backoff_max) => :oidcc_backoff.max(),
+          optional(:backoff_type) => :oidcc_backoff.type()
         }
 
   @doc """
@@ -38,15 +41,15 @@ defmodule Oidcc.ProviderConfiguration.Worker do
       ...> })
   """
   @doc since: "3.0.0"
-  @spec start_link(opts :: :oidcc_provider_configuration_worker.opts()) :: GenServer.on_start()
+  @spec start_link(opts :: opts()) :: GenServer.on_start()
   def start_link(opts)
 
   def start_link(%{name: name} = opts) when is_atom(name),
-    do: start_link(%{opts | name: {:local, name}})
+    do: :oidcc_provider_configuration_worker.start_link(%{opts | name: {:local, name}})
 
   def start_link(opts), do: :oidcc_provider_configuration_worker.start_link(opts)
 
-  @spec child_spec(opts :: :oidcc_provider_configuration_worker.opts()) :: Supervisor.child_spec()
+  @spec child_spec(opts :: opts()) :: Supervisor.child_spec()
   def child_spec(opts),
     do:
       Supervisor.child_spec(

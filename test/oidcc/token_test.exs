@@ -21,8 +21,7 @@ defmodule Oidcc.TokenTest do
 
   %{
     "clientId" => client_credentials_client_id,
-    "clientSecret" => client_credentials_client_secret,
-    "project" => project
+    "clientSecret" => client_credentials_client_secret
   } =
     :oidcc
     |> Application.app_dir("priv/test/fixtures/zitadel-client-credentials.json")

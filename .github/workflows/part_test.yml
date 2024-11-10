@@ -114,7 +114,7 @@ jobs:
             unstable: false
           - otp: "26.2.5"
             unstable: false
-          - otp: "27.0.1"
+          - otp: "27.1.2"
             unstable: false
           - otp: "master"
             unstable: true
@@ -161,7 +161,7 @@ jobs:
             unstable: false
           - otp: "26.2.5"
             unstable: false
-          - otp: "27.0.1"
+          - otp: "27.1.2"
             unstable: false
           - otp: "master"
             unstable: true
@@ -213,8 +213,8 @@ jobs:
           - elixir: "1.16.3"
             otp: "26.2.5"
             unstable: false
-          - elixir: "1.17.2"
-            otp: "27.0.1"
+          - elixir: "1.17.3"
+            otp: "27.1.2"
             unstable: false
           - elixir: "main"
             otp: "${{ needs.detectToolVersions.outputs.otpVersion }}"

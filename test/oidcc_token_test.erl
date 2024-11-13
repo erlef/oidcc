@@ -1710,17 +1710,65 @@ trusted_audiences_test() ->
 
     ok.
 
-retrieve_pkce_required_test() ->
-    ClientContext = client_context_fapi2_fixture(),
+retrieve_pkce_test() ->
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(
+            post,
+            {_TokenEndpoint, _Header, "application/x-www-form-urlencoded", _Body},
+            _HttpOpts,
+            _Opts,
+            _Profile
+        ) ->
+            {ok, {{"HTTP/1.1", 500, "Server Error"}, [], "SUCCESS"}}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    PkceSupportedClientContext = client_context_fapi2_fixture(),
+    PkceUnsupportedClientContext = PkceSupportedClientContext#oidcc_client_context{
+        provider_configuration = PkceSupportedClientContext#oidcc_client_context.provider_configuration#oidcc_provider_configuration{
+            code_challenge_methods_supported = undefined
+        }
+    },
     RedirectUri = <<"https://redirect.example/">>,
 
     ?assertEqual(
         {error, pkce_verifier_required},
-        oidcc_token:retrieve(<<"code">>, ClientContext, #{
+        oidcc_token:retrieve(<<"code">>, PkceSupportedClientContext, #{
             redirect_uri => RedirectUri,
             require_pkce => true
         })
     ),
+
+    ?assertEqual(
+        {error, {http_error, 500, "SUCCESS"}},
+        oidcc_token:retrieve(<<"code">>, PkceSupportedClientContext, #{
+            redirect_uri => RedirectUri,
+            require_pkce => true,
+            pkce_verifier => <<"verifier">>
+        })
+    ),
+
+    ?assertEqual(
+        {error, no_supported_code_challenge},
+        oidcc_token:retrieve(<<"code">>, PkceUnsupportedClientContext, #{
+            redirect_uri => RedirectUri,
+            require_pkce => true,
+            pkce_verifier => <<"verifier">>
+        })
+    ),
+
+    ?assertEqual(
+        {error, {http_error, 500, "SUCCESS"}},
+        oidcc_token:retrieve(<<"code">>, PkceUnsupportedClientContext, #{
+            redirect_uri => RedirectUri,
+            pkce_verifier => <<"verifier">>
+        })
+    ),
+
+    true = meck:validate(httpc),
+
+    meck:unload(httpc),
 
     ok.
 

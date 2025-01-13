@@ -1,0 +1,74 @@
+# SPDX-FileCopyrightText: 2023 Erlang Ecosystem Foundation
+# SPDX-License-Identifier: Apache-2.0
+
+on:
+  workflow_call:
+    inputs:
+      attest:
+        description: "Attest the SBoM"
+        default: true
+        type: boolean
+
+
+name: "License Compliance"
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: "Check REUSE License Compliance"
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: REUSE Compliance Check
+        uses: fsfe/reuse-action@676e2d560c9a403aa252096d99fcab3e1132b0f5 # v6.0.0
+
+  spdx:
+    name: "Generate SBoM"
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+      attestations: write
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594 # v2.16.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: REUSE Compliance Check
+        uses: fsfe/reuse-action@676e2d560c9a403aa252096d99fcab3e1132b0f5 # v6.0.0
+        with:
+          args: spdx --output sbom.spdx --creator-person "GitHub Action" --creator-organization "Erlang Ecosystem Foundation"
+
+      - name: "Attest provenance"
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        id: attest-provenance
+        if: "${{ github.event.inputs.attest }}"
+        with:
+          subject-path: 'sbom.spdx'
+
+      - name: "Copy provenance"
+        if: "${{ github.event.inputs.attest }}"
+        run: cp "$ATTESTATION" sbom.spdx.sigstore
+        env:
+          ATTESTATION: "${{ steps.attest-provenance.outputs.bundle-path }}"
+
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: sbom
+          path: sbom.spdx*  

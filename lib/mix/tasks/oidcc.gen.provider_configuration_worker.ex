@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 Erlang Ecosystem Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 case Code.ensure_loaded(Igniter.Mix.Task) do
   {:module, Igniter.Mix.Task} ->
     defmodule Mix.Tasks.Oidcc.Gen.ProviderConfigurationWorker do

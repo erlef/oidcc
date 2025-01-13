@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2025 Erlang Ecosystem Foundation
+SPDX-License-Identifier: Apache-2.0
+-->
+
 # Using `private_key_jwt`
 
 To use `private_key_jwt`, you need to provide the private key as a `JOSE.JWK`

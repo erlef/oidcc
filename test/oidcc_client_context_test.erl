@@ -60,6 +60,7 @@ apply_profiles_fapi2_security_profile_test() ->
             preferred_auth_methods := [private_key_jwt, tls_client_auth],
             require_pkce := true,
             trusted_audiences := [],
+            jwt_aud_as_issuer := true,
             request_opts := #{
                 ssl := _
             }
@@ -154,6 +155,7 @@ apply_profiles_fapi2_message_signing_test() ->
             preferred_auth_methods := [private_key_jwt, tls_client_auth],
             require_pkce := true,
             trusted_audiences := [],
+            jwt_aud_as_issuer := true,
             request_opts := #{
                 ssl := _
             }

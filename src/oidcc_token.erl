@@ -124,6 +124,8 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
 * `dpop_nonce` - if using DPoP, the `nonce` value to use in the proof claim.
 * `trusted_audiences` - if present, a list of additional audience values to
   accept. Defaults to `any` which allows any additional values.
+* `jwt_aud_as_issuer` - whether to use the issuer as the audience for JWTs.
+  Defaults to false.
 """).
 ?DOC(#{since => <<"3.0.0">>}).
 -type retrieve_opts() ::
@@ -139,7 +141,8 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
         url_extension => oidcc_http_util:query_params(),
         body_extension => oidcc_http_util:query_params(),
         dpop_nonce => binary(),
-        trusted_audiences => [binary()] | any
+        trusted_audiences => [binary()] | any,
+        jwt_aud_as_issuer => boolean()
     }.
 
 ?DOC("See `t:refresh_opts_no_sub/0`.").

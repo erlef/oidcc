@@ -901,6 +901,149 @@ auth_method_private_key_jwt_test() ->
     meck:unload(httpc),
 
     ok.
+auth_method_private_key_jwt_aud_as_issuer_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, _} = application:ensure_all_started(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ConfigurationBinary)
+    ),
+
+    #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
+        Configuration = Configuration0#oidcc_provider_configuration{
+            token_endpoint_auth_methods_supported = [<<"private_key_jwt">>],
+            token_endpoint_auth_signing_alg_values_supported = [<<"RS256">>]
+        },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+    LocalEndpoint = <<"https://my.server/auth">>,
+    AuthCode = <<"1234567890">>,
+    AccessToken = <<"access_token">>,
+    RefreshToken = <<"refresh_token">>,
+    Claims =
+        #{
+            <<"iss">> => Issuer,
+            <<"sub">> => <<"sub">>,
+            <<"aud">> => ClientId,
+            <<"iat">> => erlang:system_time(second),
+            <<"exp">> => erlang:system_time(second) + 10,
+            <<"at_hash">> => <<"hrOQHuo3oE6FR82RIiX1SA">>
+        },
+
+    Jwk = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+
+    Jwt = jose_jwt:from(Claims),
+    Jws = #{<<"alg">> => <<"RS256">>},
+    {_Jws, Token} =
+        jose_jws:compact(
+            jose_jwt:sign(Jwk, Jws, Jwt)
+        ),
+
+    TokenData =
+        jsx:encode(#{
+            <<"access_token">> => AccessToken,
+            <<"token_type">> => <<"Bearer">>,
+            <<"id_token">> => Token,
+            <<"scope">> => <<"profile openid">>,
+            <<"refresh_token">> => RefreshToken
+        }),
+
+    ClientJwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    ClientJwk = ClientJwk0#jose_jwk{
+        fields = #{<<"kid">> => <<"private_kid">>, <<"use">> => <<"sig">>}
+    },
+
+    ClientContext = oidcc_client_context:from_manual(Configuration, Jwk, ClientId, ClientSecret, #{
+        client_jwks => ClientJwk
+    }),
+
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(
+            post,
+            {ReqTokenEndpoint, Header, "application/x-www-form-urlencoded", Body},
+            _HttpOpts,
+            _Opts,
+            _Profile
+        ) ->
+            TokenEndpoint = ReqTokenEndpoint,
+            ?assertMatch(none, proplists:lookup("authorization", Header)),
+            BodyMap = maps:from_list(uri_string:dissect_query(Body)),
+
+            ?assertMatch(
+                #{
+                    <<"grant_type">> := <<"authorization_code">>,
+                    <<"code">> := AuthCode,
+                    <<"client_id">> := ClientId,
+                    <<"client_assertion_type">> :=
+                        <<"urn:ietf:params:oauth:client-assertion-type:jwt-bearer">>,
+                    <<"client_assertion">> := _
+                },
+                BodyMap
+            ),
+
+            ClientAssertion = maps:get(<<"client_assertion">>, BodyMap),
+
+            {true, ClientAssertionJwt, ClientAssertionJws} = jose_jwt:verify(
+                ClientJwk, ClientAssertion
+            ),
+
+            ?assertMatch(
+                #jose_jws{alg = {_, 'RS256'}}, ClientAssertionJws
+            ),
+
+            #jose_jws{fields = ClientAssertionJwsFields} = ClientAssertionJws,
+            ?assertMatch(
+                #{
+                    <<"kid">> := <<"private_kid">>
+                },
+                ClientAssertionJwsFields
+            ),
+
+            ?assertMatch(
+                #jose_jwt{
+                    fields = #{
+                        <<"aud">> := Issuer,
+                        <<"exp">> := _,
+                        <<"iat">> := _,
+                        <<"iss">> := ClientId,
+                        <<"jti">> := _,
+                        <<"nbf">> := _,
+                        <<"sub">> := ClientId
+                    }
+                },
+                ClientAssertionJwt
+            ),
+
+            {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], TokenData}}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    ?assertMatch(
+        {ok, #oidcc_token{
+            id = #oidcc_token_id{token = Token, claims = Claims},
+            access = #oidcc_token_access{token = AccessToken},
+            refresh = #oidcc_token_refresh{token = RefreshToken},
+            scope = [<<"profile">>, <<"openid">>]
+        }},
+        oidcc_token:retrieve(
+            AuthCode,
+            ClientContext,
+            #{
+                redirect_uri => LocalEndpoint,
+                jwt_aud_as_issuer => true
+            }
+        )
+    ),
+
+    true = meck:validate(httpc),
+
+    meck:unload(httpc),
+
+    ok.
 
 auth_method_private_key_jwt_with_dpop_test() ->
     PrivDir = code:priv_dir(oidcc),

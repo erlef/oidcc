@@ -26,6 +26,7 @@
     require_pkce => boolean(),
     trusted_audiences => [binary()] | any,
     preferred_auth_methods => [oidcc_auth_util:auth_method()],
+    jwt_aud_as_issuer => boolean(),
     request_opts => oidcc_http_util:request_opts()
 }.
 
@@ -34,6 +35,7 @@
     require_pkce => boolean(),
     trusted_audiences => [binary()] | any,
     preferred_auth_methods => [oidcc_auth_util:auth_method()],
+    jwt_aud_as_issuer => boolean(),
     request_opts => oidcc_http_util:request_opts()
 }.
 
@@ -50,7 +52,7 @@ apply_profiles(
     #{profiles := [fapi2_security_profile | RestProfiles]} = Opts0
 ) ->
     %% FAPI2 Security Profile
-    %% - https://openid.bitbucket.io/fapi/fapi-2_0-security-profile.html
+    %% - https://openid.bitbucket.io/fapi/fapi-security-profile-2_0.html
     {ClientContext1, Opts1} = enforce_s256_pkce(ClientContext0, Opts0),
     ClientContext2 = limit_response_types([<<"code">>], ClientContext1),
     ClientContext3 = enforce_par(ClientContext2),
@@ -71,6 +73,10 @@ apply_profiles(
     Opts3 = map_put_new(trusted_audiences, [], Opts2),
     Opts4 = map_put_new(preferred_auth_methods, [private_key_jwt, tls_client_auth], Opts3),
     Opts5 = put_tls_defaults(Opts4),
+    %% 5.3.2.1 point 8 - shall only accept its issuer identifier value (as
+    %% defined in [RFC8414]) as a string in the aud claim received in client
+    %% authentication assertions;
+    Opts6 = map_put_new(jwt_aud_as_issuer, true, Opts5),
     Opts = limit_tls_ciphers(
         [
             "TLS_DHE_RSA_WITH_AES_128_GCM_SHA256",
@@ -78,7 +84,7 @@ apply_profiles(
             "TLS_DHE_RSA_WITH_AES_256_GCM_SHA384",
             "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
         ],
-        Opts5
+        Opts6
     ),
     apply_profiles(ClientContext, Opts);
 apply_profiles(

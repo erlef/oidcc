@@ -183,8 +183,9 @@ add_authentication(
     maybe
         [_ | _] ?= AllowAlgorithms,
         #jose_jwk{} ?= ClientJwks,
+        OptsWithAud = opts_with_aud(ClientContext, Opts),
         {ok, ClientAssertion} ?=
-            signed_client_assertion(AllowAlgorithms, Opts, ClientContext, ClientJwks),
+            signed_client_assertion(AllowAlgorithms, OptsWithAud, ClientContext, ClientJwks),
         {ok, add_jwt_bearer_assertion(ClientAssertion, QsBodyList, Header, ClientContext)}
     else
         _ ->
@@ -393,3 +394,15 @@ dpop_proof(_Method, _Endpoint, _Claims, _ClientContext) ->
 -spec random_string(Bytes :: pos_integer()) -> binary().
 random_string(Bytes) ->
     base64:encode(crypto:strong_rand_bytes(Bytes), #{mode => urlsafe, padding => false}).
+
+opts_with_aud(_ClientContext, #{audience := _} = Opts) ->
+    Opts;
+opts_with_aud(
+    #oidcc_client_context{
+        provider_configuration = #oidcc_provider_configuration{issuer = Issuer}
+    },
+    #{jwt_aud_as_issuer := true} = Opts
+) ->
+    maps:put(audience, Issuer, Opts);
+opts_with_aud(_ClientContext, Opts) ->
+    Opts.

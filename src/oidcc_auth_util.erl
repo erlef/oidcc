@@ -241,24 +241,27 @@ signed_client_assertion(AllowAlgorithms, Opts, ClientContext, Jwk) ->
     ClientContext :: oidcc_client_context:t().
 token_request_claims(Opts, #oidcc_client_context{
     client_id = ClientId,
-    provider_configuration = #oidcc_provider_configuration{token_endpoint = TokenEndpoint}
+    provider_configuration = #oidcc_provider_configuration{issuer = Issuer}
 }) ->
-    Audience = maps:get(audience, Opts, TokenEndpoint),
+    Audience = maps:get(audience, Opts, Issuer),
     MaxClockSkew =
         case application:get_env(oidcc, max_clock_skew) of
             undefined -> 0;
             {ok, ClockSkew} -> ClockSkew
         end,
 
-    #{
-        <<"iss">> => ClientId,
-        <<"sub">> => ClientId,
-        <<"aud">> => Audience,
-        <<"jti">> => random_string(32),
-        <<"iat">> => os:system_time(seconds),
-        <<"exp">> => os:system_time(seconds) + 30,
-        <<"nbf">> => os:system_time(seconds) - MaxClockSkew
-    }.
+    maps:merge(
+        #{
+            <<"iss">> => ClientId,
+            <<"sub">> => ClientId,
+            <<"aud">> => Audience,
+            <<"jti">> => random_string(32),
+            <<"iat">> => os:system_time(seconds),
+            <<"exp">> => os:system_time(seconds) + 30,
+            <<"nbf">> => os:system_time(seconds) - MaxClockSkew
+        },
+        maps:get(token_request_claims, Opts, #{})
+    ).
 
 -spec add_jwt_bearer_assertion(ClientAssertion, Body, Header, ClientContext) -> {Body, Header} when
     ClientAssertion :: binary(),

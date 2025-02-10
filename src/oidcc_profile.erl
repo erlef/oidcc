@@ -50,7 +50,7 @@ apply_profiles(
     #{profiles := [fapi2_security_profile | RestProfiles]} = Opts0
 ) ->
     %% FAPI2 Security Profile
-    %% - https://openid.bitbucket.io/fapi/fapi-2_0-security-profile.html
+    %% - https://openid.bitbucket.io/fapi/fapi-security-profile-2_0.html
     {ClientContext1, Opts1} = enforce_s256_pkce(ClientContext0, Opts0),
     ClientContext2 = limit_response_types([<<"code">>], ClientContext1),
     ClientContext3 = enforce_par(ClientContext2),

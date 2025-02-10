@@ -124,6 +124,7 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
 * `dpop_nonce` - if using DPoP, the `nonce` value to use in the proof claim.
 * `trusted_audiences` - if present, a list of additional audience values to
   accept. Defaults to `any` which allows any additional values.
+* `token_request_claims` - Additional claims to use with the token request.
 """).
 ?DOC(#{since => <<"3.0.0">>}).
 -type retrieve_opts() ::
@@ -139,7 +140,8 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
         url_extension => oidcc_http_util:query_params(),
         body_extension => oidcc_http_util:query_params(),
         dpop_nonce => binary(),
-        trusted_audiences => [binary()] | any
+        trusted_audiences => [binary()] | any,
+        token_request_claims => #{binary() => binary() | integer()}
     }.
 
 ?DOC("See `t:refresh_opts_no_sub/0`.").

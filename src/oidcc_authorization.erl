@@ -406,10 +406,6 @@ attempt_par(
     },
 
     RequestOpts = maps:get(request_opts, Opts, #{}),
-    %% https://datatracker.ietf.org/doc/html/rfc9126#section-2
-    %% > To address that ambiguity, the issuer identifier URL of the authorization
-    %% > server according to [RFC8414] SHOULD be used as the value of the audience.
-    AuthenticationOpts = maps:put(audience, Issuer, Opts),
 
     maybe
         {ok, {Body0, Header}, AuthMethod} ?=
@@ -418,7 +414,7 @@ attempt_par(
                 Header0,
                 SupportedAuthMethods,
                 SigningAlgs,
-                AuthenticationOpts,
+                Opts,
                 ClientContext
             ),
         %% ensure no duplicate parameters (such as client_id)

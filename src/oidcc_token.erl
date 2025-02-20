@@ -708,35 +708,12 @@ when
     ClientContext :: oidcc_client_context:t(),
     Opts :: retrieve_opts().
 extract_response(TokenResponseBody, ClientContext, Opts) ->
-    RefreshJwksFun = maps:get(refresh_jwks, Opts, undefined),
     maybe
-        {ok, Token} ?= int_extract_response(TokenResponseBody, ClientContext, Opts),
-        {ok, Token}
-    else
-        {error, {no_matching_key_with_kid, Kid}} when RefreshJwksFun =/= undefined ->
-            #oidcc_client_context{jwks = OldJwks} = ClientContext,
-            maybe
-                {ok, RefreshedJwks} ?= RefreshJwksFun(OldJwks, Kid),
-                RefreshedClientContext = ClientContext#oidcc_client_context{jwks = RefreshedJwks},
-                int_extract_response(TokenResponseBody, RefreshedClientContext, Opts)
-            end;
-        {error, Reason} ->
-            {error, Reason}
-    end.
-
--spec int_extract_response(TokenMap, ClientContext, Opts) ->
-    {ok, t()} | {error, error()}
-when
-    TokenMap :: map(),
-    ClientContext :: oidcc_client_context:t(),
-    Opts :: retrieve_opts().
-int_extract_response(TokenMap, ClientContext, Opts) ->
-    maybe
-        {ok, Scopes} ?= extract_scope(TokenMap, Opts),
-        {ok, AccessExpire} ?= extract_expiry(TokenMap),
-        {ok, AccessTokenRecord} ?= extract_access_token(TokenMap, AccessExpire),
-        {ok, RefreshTokenRecord} ?= extract_refresh_token(TokenMap),
-        {ok, {IdTokenRecord, NoneUsed}} ?= extract_id_token(TokenMap, ClientContext, Opts),
+        {ok, Scopes} ?= extract_scope(TokenResponseBody, Opts),
+        {ok, AccessExpire} ?= extract_expiry(TokenResponseBody),
+        {ok, AccessTokenRecord} ?= extract_access_token(TokenResponseBody, AccessExpire),
+        {ok, RefreshTokenRecord} ?= extract_refresh_token(TokenResponseBody),
+        {ok, {IdTokenRecord, NoneUsed}} ?= extract_id_token(TokenResponseBody, ClientContext, Opts),
         TokenRecord = #oidcc_token{
             id = IdTokenRecord,
             access = AccessTokenRecord,
@@ -888,6 +865,31 @@ validate_id_token(IdToken, ClientContext, Nonce) when is_binary(Nonce) ->
 validate_id_token(IdToken, ClientContext, any) ->
     validate_id_token(IdToken, ClientContext, #{nonce => any});
 validate_id_token(IdToken, ClientContext, Opts) when is_map(Opts) ->
+    RefreshJwksFun = maps:get(refresh_jwks, Opts, undefined),
+
+    maybe
+        {ok, Claims} ?= int_validate_id_token(IdToken, ClientContext, Opts),
+        {ok, Claims}
+    else
+        {error, {no_matching_key_with_kid, Kid}} when RefreshJwksFun =/= undefined ->
+            #oidcc_client_context{jwks = OldJwks} = ClientContext,
+            maybe
+                {ok, RefreshedJwks} ?= RefreshJwksFun(OldJwks, Kid),
+                RefreshedClientContext = ClientContext#oidcc_client_context{jwks = RefreshedJwks},
+                int_validate_id_token(IdToken, RefreshedClientContext, Opts)
+            end;
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+-spec int_validate_id_token(IdToken, ClientContext, Opts) ->
+    {ok, Claims} | {error, error()}
+when
+    IdToken :: binary(),
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: retrieve_opts(),
+    Claims :: oidcc_jwt_util:claims().
+int_validate_id_token(IdToken, ClientContext, Opts) ->
     #oidcc_client_context{
         provider_configuration = Configuration,
         jwks = #jose_jwk{} = Jwks0,

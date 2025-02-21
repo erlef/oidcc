@@ -2139,6 +2139,58 @@ validate_id_token_encrypted_token_test() ->
 
     ok.
 
+validate_id_token_rotation_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    JwkBeforeRefresh0 = jose_jwk:generate_key(16),
+    JwkBeforeRefresh = JwkBeforeRefresh0#jose_jwk{fields = #{<<"kid">> => <<"kid1">>}},
+
+    JwkAfterRefresh0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    JwkAfterRefresh = JwkAfterRefresh0#jose_jwk{fields = #{<<"kid">> => <<"kid2">>}},
+
+    RefreshJwksFun = fun(_OldJwk, <<"kid2">>) -> {ok, JwkAfterRefresh} end,
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, #oidcc_provider_configuration{issuer = Issuer} = Configuration} = oidcc_provider_configuration:decode_configuration(
+        jose:decode(ConfigurationBinary)
+    ),
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+
+    ClientContext = oidcc_client_context:from_manual(
+        Configuration, JwkBeforeRefresh, ClientId, ClientSecret
+    ),
+
+    Claims =
+        #{
+            <<"iss">> => Issuer,
+            <<"sub">> => <<"sub">>,
+            <<"aud">> => ClientId,
+            <<"iat">> => erlang:system_time(second),
+            <<"exp">> => erlang:system_time(second) + 10,
+            <<"at_hash">> => <<"hrOQHuo3oE6FR82RIiX1SA">>
+        },
+
+    Jwt = jose_jwt:from(Claims),
+    Jws = #{<<"alg">> => <<"RS256">>, <<"kid">> => <<"kid2">>},
+    {_Jws, Token} =
+        jose_jws:compact(
+            jose_jwt:sign(JwkAfterRefresh, Jws, Jwt)
+        ),
+
+    ?assertEqual(
+        {error, {no_matching_key_with_kid, <<"kid2">>}},
+        oidcc_token:validate_id_token(Token, ClientContext, #{})
+    ),
+
+    ?assertEqual(
+        {ok, Claims},
+        oidcc_token:validate_id_token(Token, ClientContext, #{refresh_jwks => RefreshJwksFun})
+    ),
+
+    ok.
+
 validate_jwt_test() ->
     #oidcc_client_context{
         client_id = ClientId,

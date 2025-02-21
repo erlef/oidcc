@@ -213,7 +213,9 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
     #{
         signing_algs => [binary()] | undefined,
         encryption_algs => [binary()] | undefined,
-        encryption_encs => [binary()] | undefined
+        encryption_encs => [binary()] | undefined,
+        trusted_audiences => [binary()] | any,
+        refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun()
     }.
 
 ?DOC(#{since => <<"3.0.0">>}).
@@ -442,7 +444,7 @@ validate_jarm(Response, ClientContext, Opts) ->
         Jwks2, EncryptionAlgSupported, ClientSecret
     ),
     ExpClaims = [{<<"iss">>, Issuer}],
-    TrustedAudience = maps:get(trusted_audiences, Opts, any),
+    TrustedAudiences = maps:get(trusted_audiences, Opts, any),
     %% https://openid.net/specs/oauth-v2-jarm-final.html#name-processing-rules
     %% 1. decrypt if necessary
     %% 2. validate <<"iss">> claim
@@ -456,7 +458,7 @@ validate_jarm(Response, ClientContext, Opts) ->
                 Response, Jwks, SigningAlgSupported, EncryptionAlgSupported, EncryptionEncSupported
             ),
         ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),
-        ok ?= verify_aud_claim(Claims, ClientId, TrustedAudience),
+        ok ?= verify_aud_claim(Claims, ClientId, TrustedAudiences),
         ok ?= verify_exp_claim(Claims),
         ok ?= verify_nbf_claim(Claims),
         ok ?= oidcc_jwt_util:verify_not_none_alg(Jws),
@@ -649,27 +651,28 @@ jwt_profile(Subject, ClientContext, Jwk, Opts) ->
             {error, {grant_type_not_supported, jwt_bearer}}
     end.
 
-%% @doc Retrieve Client Credential Token
-%%
-%% See [https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.4]
-%%
-%% For a high level interface using {@link oidcc_provider_configuration_worker}
-%% see {@link oidcc:client_credentials_token/4}.
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, ClientContext} =
-%%   oidcc_client_context:from_configuration_worker(provider_name,
-%%                                                  <<"client_id">>,
-%%                                                  <<"client_secret">>),
-%%
-%% {ok, #oidcc_token{}} =
-%%   oidcc_token:client_credentials(ClientContext,
-%%                                  #{scope => [<<"scope">>]}).
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Retrieve Client Credential Token
+
+See https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.4
+
+For a high level interface using `m:oidcc_provider_configuration_worker`
+see `oidcc:client_credentials_token/4`.
+
+## Examples
+
+```erlang
+{ok, ClientContext} =
+  oidcc_client_context:from_configuration_worker(provider_name,
+                                                 <<"client_id">>,
+                                                 <<"client_secret">>),
+
+{ok, #oidcc_token{}} =
+  oidcc_token:client_credentials(ClientContext,
+                                 #{scope => [<<"scope">>]}).
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec client_credentials(ClientContext, Opts) -> {ok, t()} | {error, error()} when
     ClientContext :: oidcc_client_context:authenticated_t(),
     Opts :: client_credentials_opts().
@@ -832,26 +835,37 @@ verify_access_token_map_hash(#oidcc_token{
 verify_access_token_map_hash(#oidcc_token{}) ->
     ok.
 
-%% @doc Validate ID Token
-%%
-%% Usually the id token is validated using {@link retrieve/3}.
-%% If you get the token passed from somewhere else, this function can validate it.
-%%
-%% <h2>Examples</h2>
-%%
-%% ```
-%% {ok, ClientContext} =
-%%   oidcc_client_context:from_configuration_worker(provider_name,
-%%                                                  <<"client_id">>,
-%%                                                  <<"client_secret">>),
-%%
-%% %% Get IdToken from somewhere
-%%
-%% {ok, Claims} =
-%%   oidcc:validate_id_token(IdToken, ClientContext, ExpectedNonce).
-%% '''
-%% @end
-%% @since 3.0.0
+?DOC("""
+Validate ID Token
+
+Usually the id token is validated using `retrieve/3`.
+
+If you get the token passed from somewhere else, this function can validate it.
+
+## Validations
+
+* `iss` claim must match the issuer of the provider.
+* `nonce` claim must match the `nonce` option.
+* `aud` claim must match the `trusted_audiences` option.
+* `azp` claim must match the client id.
+* `exp` claim must be in the future.
+* `nbf` claim must be in the past.
+
+## Examples
+
+```erlang
+{ok, ClientContext} =
+  oidcc_client_context:from_configuration_worker(provider_name,
+                                                 <<"client_id">>,
+                                                 <<"client_secret">>),
+
+%% Get IdToken from somewhere
+
+{ok, Claims} =
+  oidcc:validate_id_token(IdToken, ClientContext, ExpectedNonce).
+```
+""").
+?DOC(#{since => <<"3.0.0">>}).
 -spec validate_id_token(IdToken, ClientContext, NonceOrOpts) ->
     {ok, Claims} | {error, error()}
 when
@@ -865,93 +879,40 @@ validate_id_token(IdToken, ClientContext, Nonce) when is_binary(Nonce) ->
 validate_id_token(IdToken, ClientContext, any) ->
     validate_id_token(IdToken, ClientContext, #{nonce => any});
 validate_id_token(IdToken, ClientContext, Opts) when is_map(Opts) ->
-    RefreshJwksFun = maps:get(refresh_jwks, Opts, undefined),
-
-    maybe
-        {ok, Claims} ?= int_validate_id_token(IdToken, ClientContext, Opts),
-        {ok, Claims}
-    else
-        {error, {no_matching_key_with_kid, Kid}} when RefreshJwksFun =/= undefined ->
-            #oidcc_client_context{jwks = OldJwks} = ClientContext,
-            maybe
-                {ok, RefreshedJwks} ?= RefreshJwksFun(OldJwks, Kid),
-                RefreshedClientContext = ClientContext#oidcc_client_context{jwks = RefreshedJwks},
-                int_validate_id_token(IdToken, RefreshedClientContext, Opts)
-            end;
-        {error, Reason} ->
-            {error, Reason}
-    end.
-
--spec int_validate_id_token(IdToken, ClientContext, Opts) ->
-    {ok, Claims} | {error, error()}
-when
-    IdToken :: binary(),
-    ClientContext :: oidcc_client_context:t(),
-    Opts :: retrieve_opts(),
-    Claims :: oidcc_jwt_util:claims().
-int_validate_id_token(IdToken, ClientContext, Opts) ->
     #oidcc_client_context{
         provider_configuration = Configuration,
-        jwks = #jose_jwk{} = Jwks0,
-        client_id = ClientId,
-        client_secret = ClientSecret,
-        client_jwks = ClientJwks
+        client_id = ClientId
     } =
         ClientContext,
     #oidcc_provider_configuration{
         id_token_signing_alg_values_supported = AllowAlgorithms,
         id_token_encryption_alg_values_supported = EncryptionAlgs,
-        id_token_encryption_enc_values_supported = EncryptionEncs,
-        issuer = Issuer
+        id_token_encryption_enc_values_supported = EncryptionEncs
     } =
         Configuration,
 
-    Nonce = maps:get(nonce, Opts, any),
-    TrustedAudience = maps:get(trusted_audiences, Opts, any),
+    ValidateOpts = maps:merge(Opts, #{
+        signing_algs => AllowAlgorithms,
+        encryption_algs => EncryptionAlgs,
+        encryption_encs => EncryptionEncs
+    }),
 
-    maybe
-        ExpClaims0 = [{<<"iss">>, Issuer}],
-        ExpClaims =
-            case Nonce of
-                any ->
-                    ExpClaims0;
-                Bin when is_binary(Bin) ->
-                    [{<<"nonce">>, Nonce} | ExpClaims0]
-            end,
-        Jwks1 =
-            case ClientJwks of
-                none -> Jwks0;
-                #jose_jwk{} -> oidcc_jwt_util:merge_jwks(Jwks0, ClientJwks)
-            end,
-        Jwks2 = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks1, AllowAlgorithms, ClientSecret),
-        Jwks = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks2, EncryptionAlgs, ClientSecret),
-        MaybeVerified = oidcc_jwt_util:decrypt_and_verify(
-            IdToken, Jwks, AllowAlgorithms, EncryptionAlgs, EncryptionEncs
-        ),
-        {ok, {#jose_jwt{fields = Claims}, Jws}} ?=
-            case MaybeVerified of
-                {ok, Valid} ->
-                    {ok, Valid};
-                {error, {none_alg_used, Jwt0, Jws0}} ->
-                    {ok, {Jwt0, Jws0}};
-                Other ->
-                    Other
-            end,
-        ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),
-        ok ?= verify_missing_required_claims(Claims),
-        ok ?= verify_aud_claim(Claims, ClientId, TrustedAudience),
-        ok ?= verify_azp_claim(Claims, ClientId),
-        ok ?= verify_exp_claim(Claims),
-        ok ?= verify_nbf_claim(Claims),
-        case Jws of
-            #jose_jws{alg = {jose_jws_alg_none, none}} ->
-                {error, {none_alg_used, Claims}};
-            #jose_jws{} ->
-                {ok, Claims};
-            #jose_jwe{} ->
-                {ok, Claims}
+    Nonce = maps:get(nonce, Opts, any),
+
+    ExpClaims =
+        case Nonce of
+            any -> [];
+            Bin when is_binary(Bin) -> [{<<"nonce">>, Nonce}]
+        end,
+
+    validate_jwt(IdToken, ClientContext, ValidateOpts, fun(Claims) ->
+        maybe
+            ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),
+            ok ?= verify_missing_required_claims(Claims),
+            ok ?= verify_azp_claim(Claims, ClientId),
+            ok
         end
-    end.
+    end).
 
 ?DOC("""
 Validate JWT
@@ -963,6 +924,13 @@ generated for a user at one client is used to validate their access at another c
 Validating an arbitrary JWT token (not an ID token) is not covered by the OpenID
 Connect specification. Therefore the signing / encryption algorithms are not
 derieved from the provider configuration, but must be provided by the caller.
+
+## Validations
+
+* `iss` claim must match the issuer of the provider.
+* `aud` claim must match the `trusted_audiences` option.
+* `exp` claim must be in the future.
+* `nbf` claim must be in the past.
 
 ## Examples
 
@@ -983,14 +951,45 @@ Opts = #{
 ```
 """).
 ?DOC(#{since => <<"3.2.0">>}).
--spec validate_jwt(Jwt, ClientContext, Opts) ->
+-spec validate_jwt(Token, ClientContext, Opts) ->
     {ok, Claims} | {error, error()}
 when
-    Jwt :: binary(),
+    Token :: binary(),
     ClientContext :: oidcc_client_context:t(),
     Opts :: validate_jwt_opts(),
     Claims :: oidcc_jwt_util:claims().
-validate_jwt(Jwt, ClientContext, Opts) when is_map(Opts) ->
+validate_jwt(Token, ClientContext, Opts) when is_map(Opts) ->
+    validate_jwt(Token, ClientContext, Opts, fun(_Claims) -> ok end).
+
+-spec validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
+    {ok, Claims} | {error, error()}
+when
+    Token :: binary(),
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: validate_jwt_opts(),
+    Claims :: oidcc_jwt_util:claims(),
+    AdditionalClaimValidation :: fun((Claims) -> ok | {error, error()}).
+validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
+    RefreshJwksFun = maps:get(refresh_jwks, Opts, undefined),
+    unknown_kid_retry(
+        fun(RefreshedClientContext) ->
+            int_validate_jwt(
+                Token, RefreshedClientContext, Opts, AdditionalClaimValidation
+            )
+        end,
+        ClientContext,
+        RefreshJwksFun
+    ).
+
+-spec int_validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
+    {ok, Claims} | {error, error()}
+when
+    Token :: binary(),
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: validate_jwt_opts(),
+    Claims :: oidcc_jwt_util:claims(),
+    AdditionalClaimValidation :: fun((Claims) -> ok | {error, error()}).
+int_validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
     #oidcc_client_context{
         provider_configuration = Configuration,
         jwks = #jose_jwk{} = Jwks0,
@@ -1010,12 +1009,11 @@ validate_jwt(Jwt, ClientContext, Opts) when is_map(Opts) ->
 
     case {SigningAlgs, EncryptionAlgs} of
         {[], []} ->
-            error(badarg, [Jwt, ClientContext, Opts], []);
+            error(badarg, [Token, ClientContext, Opts], []);
         _ ->
             ok
     end,
 
-    ExpClaims = [{<<"iss">>, Issuer}],
     Jwks1 =
         case ClientJwks of
             none -> Jwks0;
@@ -1023,19 +1021,29 @@ validate_jwt(Jwt, ClientContext, Opts) when is_map(Opts) ->
         end,
     Jwks2 = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks1, SigningAlgs, ClientSecret),
     Jwks = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks2, EncryptionAlgs, ClientSecret),
-    TrustedAudience = maps:get(trusted_audience, Opts, any),
+    TrustedAudiences = maps:get(trusted_audiences, Opts, any),
 
     maybe
-        {ok, {#jose_jwt{fields = Claims}, _}} ?=
-            oidcc_jwt_util:decrypt_and_verify(
-                Jwt, Jwks, SigningAlgs, EncryptionAlgs, EncryptionEncs
+        {ok, {#jose_jwt{fields = Claims}, Jws}} ?=
+            rescue_none_validated_jwt(
+                oidcc_jwt_util:decrypt_and_verify(
+                    Token, Jwks, SigningAlgs, EncryptionAlgs, EncryptionEncs
+                )
             ),
-        ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),
+        ok ?= oidcc_jwt_util:verify_claims(Claims, [{<<"iss">>, Issuer}]),
         ok ?= verify_missing_required_claims(Claims),
-        ok ?= verify_aud_claim(Claims, ClientId, TrustedAudience),
+        ok ?= verify_aud_claim(Claims, ClientId, TrustedAudiences),
         ok ?= verify_exp_claim(Claims),
         ok ?= verify_nbf_claim(Claims),
-        {ok, Claims}
+        ok ?= AdditionalClaimValidation(Claims),
+        case Jws of
+            #jose_jws{alg = {jose_jws_alg_none, none}} ->
+                {error, {none_alg_used, Claims}};
+            #jose_jws{} ->
+                {ok, Claims};
+            #jose_jwe{} ->
+                {ok, Claims}
+        end
     end.
 
 ?DOC("""
@@ -1088,27 +1096,27 @@ authorization_headers(
     ),
     maps:from_list([{list_to_binary(Key), list_to_binary([Value])} || {Key, Value} <- Header]).
 
--spec verify_aud_claim(Claims, ClientId, TrustedAudience) -> ok | {error, error()} when
-    Claims :: oidcc_jwt_util:claims(), ClientId :: binary(), TrustedAudience :: [binary()] | any.
-verify_aud_claim(#{<<"aud">> := ClientId}, ClientId, _TrustedAudience) ->
+-spec verify_aud_claim(Claims, ClientId, TrustedAudiences) -> ok | {error, error()} when
+    Claims :: oidcc_jwt_util:claims(), ClientId :: binary(), TrustedAudiences :: [binary()] | any.
+verify_aud_claim(#{<<"aud">> := ClientId}, ClientId, _TrustedAudiences) ->
     ok;
 verify_aud_claim(#{<<"aud">> := Audience} = Claims, ClientId, any) when is_list(Audience) ->
     case lists:member(ClientId, Audience) of
         true -> ok;
         false -> {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}
     end;
-verify_aud_claim(#{<<"aud">> := Audience} = Claims, ClientId, TrustedAudience0) when
+verify_aud_claim(#{<<"aud">> := Audience} = Claims, ClientId, TrustedAudiences0) when
     is_list(Audience)
 ->
-    TrustedAudience = [ClientId | TrustedAudience0],
+    TrustedAudiences = [ClientId | TrustedAudiences0],
     maybe
         true ?= lists:member(ClientId, Audience),
-        [] ?= [A || A <- Audience, not lists:member(A, TrustedAudience)],
+        [] ?= [A || A <- Audience, not lists:member(A, TrustedAudiences)],
         ok
     else
         _ -> {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}
     end;
-verify_aud_claim(Claims, ClientId, _TrustedAudience) ->
+verify_aud_claim(Claims, ClientId, _TrustedAudiences) ->
     {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}.
 
 -spec verify_azp_claim(Claims, ClientId) -> ok | {error, error()} when
@@ -1271,3 +1279,37 @@ add_pkce_verifier(_BodyQs, #{require_pkce := true}, _ClientContext) ->
     {error, pkce_verifier_required};
 add_pkce_verifier(BodyQs, _Opts, _ClientContext) ->
     {ok, BodyQs}.
+
+-spec rescue_none_validated_jwt(Result) -> Response when
+    Response :: {ok, {#jose_jwt{}, #jose_jwe{} | #jose_jws{}}} | {error, oidcc_jwt_util:error()},
+    Result :: {ok, {#jose_jwt{}, #jose_jwe{} | #jose_jws{}}} | {error, oidcc_jwt_util:error()}.
+rescue_none_validated_jwt({ok, Valid}) ->
+    {ok, Valid};
+rescue_none_validated_jwt({error, {none_alg_used, Jwt0, Jws0}}) ->
+    {ok, {Jwt0, Jws0}};
+rescue_none_validated_jwt(Other) ->
+    Other.
+
+-spec unknown_kid_retry(Function, ClientContext, RefreshJwksFun) ->
+    {ok, Result} | {error, Error}
+when
+    Function :: fun((ClientContext) -> {ok, Result} | {error, Error}),
+    ClientContext :: oidcc_client_context:t(),
+    RefreshJwksFun :: undefined | oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
+    Result :: term(),
+    Error :: term().
+unknown_kid_retry(Function, ClientContext, RefreshJwksFun) ->
+    maybe
+        {ok, Result} ?= Function(ClientContext),
+        {ok, Result}
+    else
+        {error, {no_matching_key_with_kid, Kid}} when RefreshJwksFun =/= undefined ->
+            #oidcc_client_context{jwks = OldJwks} = ClientContext,
+            maybe
+                {ok, RefreshedJwks} ?= RefreshJwksFun(OldJwks, Kid),
+                RefreshedClientContext = ClientContext#oidcc_client_context{jwks = RefreshedJwks},
+                Function(RefreshedClientContext)
+            end;
+        {error, Reason} ->
+            {error, Reason}
+    end.

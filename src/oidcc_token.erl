@@ -958,6 +958,10 @@ Validates a generic JWT (such as an access token) from the given provider.
 Useful if the issuer is shared between multiple applications, and the access token
 generated for a user at one client is used to validate their access at another client.
 
+Validating an arbitrary JWT token (not an ID token) is not covered by the OpenID
+Connect specification. Therefore the signing / encryption algorithms are not
+derieved from the provider configuration, but must be provided by the caller.
+
 ## Examples
 
 ```erlang
@@ -966,6 +970,12 @@ generated for a user at one client is used to validate their access at another c
                                                 <<"client_id">>,
                                                 <<"client_secret">>),
 %% Get Jwt from Authorization header
+Jwt = <<"jwt">>,
+
+Opts = #{
+  signing_algs => [<<"RS256">>]
+},
+
 {ok, Claims} =
     oidcc:validate_jwt(Jwt, ClientContext, Opts).
 ```
@@ -995,6 +1005,14 @@ validate_jwt(Jwt, ClientContext, Opts) when is_map(Opts) ->
     SigningAlgs = maps:get(signing_algs, Opts, []),
     EncryptionAlgs = maps:get(encryption_algs, Opts, []),
     EncryptionEncs = maps:get(encryption_encs, Opts, []),
+
+    case {SigningAlgs, EncryptionAlgs} of
+        {[], []} ->
+            error(badarg, [Jwt, ClientContext, Opts], []);
+        _ ->
+            ok
+    end,
+
     ExpClaims = [{<<"iss">>, Issuer}],
     Jwks1 =
         case ClientJwks of

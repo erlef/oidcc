@@ -310,6 +310,10 @@ defmodule Oidcc.Token do
   Useful if the issuer is shared between multiple applications, and the access token
   generated for a user at one client is used to validate their access at another client.
 
+  Validating an arbitrary JWT token (not an ID token) is not covered by the OpenID
+  Connect specification. Therefore the signing / encryption algorithms are not
+  derieved from the provider configuration, but must be provided by the caller.
+
   ## Examples
 
       iex> {:ok, pid} =
@@ -324,7 +328,7 @@ defmodule Oidcc.Token do
       ...>     "client_secret"
       ...>   )
       ...>
-      ...> #Get JWT from Authorization header
+      ...> # Get JWT from Authorization header
       ...> jwt = "jwt"
       ...>
       ...> opts = %{

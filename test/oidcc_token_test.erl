@@ -2199,8 +2199,8 @@ validate_jwt_test() ->
         oidcc_token:validate_jwt(JwtFun(WrongAudience), ClientContext, Opts)
     ),
 
-    ?assertEqual(
-        {error, no_matching_key},
+    ?assertError(
+        badarg,
         oidcc_token:validate_jwt(JwtFun(WrongAudience), ClientContext, #{})
     ),
 

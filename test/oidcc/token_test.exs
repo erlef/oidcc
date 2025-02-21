@@ -227,4 +227,28 @@ defmodule Oidcc.TokenTest do
                )
     end
   end
+
+  describe inspect(&Oidcc.validate_jwt/3) do
+    test "throws badarg when leaving out signing & encryption parameters" do
+      pid =
+        start_supervised!(
+          {ProviderConfiguration.Worker, %{issuer: "https://erlef-test-w4a8z2.zitadel.cloud"}}
+        )
+
+      {:ok, client_context} =
+        ClientContext.from_configuration_worker(
+          pid,
+          @client_credentials_client_id,
+          @client_credentials_client_secret
+        )
+
+      assert_raise ArgumentError, fn ->
+        Oidcc.Token.validate_jwt(
+          "invalidtoken",
+          client_context,
+          %{}
+        )
+      end
+    end
+  end
 end

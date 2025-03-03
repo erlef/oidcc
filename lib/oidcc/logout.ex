@@ -5,6 +5,7 @@ defmodule Oidcc.Logout do
   @moduledoc since: "3.0.0"
 
   alias Oidcc.ClientContext
+  alias Oidcc.Token
 
   @doc """
   Initiate URI for Relaying Party initiated Logout
@@ -40,7 +41,7 @@ defmodule Oidcc.Logout do
   """
   @doc since: "3.0.0"
   @spec initiate_url(
-          token :: id_token | Oidcc.Token.t() | :undefined,
+          token :: id_token | Token.t() | :undefined,
           client_context :: ClientContext.t(),
           opts :: :oidcc_logout.initiate_url_opts()
         ) ::
@@ -49,6 +50,12 @@ defmodule Oidcc.Logout do
         when id_token: String.t()
   def initiate_url(token, client_context, opts \\ %{}) do
     client_context = ClientContext.struct_to_record(client_context)
+
+    token =
+      case token do
+        token when is_binary(token) -> token
+        %Token{} = token -> Token.struct_to_record(token)
+      end
 
     :oidcc_logout.initiate_url(token, client_context, opts)
   end

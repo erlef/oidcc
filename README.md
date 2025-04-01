@@ -121,6 +121,7 @@ A security audit was performed by [SAFE-Erlang-Elixir](https://github.com/SAFE-E
   * Grant Types: `authorization_code`, `refresh_token`, `jwt_bearer`, and
     `client_credentials`
   * Automatic JWK Refreshing when needed
+  * Regex-based issuer validation (for handling multiple tenant issuers)
 * Userinfo
   * [JWT Response](https://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse)
   * [Aggregated and Distributed Claims](https://openid.net/specs/openid-connect-core-1_0.html#AggregatedDistributedClaims)
@@ -334,3 +335,37 @@ for more details, see https://hexdocs.pm/oidcc/oidcc.html
 ```
 
 for more details, see https://hexdocs.pm/oidcc/Oidcc.html
+
+## Advanced Features
+
+### Regex Issuer Validation
+
+When working with multi-tenant OpenID Connect providers, you might need to validate tokens against a pattern rather than an exact issuer string. This is now supported using the `issuer_regex` quirk:
+
+#### Erlang
+
+```erlang
+{ok, Pid} =
+    oidcc_provider_configuration_worker:start_link(#{
+        issuer => <<"https://tenant1.example.com">>,
+        name => {local, multi_tenant_provider},
+        quirks => #{issuer_regex => <<"^https://tenant\\d+\\.example\\.com$">>}
+    }).
+
+% This will now allow tokens with issuers like "https://tenant2.example.com",
+% "https://tenant42.example.com", etc. to validate successfully
+```
+
+#### Elixir
+
+```elixir
+{:ok, _pid} =
+  Oidcc.ProviderConfiguration.Worker.start_link(%{
+    issuer: "https://tenant1.example.com",
+    name: Myapp.MultiTenantProvider,
+    quirks: %{issuer_regex: "^https://tenant\\d+\\.example\\.com$"}
+  })
+
+# This will now allow tokens with issuers like "https://tenant2.example.com",
+# "https://tenant42.example.com", etc. to validate successfully
+```

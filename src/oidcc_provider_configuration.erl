@@ -42,11 +42,14 @@ Allow Specification Non-compliance.
   providers and **never in production**.
 * `document_overrides` - a map to merge with the real OIDD document,
   in case the OP left out some values.
+* `issuer_regex` - Optional regex pattern to match against the issuer claim
+  instead of requiring an exact match.
 """).
 ?DOC(#{since => <<"3.1.0">>}).
 -type quirks() :: #{
     allow_unsafe_http => boolean(),
-    document_overrides => map()
+    document_overrides => map(),
+    issuer_regex => binary()
 }.
 
 ?DOC("""
@@ -305,9 +308,19 @@ Decode JSON into a `t:oidcc_provider_configuration:t/0` record.
 decode_configuration(Configuration0, Opts) ->
     Quirks = maps:get(quirks, Opts, #{}),
     AllowUnsafeHttp = maps:get(allow_unsafe_http, Quirks, false),
-
+    IssuerRegex = maps:get(issuer_regex, Quirks, undefined),
+    
     DocumentOverrides = maps:get(document_overrides, Quirks, #{}),
     Configuration = maps:merge(Configuration0, DocumentOverrides),
+    
+    % If issuer_regex is present, add it to the extra_fields
+    ExtraFieldsUpdate = 
+        case IssuerRegex of
+            undefined -> 
+                #{};
+            Pattern when is_binary(Pattern) -> 
+                #{<<"issuer_regex">> => Pattern}
+        end,
 
     maybe
         {ok, {
@@ -574,7 +587,7 @@ decode_configuration(Configuration0, Opts) ->
             require_signed_request_object = RequireSignedRequestObject,
             mtls_endpoint_aliases = MtlsEndpointAliases,
             tls_client_certificate_bound_access_tokens = TlsClientCertificateBoundAccessTokens,
-            extra_fields = ExtraFields
+            extra_fields = maps:merge(ExtraFields, ExtraFieldsUpdate)
         }}
     end.
 

@@ -844,7 +844,7 @@ If you get the token passed from somewhere else, this function can validate it.
 
 ## Validations
 
-* `iss` claim must match the issuer of the provider.
+* `iss` claim must match the issuer of the provider, or match the regex pattern if `issuer_regex` is configured in quirks.
 * `nonce` claim must match the `nonce` option.
 * `aud` claim must match the `trusted_audiences` option.
 * `azp` claim must match the client id.
@@ -864,6 +864,12 @@ If you get the token passed from somewhere else, this function can validate it.
 {ok, Claims} =
   oidcc:validate_id_token(IdToken, ClientContext, ExpectedNonce).
 ```
+
+## Regex Issuer Validation
+
+You can use a regex pattern to validate the issuer claim by adding an `issuer_regex` 
+to the quirks map when creating the provider configuration. See the documentation for `validate_jwt/3`
+for more details.
 """).
 ?DOC(#{since => <<"3.0.0">>}).
 -spec validate_id_token(IdToken, ClientContext, NonceOrOpts) ->
@@ -927,7 +933,7 @@ derieved from the provider configuration, but must be provided by the caller.
 
 ## Validations
 
-* `iss` claim must match the issuer of the provider.
+* `iss` claim must match the issuer of the provider, or match the regex pattern if `issuer_regex` is configured in quirks.
 * `aud` claim must match the `trusted_audiences` option.
 * `exp` claim must be in the future.
 * `nbf` claim must be in the past.
@@ -949,6 +955,22 @@ Opts = #{
 {ok, Claims} =
     oidcc:validate_jwt(Jwt, ClientContext, Opts).
 ```
+
+## Regex Issuer Validation
+
+You can use a regex pattern to validate the issuer claim by adding an `issuer_regex` 
+to the quirks map when creating the provider configuration:
+
+```erlang
+{ok, {ProviderConfig, _}} = 
+    oidcc_provider_configuration:load_configuration(Issuer, #{
+        quirks => #{
+            issuer_regex => <<"^https://accounts\\.example\\.com/[a-z0-9]+$">>
+        }
+    }),
+```
+
+This will allow tokens with issuer claims that match the regex pattern to validate successfully.
 """).
 ?DOC(#{since => <<"3.2.0">>}).
 -spec validate_jwt(Token, ClientContext, Opts) ->
@@ -999,7 +1021,8 @@ int_validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
     } =
         ClientContext,
     #oidcc_provider_configuration{
-        issuer = Issuer
+        issuer = Issuer,
+        extra_fields = ExtraFields
     } =
         Configuration,
 
@@ -1023,6 +1046,8 @@ int_validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
     Jwks = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks2, EncryptionAlgs, ClientSecret),
     TrustedAudiences = maps:get(trusted_audiences, Opts, any),
 
+    IssuerRegex = maps:get(<<"issuer_regex">>, ExtraFields, undefined),
+    
     maybe
         {ok, {#jose_jwt{fields = Claims}, Jws}} ?=
             rescue_none_validated_jwt(
@@ -1030,7 +1055,14 @@ int_validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
                     Token, Jwks, SigningAlgs, EncryptionAlgs, EncryptionEncs
                 )
             ),
-        ok ?= oidcc_jwt_util:verify_claims(Claims, [{<<"iss">>, Issuer}]),
+        ExpectedClaims = 
+            case IssuerRegex of
+                undefined -> 
+                    [{<<"iss">>, Issuer}];
+                Pattern -> 
+                    [{<<"iss">>, {regex, Pattern}}]
+            end,
+        ok ?= oidcc_jwt_util:verify_claims(Claims, ExpectedClaims),
         ok ?= verify_missing_required_claims(Claims),
         ok ?= verify_aud_claim(Claims, ClientId, TrustedAudiences),
         ok ?= verify_exp_claim(Claims),

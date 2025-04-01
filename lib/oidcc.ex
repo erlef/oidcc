@@ -46,7 +46,7 @@ defmodule Oidcc do
   @spec create_redirect_url(
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
-          client_secret :: String.t(),
+          client_secret :: String.t() | :unauthenticated,
           opts :: :oidcc_authorization.opts() | :oidcc_client_context.opts()
         ) ::
           {:ok, :uri_string.uri_string()}
@@ -86,7 +86,7 @@ defmodule Oidcc do
           auth_code :: String.t(),
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
-          client_secret :: String.t(),
+          client_secret :: String.t() | :unauthenticated,
           opts :: :oidcc_token.retrieve_opts() | :oidcc_client_context.opts()
         ) ::
           {:ok, Oidcc.Token.t()} | {:error, :oidcc_client_context.error() | :oidcc_token.error()}
@@ -129,14 +129,14 @@ defmodule Oidcc do
           refresh_token :: String.t(),
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
-          client_secret :: String.t(),
+          client_secret :: String.t() | :unauthenticated,
           opts :: :oidcc_token.refresh_opts() | :oidcc_client_context.opts()
         ) :: {:ok, Oidcc.Token.t()} | {:error, :oidcc_token.error()}
   @spec refresh_token(
           token :: Oidcc.Token.t(),
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
-          client_secret :: String.t(),
+          client_secret :: String.t() | :unauthenticated,
           opts :: :oidcc_token.refresh_opts_no_sub() | :oidcc_client_context.opts()
         ) ::
           {:ok, Oidcc.Token.t()} | {:error, :oidcc_client_context.error() | :oidcc_token.error()}
@@ -239,7 +239,7 @@ defmodule Oidcc do
           token :: Oidcc.Token.t(),
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
-          client_secret :: String.t(),
+          client_secret :: String.t() | :unauthenticated,
           opts :: :oidcc_userinfo.retrieve_opts_no_sub() | :oidcc_client_context.opts()
         ) :: {:ok, :oidcc_jwt_util.claims()} | {:error, :oidcc_userinfo.error()}
   @spec retrieve_userinfo(
@@ -295,7 +295,7 @@ defmodule Oidcc do
           subject :: String.t(),
           provider_configuration_name :: GenServer.name(),
           client_id :: String.t(),
-          client_secret :: String.t(),
+          client_secret :: String.t() | :unauthenticated,
           jwk :: JOSE.JWK.t(),
           opts :: :oidcc_token.jwt_profile_opts() | :oidcc_client_context.opts()
         ) ::

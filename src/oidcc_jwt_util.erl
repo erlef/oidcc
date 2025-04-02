@@ -116,17 +116,32 @@ verify_signature(Token, AllowAlgorithms, #jose_jwk{} = Jwks) ->
 ?DOC(false).
 -spec verify_claims(Claims, ExpClaims) -> ok | {error, {missing_claim, ExpClaim, Claims}} when
     Claims :: claims(),
-    ExpClaim :: {binary(), term()},
+    ExpClaim :: {binary(), term() | {regex, binary()}},
     ExpClaims :: [ExpClaim].
 verify_claims(Claims, ExpClaims) ->
     CheckExpectedClaims =
-        fun({Key, Value}) ->
-            case maps:get(Key, Claims, none) of
-                Value ->
-                    false;
-                _Other ->
-                    true
-            end
+        fun
+            ({Key, {regex, Pattern}}) ->
+                case maps:get(Key, Claims, none) of
+                    none ->
+                        true;
+                    Value when is_binary(Value) ->
+                        case re:run(Value, Pattern, [{capture, none}]) of
+                            match ->
+                                false;
+                            nomatch ->
+                                true
+                        end;
+                    _Other ->
+                        true
+                end;
+            ({Key, Value}) ->
+                case maps:get(Key, Claims, none) of
+                    Value ->
+                        false;
+                    _Other ->
+                        true
+                end
         end,
     case lists:filter(CheckExpectedClaims, ExpClaims) of
         [] ->

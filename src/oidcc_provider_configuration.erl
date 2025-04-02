@@ -42,11 +42,17 @@ Allow Specification Non-compliance.
   providers and **never in production**.
 * `document_overrides` - a map to merge with the real OIDD document,
   in case the OP left out some values.
+* `issuer_regex` - Optional regex pattern to match against the issuer claim
+  instead of requiring an exact match. This may be necessary for certain providers that do not
+  conform to the OpenID specification, such as Microsoft Entra ID where
+  the issuer is 'https://login.microsoftonline.com/{tenantid}/v2.0' in the
+  [OpenID configuration](https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration).
 """).
 ?DOC(#{since => <<"3.1.0">>}).
 -type quirks() :: #{
     allow_unsafe_http => boolean(),
-    document_overrides => map()
+    document_overrides => map(),
+    issuer_regex => binary()
 }.
 
 ?DOC("""
@@ -78,6 +84,7 @@ All unrecognized fields are stored in `extra_fields`.
 -type t() ::
     #oidcc_provider_configuration{
         issuer :: uri_string:uri_string(),
+        issuer_regex :: binary() | undefined,
         authorization_endpoint :: uri_string:uri_string(),
         token_endpoint :: uri_string:uri_string() | undefined,
         userinfo_endpoint :: uri_string:uri_string() | undefined,
@@ -227,11 +234,20 @@ load_configuration(Issuer0, Opts) ->
         {ok, {{json, ConfigurationMap}, Headers}} ?=
             oidcc_http_util:request(get, Request, TelemetryOpts, RequestOpts),
         Expiry = oidcc_http_util:headers_to_cache_deadline(Headers, DefaultExpiry),
-        {ok, #oidcc_provider_configuration{issuer = ConfigIssuer} = Configuration} ?=
+        {ok,
+            #oidcc_provider_configuration{issuer = ConfigIssuer, issuer_regex = ConfigIssuerRegex} =
+                Configuration} ?=
             decode_configuration(ConfigurationMap, #{quirks => Quirks}),
         case ConfigIssuer of
             Issuer ->
                 {ok, {Configuration, Expiry}};
+            _ when is_binary(ConfigIssuerRegex) ->
+                case re:run(Issuer, ConfigIssuerRegex, [{capture, none}]) of
+                    match ->
+                        {ok, {Configuration, Expiry}};
+                    nomatch ->
+                        {error, {issuer_mismatch, ConfigIssuer}}
+                end;
             _DifferentIssuer when AllowIssuerMismatch -> {ok, {Configuration, Expiry}};
             DifferentIssuer when not AllowIssuerMismatch ->
                 {error, {issuer_mismatch, DifferentIssuer}}
@@ -305,6 +321,7 @@ Decode JSON into a `t:oidcc_provider_configuration:t/0` record.
 decode_configuration(Configuration0, Opts) ->
     Quirks = maps:get(quirks, Opts, #{}),
     AllowUnsafeHttp = maps:get(allow_unsafe_http, Quirks, false),
+    IssuerRegex = maps:get(issuer_regex, Quirks, undefined),
 
     DocumentOverrides = maps:get(document_overrides, Quirks, #{}),
     Configuration = maps:merge(Configuration0, DocumentOverrides),
@@ -501,6 +518,7 @@ decode_configuration(Configuration0, Opts) ->
             ),
         {ok, #oidcc_provider_configuration{
             issuer = Issuer,
+            issuer_regex = IssuerRegex,
             authorization_endpoint = AuthorizationEndpoint,
             token_endpoint = TokenEndpoint,
             userinfo_endpoint = UserinfoEndpoint,

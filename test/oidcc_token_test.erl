@@ -2258,6 +2258,87 @@ validate_jwt_test() ->
 
     ok.
 
+validate_jwt_with_regex_issuer_test() ->
+    #oidcc_client_context{
+        client_id = ClientId,
+        jwks = Jwk,
+        provider_configuration = ProvConfig0
+    } =
+        ClientContext0 = client_context_fapi2_fixture(),
+
+    % Base issuer value for our tests
+    Issuer = <<"https://example.com/tenant1">>,
+
+    % Update provider configuration with the regex pattern
+    RegexPattern = <<"^https://example\\.com/tenant\\d+$">>,
+    ProvConfig1 = ProvConfig0#oidcc_provider_configuration{
+        issuer = Issuer,
+        issuer_regex = RegexPattern
+    },
+
+    % Update client context with modified provider configuration
+    ClientContext = ClientContext0#oidcc_client_context{
+        provider_configuration = ProvConfig1
+    },
+
+    % Create claims with different issuer values - some should match regex, some shouldn't
+    BaseClaims = #{
+        <<"aud">> => ClientId,
+        <<"sub">> => <<"1234">>,
+        <<"iat">> => erlang:system_time(second),
+        <<"exp">> => erlang:system_time(second) + 10
+    },
+
+    ExactMatchIssuer = BaseClaims#{<<"iss">> => Issuer},
+    RegexMatch1 = BaseClaims#{<<"iss">> => <<"https://example.com/tenant2">>},
+    RegexMatch2 = BaseClaims#{<<"iss">> => <<"https://example.com/tenant42">>},
+    NoMatch1 = BaseClaims#{<<"iss">> => <<"https://different.com/tenant1">>},
+    NoMatch2 = BaseClaims#{<<"iss">> => <<"https://example.com/not-tenant">>},
+
+    JwtFun = fun(Claims) ->
+        Jwt = jose_jwt:from(Claims),
+        Jws = #{<<"alg">> => <<"RS256">>},
+        {_Jws, Token} =
+            jose_jws:compact(
+                jose_jwt:sign(Jwk, Jws, Jwt)
+            ),
+        Token
+    end,
+
+    Opts = #{
+        signing_algs => [<<"RS256">>]
+    },
+
+    % Test the exact issuer - should still work with regex enabled
+    ?assertEqual(
+        {ok, ExactMatchIssuer},
+        oidcc_token:validate_jwt(JwtFun(ExactMatchIssuer), ClientContext, Opts)
+    ),
+
+    % Test other values that match the regex pattern
+    ?assertEqual(
+        {ok, RegexMatch1},
+        oidcc_token:validate_jwt(JwtFun(RegexMatch1), ClientContext, Opts)
+    ),
+
+    ?assertEqual(
+        {ok, RegexMatch2},
+        oidcc_token:validate_jwt(JwtFun(RegexMatch2), ClientContext, Opts)
+    ),
+
+    % Test values that don't match the regex pattern
+    ?assertMatch(
+        {error, {missing_claim, {<<"iss">>, {regex, RegexPattern}}, _}},
+        oidcc_token:validate_jwt(JwtFun(NoMatch1), ClientContext, Opts)
+    ),
+
+    ?assertMatch(
+        {error, {missing_claim, {<<"iss">>, {regex, RegexPattern}}, _}},
+        oidcc_token:validate_jwt(JwtFun(NoMatch2), ClientContext, Opts)
+    ),
+
+    ok.
+
 client_context_fapi2_fixture() ->
     PrivDir = code:priv_dir(oidcc),
 

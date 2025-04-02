@@ -590,6 +590,25 @@ document_overrides_quirk_test() ->
     ),
     ok.
 
+issuer_regex_quirk_test() ->
+    PrivDir = code:priv_dir(oidcc),
+    {ok, Configuration} = file:read_file(PrivDir ++ "/test/fixtures/google-metadata.json"),
+    RegexPattern = <<"^https://[a-z]+\\.google\\.com$">>,
+
+    Result = oidcc_provider_configuration:decode_configuration(jose:decode(Configuration), #{
+        quirks => #{issuer_regex => RegexPattern}
+    }),
+
+    ?assertMatch(
+        {ok, #oidcc_provider_configuration{
+            issuer = <<"https://accounts.google.com">>,
+            issuer_regex = RegexPattern
+        }},
+        Result
+    ),
+
+    ok.
+
 uri_concatenation_test() ->
     ok = meck:new(httpc, [no_link]),
     HttpFun =

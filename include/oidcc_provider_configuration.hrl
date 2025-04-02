@@ -7,6 +7,7 @@
     %% OpenID Connect Discovery 1.0 / OAuth 2.0 Discovery (draft-jones-oauth-discovery-01)
     {
         issuer :: uri_string:uri_string(),
+        issuer_regex :: binary() | undefined,
         %% OpenID Connect Discovery 1.0 / OAuth 2.0 Discovery (draft-jones-oauth-discovery-01)
         authorization_endpoint :: uri_string:uri_string(),
         %% OpenID Connect Discovery 1.0 / OAuth 2.0 Discovery (draft-jones-oauth-discovery-01)

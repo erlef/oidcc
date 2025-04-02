@@ -2265,17 +2265,17 @@ validate_jwt_with_regex_issuer_test() ->
         provider_configuration = ProvConfig0
     } =
         ClientContext0 = client_context_fapi2_fixture(),
-    
+
     % Base issuer value for our tests
     Issuer = <<"https://example.com/tenant1">>,
-    
+
     % Update provider configuration with the regex pattern
     RegexPattern = <<"^https://example\\.com/tenant\\d+$">>,
     ProvConfig1 = ProvConfig0#oidcc_provider_configuration{
         issuer = Issuer,
         issuer_regex = RegexPattern
     },
-    
+
     % Update client context with modified provider configuration
     ClientContext = ClientContext0#oidcc_client_context{
         provider_configuration = ProvConfig1
@@ -2288,13 +2288,13 @@ validate_jwt_with_regex_issuer_test() ->
         <<"iat">> => erlang:system_time(second),
         <<"exp">> => erlang:system_time(second) + 10
     },
-    
+
     ExactMatchIssuer = BaseClaims#{<<"iss">> => Issuer},
     RegexMatch1 = BaseClaims#{<<"iss">> => <<"https://example.com/tenant2">>},
     RegexMatch2 = BaseClaims#{<<"iss">> => <<"https://example.com/tenant42">>},
     NoMatch1 = BaseClaims#{<<"iss">> => <<"https://different.com/tenant1">>},
     NoMatch2 = BaseClaims#{<<"iss">> => <<"https://example.com/not-tenant">>},
-    
+
     JwtFun = fun(Claims) ->
         Jwt = jose_jwt:from(Claims),
         Jws = #{<<"alg">> => <<"RS256">>},
@@ -2320,7 +2320,7 @@ validate_jwt_with_regex_issuer_test() ->
         {ok, RegexMatch1},
         oidcc_token:validate_jwt(JwtFun(RegexMatch1), ClientContext, Opts)
     ),
-    
+
     ?assertEqual(
         {ok, RegexMatch2},
         oidcc_token:validate_jwt(JwtFun(RegexMatch2), ClientContext, Opts)
@@ -2331,7 +2331,7 @@ validate_jwt_with_regex_issuer_test() ->
         {error, {missing_claim, {<<"iss">>, {regex, RegexPattern}}, _}},
         oidcc_token:validate_jwt(JwtFun(NoMatch1), ClientContext, Opts)
     ),
-    
+
     ?assertMatch(
         {error, {missing_claim, {<<"iss">>, {regex, RegexPattern}}, _}},
         oidcc_token:validate_jwt(JwtFun(NoMatch2), ClientContext, Opts)

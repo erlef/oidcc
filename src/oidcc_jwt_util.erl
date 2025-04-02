@@ -127,9 +127,9 @@ verify_claims(Claims, ExpClaims) ->
                         true;
                     Value when is_binary(Value) ->
                         case re:run(Value, Pattern, [{capture, none}]) of
-                            match -> 
+                            match ->
                                 false;
-                            nomatch -> 
+                            nomatch ->
                                 true
                         end;
                     _Other ->

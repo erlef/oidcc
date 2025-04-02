@@ -594,7 +594,7 @@ issuer_regex_quirk_test() ->
     PrivDir = code:priv_dir(oidcc),
     {ok, Configuration} = file:read_file(PrivDir ++ "/test/fixtures/google-metadata.json"),
     RegexPattern = <<"^https://[a-z]+\\.google\\.com$">>,
-    
+
     Result = oidcc_provider_configuration:decode_configuration(jose:decode(Configuration), #{
         quirks => #{issuer_regex => RegexPattern}
     }),
@@ -606,7 +606,7 @@ issuer_regex_quirk_test() ->
         }},
         Result
     ),
-    
+
     ok.
 
 uri_concatenation_test() ->

@@ -1045,7 +1045,7 @@ int_validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
     Jwks2 = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks1, SigningAlgs, ClientSecret),
     Jwks = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks2, EncryptionAlgs, ClientSecret),
     TrustedAudiences = maps:get(trusted_audiences, Opts, any),
-    
+
     maybe
         {ok, {#jose_jwt{fields = Claims}, Jws}} ?=
             rescue_none_validated_jwt(
@@ -1053,11 +1053,11 @@ int_validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
                     Token, Jwks, SigningAlgs, EncryptionAlgs, EncryptionEncs
                 )
             ),
-        ExpectedClaims = 
+        ExpectedClaims =
             case IssuerRegex of
-                undefined -> 
+                undefined ->
                     [{<<"iss">>, Issuer}];
-                Pattern -> 
+                Pattern ->
                     [{<<"iss">>, {regex, Pattern}}]
             end,
         ok ?= oidcc_jwt_util:verify_claims(Claims, ExpectedClaims),

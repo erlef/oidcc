@@ -234,7 +234,9 @@ load_configuration(Issuer0, Opts) ->
         {ok, {{json, ConfigurationMap}, Headers}} ?=
             oidcc_http_util:request(get, Request, TelemetryOpts, RequestOpts),
         Expiry = oidcc_http_util:headers_to_cache_deadline(Headers, DefaultExpiry),
-        {ok, #oidcc_provider_configuration{issuer = ConfigIssuer, issuer_regex = ConfigIssuerRegex} = Configuration} ?=
+        {ok,
+            #oidcc_provider_configuration{issuer = ConfigIssuer, issuer_regex = ConfigIssuerRegex} =
+                Configuration} ?=
             decode_configuration(ConfigurationMap, #{quirks => Quirks}),
         case ConfigIssuer of
             Issuer ->
@@ -320,7 +322,7 @@ decode_configuration(Configuration0, Opts) ->
     Quirks = maps:get(quirks, Opts, #{}),
     AllowUnsafeHttp = maps:get(allow_unsafe_http, Quirks, false),
     IssuerRegex = maps:get(issuer_regex, Quirks, undefined),
-    
+
     DocumentOverrides = maps:get(document_overrides, Quirks, #{}),
     Configuration = maps:merge(Configuration0, DocumentOverrides),
 

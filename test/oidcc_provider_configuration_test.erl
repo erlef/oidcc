@@ -598,20 +598,13 @@ issuer_regex_quirk_test() ->
     Result = oidcc_provider_configuration:decode_configuration(jose:decode(Configuration), #{
         quirks => #{issuer_regex => RegexPattern}
     }),
-    
+
     ?assertMatch(
         {ok, #oidcc_provider_configuration{
             issuer = <<"https://accounts.google.com">>,
-            extra_fields = #{<<"issuer_regex">> := RegexPattern}
+            issuer_regex = RegexPattern
         }},
         Result
-    ),
-    
-    % Verify the regex pattern is properly stored in extra_fields
-    {ok, ProvConfig} = Result,
-    ?assertEqual(
-        RegexPattern,
-        maps:get(<<"issuer_regex">>, ProvConfig#oidcc_provider_configuration.extra_fields)
     ),
     
     ok.

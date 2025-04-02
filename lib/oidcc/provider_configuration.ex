@@ -68,6 +68,7 @@ defmodule Oidcc.ProviderConfiguration do
   @typedoc since: "3.0.0"
   @type t() :: %__MODULE__{
           issuer: :uri_string.uri_string(),
+          issuer_regex: binary() | :undefined,
           authorization_endpoint: :uri_string.uri_string(),
           token_endpoint: :uri_string.uri_string() | :undefined,
           userinfo_endpoint: :uri_string.uri_string() | :undefined,

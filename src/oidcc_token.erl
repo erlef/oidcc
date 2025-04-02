@@ -1022,7 +1022,7 @@ int_validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
         ClientContext,
     #oidcc_provider_configuration{
         issuer = Issuer,
-        extra_fields = ExtraFields
+        issuer_regex = IssuerRegex
     } =
         Configuration,
 
@@ -1045,8 +1045,6 @@ int_validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
     Jwks2 = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks1, SigningAlgs, ClientSecret),
     Jwks = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks2, EncryptionAlgs, ClientSecret),
     TrustedAudiences = maps:get(trusted_audiences, Opts, any),
-
-    IssuerRegex = maps:get(<<"issuer_regex">>, ExtraFields, undefined),
     
     maybe
         {ok, {#jose_jwt{fields = Claims}, Jws}} ?=

@@ -2273,7 +2273,7 @@ validate_jwt_with_regex_issuer_test() ->
     RegexPattern = <<"^https://example\\.com/tenant\\d+$">>,
     ProvConfig1 = ProvConfig0#oidcc_provider_configuration{
         issuer = Issuer,
-        extra_fields = #{<<"issuer_regex">> => RegexPattern}
+        issuer_regex = RegexPattern
     },
     
     % Update client context with modified provider configuration

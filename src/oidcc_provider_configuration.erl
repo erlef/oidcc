@@ -81,6 +81,7 @@ All unrecognized fields are stored in `extra_fields`.
 -type t() ::
     #oidcc_provider_configuration{
         issuer :: uri_string:uri_string(),
+        issuer_regex :: binary() | undefined,
         authorization_endpoint :: uri_string:uri_string(),
         token_endpoint :: uri_string:uri_string() | undefined,
         userinfo_endpoint :: uri_string:uri_string() | undefined,
@@ -230,11 +231,18 @@ load_configuration(Issuer0, Opts) ->
         {ok, {{json, ConfigurationMap}, Headers}} ?=
             oidcc_http_util:request(get, Request, TelemetryOpts, RequestOpts),
         Expiry = oidcc_http_util:headers_to_cache_deadline(Headers, DefaultExpiry),
-        {ok, #oidcc_provider_configuration{issuer = ConfigIssuer} = Configuration} ?=
+        {ok, #oidcc_provider_configuration{issuer = ConfigIssuer, issuer_regex = ConfigIssuerRegex} = Configuration} ?=
             decode_configuration(ConfigurationMap, #{quirks => Quirks}),
         case ConfigIssuer of
             Issuer ->
                 {ok, {Configuration, Expiry}};
+            _ when is_binary(ConfigIssuerRegex) ->
+                case re:run(Issuer, ConfigIssuerRegex, [{capture, none}]) of
+                    match ->
+                        {ok, {Configuration, Expiry}};
+                    nomatch ->
+                        {error, {issuer_mismatch, ConfigIssuer}}
+                end;
             _DifferentIssuer when AllowIssuerMismatch -> {ok, {Configuration, Expiry}};
             DifferentIssuer when not AllowIssuerMismatch ->
                 {error, {issuer_mismatch, DifferentIssuer}}
@@ -312,15 +320,6 @@ decode_configuration(Configuration0, Opts) ->
     
     DocumentOverrides = maps:get(document_overrides, Quirks, #{}),
     Configuration = maps:merge(Configuration0, DocumentOverrides),
-    
-    % If issuer_regex is present, add it to the extra_fields
-    ExtraFieldsUpdate = 
-        case IssuerRegex of
-            undefined -> 
-                #{};
-            Pattern when is_binary(Pattern) -> 
-                #{<<"issuer_regex">> => Pattern}
-        end,
 
     maybe
         {ok, {
@@ -514,6 +513,7 @@ decode_configuration(Configuration0, Opts) ->
             ),
         {ok, #oidcc_provider_configuration{
             issuer = Issuer,
+            issuer_regex = IssuerRegex,
             authorization_endpoint = AuthorizationEndpoint,
             token_endpoint = TokenEndpoint,
             userinfo_endpoint = UserinfoEndpoint,
@@ -587,7 +587,7 @@ decode_configuration(Configuration0, Opts) ->
             require_signed_request_object = RequireSignedRequestObject,
             mtls_endpoint_aliases = MtlsEndpointAliases,
             tls_client_certificate_bound_access_tokens = TlsClientCertificateBoundAccessTokens,
-            extra_fields = maps:merge(ExtraFields, ExtraFieldsUpdate)
+            extra_fields = ExtraFields
         }}
     end.
 

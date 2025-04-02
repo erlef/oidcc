@@ -43,7 +43,10 @@ Allow Specification Non-compliance.
 * `document_overrides` - a map to merge with the real OIDD document,
   in case the OP left out some values.
 * `issuer_regex` - Optional regex pattern to match against the issuer claim
-  instead of requiring an exact match.
+  instead of requiring an exact match. This may be necessary for certain providers that do not 
+  conform to the OpenID specification, such as Microsoft Entra ID where
+  the issuer is 'https://login.microsoftonline.com/{tenantid}/v2.0' in the 
+  [OpenID configuration](https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration).
 """).
 ?DOC(#{since => <<"3.1.0">>}).
 -type quirks() :: #{

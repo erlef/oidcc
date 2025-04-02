@@ -965,7 +965,7 @@ to the quirks map when creating the provider configuration:
 {ok, {ProviderConfig, _}} = 
     oidcc_provider_configuration:load_configuration(Issuer, #{
         quirks => #{
-            issuer_regex => <<"^https://accounts\\.example\\.com/[a-z0-9]+$">>
+            issuer_regex => <<"^https://accounts\\.example\\.com/[a-z0-9]+">>
         }
     }),
 ```

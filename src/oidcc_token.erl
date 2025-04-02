@@ -867,7 +867,7 @@ If you get the token passed from somewhere else, this function can validate it.
 
 ## Regex Issuer Validation
 
-You can use a regex pattern to validate the issuer claim by adding an `issuer_regex` 
+You can use a regex pattern to validate the issuer claim by adding an `issuer_regex`
 to the quirks map when creating the provider configuration. See the documentation for `validate_jwt/3`
 for more details.
 """).
@@ -958,11 +958,11 @@ Opts = #{
 
 ## Regex Issuer Validation
 
-You can use a regex pattern to validate the issuer claim by adding an `issuer_regex` 
+You can use a regex pattern to validate the issuer claim by adding an `issuer_regex`
 to the quirks map when creating the provider configuration:
 
 ```erlang
-{ok, {ProviderConfig, _}} = 
+{ok, {ProviderConfig, _}} =
     oidcc_provider_configuration:load_configuration(Issuer, #{
         quirks => #{
             issuer_regex => <<"^https://accounts\\.example\\.com/[a-z0-9]+">>

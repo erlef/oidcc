@@ -348,3 +348,54 @@ for more details, see https://hexdocs.pm/oidcc/oidcc.html
 for more details, see https://hexdocs.pm/oidcc/Oidcc.html
 
 <!-- tabs-close -->
+
+### `private_key_jwt`
+
+For using `private_key_jwt` one needs to provide the private key as jose jwk
+everywhere client_context_options can be provided. One also needs to set
+a dummy client secret for now, so the client is considered an authenticated one.
+
+<!-- tabs-open -->
+
+#### Erlang
+
+```erlang
+%% Load key into jwk format
+ClientJwk0 = jose_jwk:from_pem(<<"key_pem">>),
+
+%% Set kid field, to make the computed jwts have a kid header
+ClientJwk = ClientJwk0#jose_jwk{
+    fields = #{<<"kid">> => <<"private_kid">>}
+},
+
+%% Refresh token when it expires
+{ok, ClientContext} =
+    oidcc_client_context:from_configuration_worker(
+        Pid,
+        <<"client_id">>,
+        <<"dummy_client_secret">>,
+        #{client_jwks => ClientJwk}
+    ).
+```
+
+#### Elixir
+
+```elixir
+# Load key into jwk format
+# Set kid field, to make the computed jwts have a kid header
+client_jwk =
+  key
+  |> JOSE.JWK.from_pem() 
+  |> Map.put(:fields, %{"kid" => kid})
+
+# Refresh token when it expires
+{ok, client_context} =
+    Oidcc.ClientContext.from_configuration_worker(
+        pid,
+        "client_id",
+        "dummy_client_secret",
+        %{client_jwks: client_jwk}
+    ).
+```
+
+<!-- tabs-close -->

@@ -77,7 +77,7 @@ defmodule Oidcc.Mixfile do
     [
       source_ref: ref,
       main: "readme",
-      extras: ["README.md"],
+      extras: ["README.md" | Path.wildcard(Path.join(__DIR__, "guides/**/*.md"))],
       groups_for_modules: [Erlang: [~r/oidcc/], "Elixir": [~r/^Oidcc/]],
       logo: "assets/logo.svg",
       assets: %{"assets" => "assets"}

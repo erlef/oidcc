@@ -351,9 +351,12 @@ for more details, see https://hexdocs.pm/oidcc/Oidcc.html
 
 ### `private_key_jwt`
 
-For using `private_key_jwt` one needs to provide the private key as jose jwk
-everywhere client_context_options can be provided. One also needs to set
-a dummy client secret for now, so the client is considered an authenticated one.
+To use `private_key_jwt`, you need to provide the private key as a `JOSE.JWK`
+wherever `client_context_options` can be provided.  
+
+<!-- TODO: Remove once https://github.com/erlef/oidcc/issues/442 is fixed -->
+You also need to set a dummy client secret for now, so that the client is considered
+authenticated.
 
 <!-- tabs-open -->
 

@@ -29,3 +29,11 @@ jobs:
     uses: ./.github/workflows/part_docs.yml
     with:
       attest: false
+
+  dependency_submission:
+    name: "Mix Dependency Submission"
+
+    permissions:
+      contents: write
+
+    uses: ./.github/workflows/part_dependency_submission.yml

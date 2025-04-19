@@ -1,0 +1,26 @@
+on:
+  workflow_call: {}
+
+name: "Mix Dependency Submission"
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    name: "Submit"
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@c6295a65d1254861815972266d5933fd6e532bdf # v2.11.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: erlef/mix-dependency-submission@6b9e140ea0cb657344589f9d073b7a6a328bedc4 # v1.0.0-beta.8

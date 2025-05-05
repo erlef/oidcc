@@ -60,20 +60,16 @@ case Code.ensure_loaded(Igniter.Mix.Task) do
       end
 
       @impl Igniter.Mix.Task
-      def igniter(igniter, argv) do
-        # extract positional arguments according to `positional` above
-        {_arguments, argv} = positional_args!(argv)
-        # extract options according to `schema` and `aliases` above
-        options = setup_options(argv, igniter)
+      def igniter(igniter) do
+        options = setup_options(igniter)
 
         igniter
         |> configure_issuer(options)
         |> add_application_worker(options)
       end
 
-      defp setup_options(argv, igniter) do
-        argv
-        |> options!()
+      defp setup_options(igniter) do
+        igniter.args.options
         |> Keyword.update(
           :name,
           Module.module_name(igniter, "OpenIDProvider"),

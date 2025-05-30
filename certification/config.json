@@ -1,0 +1,154 @@
+{
+  "plans": [
+    {
+      "name": "oidcc-client-basic-certification-test-plan",
+      "config": {
+        "description": "Basic Certification (Plain HTTP)"
+      },
+      "variant": {
+        "request_type": "plain_http_request",
+        "client_registration": "dynamic_client"
+      }
+    },
+    {
+      "name": "oidcc-client-basic-certification-test-plan",
+      "config": {
+        "description": "Basic Certification (Request Object)"
+      },
+      "variant": {
+        "request_type": "request_object",
+        "client_registration": "dynamic_client"
+      }
+    },
+    {
+      "name": "oidcc-client-formpost-basic-certification-test-plan",
+      "config": {
+        "description": "Form POST Certification"
+      },
+      "variant": {
+        "request_type": "plain_http_request",
+        "client_registration": "dynamic_client"
+      }
+    },
+    {
+      "name": "oidcc-client-test-plan",
+      "ignore": [
+        "oidcc-client-test-discovery-webfinger-acct",
+        "oidcc-client-test-discovery-webfinger-url",
+        "oidcc-client-test-userinfo-bearer-body",
+        "oidcc-client-test-aggregated-claims"
+      ],
+      "config": {
+        "description": "Comprehensive (client_secret_basic)"
+      },
+      "variant": {
+        "client_auth_type": "client_secret_basic",
+        "request_type": "plain_http_request",
+        "response_type": "code",
+        "client_registration": "dynamic_client",
+        "response_mode": "default"
+      }
+    },
+    {
+      "name": "oidcc-client-test-plan",
+      "ignore": [
+        "oidcc-client-test-discovery-webfinger-acct",
+        "oidcc-client-test-discovery-webfinger-url",
+        "oidcc-client-test-userinfo-bearer-body",
+        "oidcc-client-test-aggregated-claims"
+      ],
+      "config": {
+        "description": "Comprehensive (client_secret_post)"
+      },
+      "variant": {
+        "client_auth_type": "client_secret_post",
+        "request_type": "plain_http_request",
+        "response_type": "code",
+        "client_registration": "dynamic_client",
+        "response_mode": "default"
+      }
+    },
+    {
+      "name": "oidcc-client-test-plan",
+      "ignore": [
+        "oidcc-client-test-discovery-webfinger-acct",
+        "oidcc-client-test-discovery-webfinger-url",
+        "oidcc-client-test-userinfo-bearer-body",
+        "oidcc-client-test-aggregated-claims"
+      ],
+      "config": {
+        "description": "Comprehensive (client_secret_jwt)"
+      },
+      "variant": {
+        "client_auth_type": "client_secret_jwt",
+        "request_type": "plain_http_request",
+        "response_type": "code",
+        "client_registration": "dynamic_client",
+        "response_mode": "default"
+      }
+    },
+    {
+      "name": "oidcc-client-test-plan",
+      "ignore": [
+        "oidcc-client-test-discovery-webfinger-acct",
+        "oidcc-client-test-discovery-webfinger-url",
+        "oidcc-client-test-userinfo-bearer-body",
+        "oidcc-client-test-aggregated-claims"
+      ],
+      "config": {
+        "description": "Comprehensive (private_key_jwt)"
+      },
+      "variant": {
+        "client_auth_type": "private_key_jwt",
+        "request_type": "plain_http_request",
+        "response_type": "code",
+        "client_registration": "dynamic_client",
+        "response_mode": "default"
+      }
+    },
+    {
+      "name": "oidcc-client-refreshtoken-test-plan",
+      "config": {
+        "description": "Refresh Token"
+      },
+      "ignore": [
+        "oidcc-client-test-discovery-webfinger-acct",
+        "oidcc-client-test-discovery-webfinger-url",
+        "oidcc-client-test-userinfo-bearer-body",
+        "oidcc-client-test-aggregated-claims"
+      ],
+      "variant": {
+        "client_auth_type": "client_secret_basic",
+        "request_type": "plain_http_request",
+        "response_type": "code",
+        "client_registration": "dynamic_client",
+        "response_mode": "default"
+      }
+    },
+    {
+      "name": "oidcc-client-config-certification-test-plan",
+      "config": {
+        "description": "Configuration Certification"
+      },
+      "variant": {
+        "client_auth_type": "client_secret_basic",
+        "request_type": "plain_http_request",
+        "response_mode": "default",
+        "client_registration": "dynamic_client"
+      }
+    },
+    {
+      "name": "oidcc-client-test-3rd-party-init-login-test-plan",
+      "config": {
+        "description": "3rd Party Init"
+      },
+      "variant": {
+        "client_auth_type": "client_secret_basic",
+        "request_type": "plain_http_request",
+        "response_type": "code",
+        "client_registration": "dynamic_client",
+        "response_mode": "default"
+      }
+    }
+  ]
+}

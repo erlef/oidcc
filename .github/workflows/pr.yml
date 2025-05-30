@@ -18,6 +18,8 @@ jobs:
       security-events: write
 
     uses: ./.github/workflows/part_test.yml
+    secrets:
+      OID_CERTIFICATION_API_TOKEN: ${{ secrets.OID_CERTIFICATION_API_TOKEN }}
 
   docs:
     name: "Docs"

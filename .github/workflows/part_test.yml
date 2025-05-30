@@ -100,7 +100,7 @@ jobs:
       - run: mix format --check-formatted
 
   eunit:
-    name: rebar3 eunit (${{ matrix.otp }})
+    name: rebar3 eunit (${{ matrix.name }})
 
     runs-on: ubuntu-latest
 
@@ -110,14 +110,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Lowest Supported
           - otp: "26.0"
-            unstable: false
-          - otp: "26.2.5"
-            unstable: false
-          - otp: "27.1.2"
-            unstable: false
+            name: "lowest"
+          # Latest Supported
+          - otp: "${{ needs.detectToolVersions.outputs.otpVersion }}"
+            name: "latest"
+          # Test Master
           - otp: "master"
-            unstable: true
+            name: "master"
 
     steps:
       - name: Harden Runner
@@ -139,15 +140,15 @@ jobs:
           restore-keys: |
             eunit-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
       - run: rebar3 eunit --cover --cover_export_name "eunit-${{ steps.setupBEAM.outputs.otp-version }}"
-        continue-on-error: ${{ matrix.unstable }}
+        continue-on-error: ${{ matrix.name == 'master' }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: "${{ matrix.otp == needs.detectToolVersions.outputs.otpVersion }}"
+        if: "${{ matrix.name == 'latest' }}"
         with:
           name: eunit-coverage-${{ matrix.otp }}
           path: "_build/test/cover/eunit-${{ steps.setupBEAM.outputs.otp-version }}.coverdata"
 
   conformance:
-    name: rebar3 ct (${{ matrix.otp }})
+    name: rebar3 ct (${{ matrix.name }})
 
     runs-on: ubuntu-latest
 
@@ -157,14 +158,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Lowest Supported
           - otp: "26.0"
-            unstable: false
-          - otp: "26.2.5"
-            unstable: false
-          - otp: "27.1.2"
-            unstable: false
+            name: "lowest"
+          # Latest Supported
+          - otp: "${{ needs.detectToolVersions.outputs.otpVersion }}"
+            name: "latest"
+          # Test Master
           - otp: "master"
-            unstable: true
+            name: "master"
 
     steps:
       - name: Harden Runner
@@ -186,15 +188,15 @@ jobs:
           restore-keys: |
             ct-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
       - run: rebar3 ct --cover --cover_export_name "ct-${{ steps.setupBEAM.outputs.otp-version }}"
-        continue-on-error: ${{ matrix.unstable }}
+        continue-on-error: ${{ matrix.name == 'master' }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: "${{ matrix.otp == needs.detectToolVersions.outputs.otpVersion }}"
+        if: "${{ matrix.name == 'latest' }}"
         with:
           name: ct-coverage-${{ matrix.otp }}
           path: _build/test/cover/ct-${{ steps.setupBEAM.outputs.otp-version }}.coverdata
 
   mix_test:
-    name: mix test (${{ matrix.elixir }})
+    name: mix test (${{ matrix.name }})
 
     runs-on: ubuntu-latest
 
@@ -204,21 +206,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Lowest Supported
           - elixir: "1.14.5"
             otp: "26.2.5"
-            unstable: false
-          - elixir: "1.15.8"
-            otp: "26.2.5"
-            unstable: false
-          - elixir: "1.16.3"
-            otp: "26.2.5"
-            unstable: false
-          - elixir: "1.17.3"
-            otp: "27.1.2"
-            unstable: false
+            name: "lowest"
+          # Latest Supported
+          - elixir: "${{ needs.detectToolVersions.outputs.elixirVersion }}"
+            otp: "${{ needs.detectToolVersions.outputs.otpVersion }}"
+            name: "latest"
+          # Test Main
           - elixir: "main"
             otp: "${{ needs.detectToolVersions.outputs.otpVersion }}"
-            unstable: true
+            name: "main"
 
     steps:
       - name: Harden Runner
@@ -248,9 +247,9 @@ jobs:
             mix_test-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-
       - run: mix deps.get
       - run: mix test --cover --export-coverage "mix_test-${{ steps.setupBEAM.outputs.elixir-version }}"
-        continue-on-error: ${{ matrix.unstable }}
+        continue-on-error: ${{ matrix.name == 'main' }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: "${{ matrix.otp == needs.detectToolVersions.outputs.otpVersion }}"
+        if: "${{ matrix.name == 'latest' }}"
         with:
           name: mix_test-coverage-${{ matrix.elixir }}
           path: cover/mix_test-${{ steps.setupBEAM.outputs.elixir-version }}.coverdata

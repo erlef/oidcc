@@ -516,7 +516,7 @@ jobs:
       # Prime Mix.install to prevent Mix Compile Locks
       - run: 'echo "" | certification/implementation_plug.exs'
 
-      - uses: erlef/oid_certo@08d9ac3e2910aba5a973227d37265910554faad0 # v1.0.0-beta.3
+      - uses: erlef/oid_certo@e47ec90093332ecc3c11d0bdec85d5306c778c29 # v1.0.0-beta.4
         with:
           command: >-
             certification/config.json

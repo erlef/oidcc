@@ -1,0 +1,17 @@
+{
+  "plans": [
+    {
+      "name": "fapi2-security-profile-id2-client-test-plan",
+      "config": {
+        "description": "FAPI 2.0 (DPoP)"
+      },
+      "variant": {
+        "sender_constrain": "dpop",
+        "client_auth_type": "private_key_jwt",
+        "authorization_request_type": "rar",
+        "fapi_client_type": "oidc",
+        "fapi_profile": "plain_fapi"
+      }
+    }
+  ]
+}

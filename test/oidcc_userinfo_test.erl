@@ -995,3 +995,53 @@ retrieve_no_access_token_test() ->
     ),
 
     ok.
+
+certification_failure_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(
+        PrivDir ++ "/test/fixtures/oidcc-client-test-aggregated-claims/introspection.json"
+    ),
+    {ok, Configuration} =
+        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+
+    {ok, JwkBinary} = file:read_file(
+        PrivDir ++ "/test/fixtures/oidcc-client-test-aggregated-claims/jwks.json"
+    ),
+    Jwks = jose_jwk:from(JwkBinary),
+
+    {ok, UserInfoJwtBinary} = file:read_file(
+        PrivDir ++ "/test/fixtures/oidcc-client-test-aggregated-claims/jwt.txt"
+    ),
+
+    ClientId = <<"client_kZLTUguwIoxXBEc38120;\"+)[">>,
+    ClientSecret = <<"client_secret">>,
+
+    ClientContext = oidcc_client_context:from_manual(
+        Configuration, Jwks, ClientId, ClientSecret
+    ),
+
+    HttpFun =
+        fun(get, _UrlHeader, _HttpOpts, _Opts, _Profile) ->
+            {ok, {
+                {"HTTP/1.1", 200, "Ok"},
+                [{"content-type", "application/jwt;charset=UTF-8"}],
+                UserInfoJwtBinary
+            }}
+        end,
+    ok = meck:new(httpc),
+    ok = meck:expect(httpc, request, HttpFun),
+
+    ?assertMatch(
+        {error, no_access_token},
+        oidcc_userinfo:retrieve(
+            <<"X5XN9Xnfnx0gzOdcHEEjOQViq0PxCUbv5Wt018LuGMaHBG4rkm">>, ClientContext, #{
+                expected_subject => <<"user-subject-1234531">>
+            }
+        )
+    ),
+
+    true = meck:validate(httpc),
+    meck:unload(httpc),
+
+    ok.

@@ -265,6 +265,7 @@ validate_userinfo_token(UserinfoToken, ClientContext, Opts) ->
         issuer = Issuer
     } =
         Configuration,
+
     maybe
         Jwks1 = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks0, AllowAlgorithms, ClientSecret),
         Jwks2 = oidcc_jwt_util:merge_client_secret_oct_keys(Jwks1, EncryptionAlgs, ClientSecret),

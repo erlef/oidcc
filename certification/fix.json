@@ -1,0 +1,23 @@
+{
+  "plans": [
+    {
+      "name": "oidcc-client-test-plan",
+      "ignore": [
+        "oidcc-client-test-discovery-webfinger-acct",
+        "oidcc-client-test-discovery-webfinger-url",
+        "oidcc-client-test-userinfo-bearer-body",
+        "oidcc-client-test-aggregated-claims"
+      ],
+      "config": {
+        "description": "Comprehensive (private_key_jwt)"
+      },
+      "variant": {
+        "client_auth_type": "private_key_jwt",
+        "request_type": "plain_http_request",
+        "response_type": "code",
+        "client_registration": "dynamic_client",
+        "response_mode": "default"
+      }
+    }
+  ]
+}

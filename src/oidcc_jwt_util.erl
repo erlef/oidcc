@@ -94,8 +94,10 @@ verify_signature(Token, AllowAlgorithms, #jose_jwk{} = Jwks) ->
             end,
         case Jwks of
             #jose_jwk{fields = #{<<"kid">> := CmpKid}} when CmpKid =/= Kid, Kid =/= none ->
+                erlang:display({Kid, CmpKid}),
                 {error, {no_matching_key_with_kid, Kid}};
             #jose_jwk{} ->
+                erlang:display({Kid, Jwks#jose_jwk.fields, jose_jwt:verify_strict(Jwks, AllowAlgorithms, Token), AllowAlgorithms}),
                 case jose_jwt:verify_strict(Jwks, AllowAlgorithms, Token) of
                     {true, Jwt, Jws} ->
                         {ok, {Jwt, Jws}};

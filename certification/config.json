@@ -149,6 +149,18 @@
         "client_registration": "dynamic_client",
         "response_mode": "default"
       }
+    },
+    {
+      "name": "oidcc-client-rp-initiated-logout-rp-basic",
+      "config": {
+        "description": "RP Initiated Logout (RP Basic)"
+      },
+      "variant": {
+        "client_auth_type": "client_secret_basic",
+        "request_type": "plain_http_request",
+        "response_mode": "default",
+        "client_registration": "dynamic_client"
+      }
     }
   ]
 }

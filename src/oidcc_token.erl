@@ -1288,7 +1288,7 @@ add_pkce_verifier(BodyQs, #{pkce_verifier := PkceVerifier} = Opts, ClientContext
     RequirePkce = maps:get(require_pkce, Opts, false),
 
     case CodeChallengeMethodsSupported of
-        undefined when RequirePkce =:= true ->
+        undefined when RequirePkce ->
             {error, no_supported_code_challenge};
         undefined ->
             {ok, BodyQs};
@@ -1299,7 +1299,7 @@ add_pkce_verifier(BodyQs, #{pkce_verifier := PkceVerifier} = Opts, ClientContext
             of
                 true ->
                     {ok, [{<<"code_verifier">>, PkceVerifier} | BodyQs]};
-                false when RequirePkce =:= true ->
+                false when RequirePkce ->
                     {error, no_supported_code_challenge};
                 false ->
                     {ok, BodyQs}

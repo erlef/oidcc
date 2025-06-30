@@ -22,6 +22,8 @@ stops_with_invalid_issuer_test() ->
 
     receive
         {'EXIT', Pid, {configuration_load_failed, _Error}} -> ok
+    after 10000 ->
+        ?assert(false)
     end,
 
     meck:unload(httpc),

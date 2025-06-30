@@ -179,9 +179,7 @@ retrieve(#oidcc_token_access{} = AccessTokenRecord, #oidcc_client_context{} = Cl
         {ok, Claims} ?= validate_userinfo_body(UserinfoResponse, ClientContext, Opts),
         lookup_distributed_claims(Claims, ClientContext, Opts)
     else
-        {error, {use_dpop_nonce, DpopNonce, _}} when
-            HasDpopNonce =:= false
-        ->
+        {error, {use_dpop_nonce, DpopNonce, _}} when not HasDpopNonce ->
             %% retry once if we didn't provide a nonce the first time
             retrieve(AccessTokenRecord, ClientContext, Opts#{dpop_nonce => DpopNonce});
         {error, Reason} ->

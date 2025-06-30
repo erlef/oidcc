@@ -173,7 +173,7 @@ append_code_challenge(#{pkce_verifier := CodeVerifier} = Opts, QueryParams, Clie
         ProviderConfiguration,
     RequirePkce = maps:get(require_pkce, Opts, false),
     case CodeChallengeMethodsSupported of
-        undefined when RequirePkce =:= true ->
+        undefined when RequirePkce ->
             {error, no_supported_code_challenge};
         undefined ->
             {ok, QueryParams};
@@ -199,7 +199,7 @@ append_code_challenge(#{pkce_verifier := CodeVerifier} = Opts, QueryParams, Clie
                         {<<"code_challenge_method">>, <<"plain">>}
                         | QueryParams
                     ]};
-                {false, false} when RequirePkce =:= true ->
+                {false, false} when RequirePkce ->
                     {error, no_supported_code_challenge};
                 {false, false} ->
                     {ok, QueryParams}
@@ -324,7 +324,7 @@ attempt_request_object(
     Jwt = jose_jwt:from(Claims),
 
     case oidcc_jwt_util:sign(Jwt, SigningJwks, deprioritize_none_alg(SigningAlgSupported)) of
-        {error, no_supported_alg_or_key} when RequireSignedRequestObject =:= true ->
+        {error, no_supported_alg_or_key} when RequireSignedRequestObject ->
             {error, request_object_required};
         {error, no_supported_alg_or_key} ->
             {ok, QueryParams ++ UrlExtension};

@@ -1,0 +1,42 @@
+{
+ "issuer": "https://my.provider",
+ "authorization_endpoint": "https://my.provider/auth",
+ "device_authorization_endpoint": "https://my.provider/device/code",
+ "introspection_endpoint": "https://my.provider/introspection",
+ "token_endpoint": "https://my.provider/token",
+ "userinfo_endpoint": "https://my.provider/userinfo",
+ "jwks_uri": "https://my.provider/jwks",
+ "response_types_supported": [
+  "code",
+  "id_token"
+ ],
+ "subject_types_supported": ["public"],
+ "id_token_signing_alg_values_supported": [
+  "RS256"
+ ],
+ "scopes_supported": [
+  "openid",
+  "profile",
+  "email",
+  "groups"
+ ],
+ "claims_supported": [
+  "aud",
+  "email",
+  "email_verified",
+  "exp",
+  "family_name",
+  "given_name",
+  "iat",
+  "iss",
+  "locale",
+  "name",
+  "picture",
+  "sub"
+ ],
+ "grant_types_supported": [
+  "authorization_code",
+  "refresh_token",
+  "urn:ietf:params:oauth:grant-type:device_code"
+ ] 
+}

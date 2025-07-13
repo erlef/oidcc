@@ -441,7 +441,7 @@ decode_configuration(Configuration0, Opts) ->
                         fun oidcc_decode_util:parse_setting_binary_list/2},
                     {optional, request_object_encryption_enc_values_supported, undefined,
                         fun oidcc_decode_util:parse_setting_binary_list/2},
-                    {optional, token_endpoint_auth_methods_supported, undefined,
+                    {optional, token_endpoint_auth_methods_supported, [<<"client_secret_basic">>],
                         fun oidcc_decode_util:parse_setting_binary_list/2},
                     {optional, token_endpoint_auth_signing_alg_values_supported, undefined,
                         fun parse_token_signing_alg_values_no_none/2},

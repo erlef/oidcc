@@ -686,7 +686,7 @@ google_merge_json(Merge) ->
 use_spec_defaults_in_implicit_configs_test() ->
     PrivDir = code:priv_dir(oidcc),
     {ok, Configuration} = file:read_file(PrivDir ++ "/test/fixtures/example-config-optionals.json"),
-    
+
     ?assertMatch(
         {ok, #oidcc_provider_configuration{
             issuer = <<"https://my.provider">>,

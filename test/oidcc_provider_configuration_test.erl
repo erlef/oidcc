@@ -682,3 +682,17 @@ google_merge_json(Merge) ->
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/google-metadata.json"),
     Decoded = jose:decode(ValidConfigString),
     maps:merge(Decoded, Merge).
+
+use_spec_defaults_in_implicit_configs_test() ->
+    PrivDir = code:priv_dir(oidcc),
+    {ok, Configuration} = file:read_file(PrivDir ++ "/test/fixtures/example-config-optionals.json"),
+
+    ?assertMatch(
+        {ok, #oidcc_provider_configuration{
+            issuer = <<"https://my.provider">>,
+            token_endpoint_auth_methods_supported = [<<"client_secret_basic">>]
+        }},
+        oidcc_provider_configuration:decode_configuration(jose:decode(Configuration))
+    ),
+
+    ok.

@@ -50,65 +50,67 @@ defmodule Oidcc.TokenTest do
   end
 
   describe inspect(&Token.retrieve/3) do
-    test_with_mock "works", %{}, :oidcc_http_util, [],
-      request: fn :post,
-                  {"https://my.provider/token", _headers, ~c"application/x-www-form-urlencoded",
-                   _body},
-                  _telemetry_opts,
-                  _http_opts ->
-        {_jws, token} =
-          @example_jwks
-          |> JOSE.JWT.sign(
-            %{"alg" => "RS256"},
-            JOSE.JWT.from(%{
-              "iss" => "https://my.provider",
-              "sub" => "sub",
-              "aud" => "client_id",
-              "iat" => :erlang.system_time(:second),
-              "exp" => :erlang.system_time(:second) + 10
-            })
+    for scope <- ["profile openid", ["profile", "openid"]] do
+      test_with_mock "works with scope: #{inspect(scope)}", %{}, :oidcc_http_util, [],
+        request: fn :post,
+                    {"https://my.provider/token", _headers, ~c"application/x-www-form-urlencoded",
+                     _body},
+                    _telemetry_opts,
+                    _http_opts ->
+          {_jws, token} =
+            @example_jwks
+            |> JOSE.JWT.sign(
+              %{"alg" => "RS256"},
+              JOSE.JWT.from(%{
+                "iss" => "https://my.provider",
+                "sub" => "sub",
+                "aud" => "client_id",
+                "iat" => :erlang.system_time(:second),
+                "exp" => :erlang.system_time(:second) + 10
+              })
+            )
+            |> JOSE.JWS.compact()
+
+          {:ok,
+           {{:json,
+             %{
+               "access_token" => "access_token",
+               "token_type" => "Bearer",
+               "id_token" => token,
+               "scope" => unquote(scope),
+               "refresh_token" => "refresh_token"
+             }}, []}}
+        end do
+        client_context =
+          ClientContext.from_manual(
+            @example_metadata,
+            @example_jwks,
+            "client_id",
+            "client_secret"
           )
-          |> JOSE.JWS.compact()
 
-        {:ok,
-         {{:json,
-           %{
-             "access_token" => "access_token",
-             "token_type" => "Bearer",
-             "id_token" => token,
-             "scope" => "profile openid",
-             "refresh_token" => "refresh_token"
-           }}, []}}
-      end do
-      client_context =
-        ClientContext.from_manual(
-          @example_metadata,
-          @example_jwks,
-          "client_id",
-          "client_secret"
-        )
-
-      assert {:ok,
-              %Token{
-                id: %Token.Id{
-                  token: _token,
-                  claims: %{
-                    "aud" => "client_id",
-                    "exp" => _exp,
-                    "iat" => _iat,
-                    "iss" => "https://my.provider",
-                    "sub" => "sub"
-                  }
-                },
-                access: %Token.Access{token: "access_token", expires: :undefined},
-                refresh: %Token.Refresh{token: "refresh_token"},
-                scope: ["profile", "openid"]
-              }} =
-               Token.retrieve(
-                 "auth_code",
-                 client_context,
-                 %{redirect_uri: "https://my.server/return"}
-               )
+        assert {:ok,
+                %Token{
+                  id: %Token.Id{
+                    token: _token,
+                    claims: %{
+                      "aud" => "client_id",
+                      "exp" => _exp,
+                      "iat" => _iat,
+                      "iss" => "https://my.provider",
+                      "sub" => "sub"
+                    }
+                  },
+                  access: %Token.Access{token: "access_token", expires: :undefined},
+                  refresh: %Token.Refresh{token: "refresh_token"},
+                  scope: ["profile", "openid"]
+                }} =
+                 Token.retrieve(
+                   "auth_code",
+                   client_context,
+                   %{redirect_uri: "https://my.server/return"}
+                 )
+      end
     end
   end
 

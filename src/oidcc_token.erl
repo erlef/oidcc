@@ -741,6 +741,10 @@ extract_scope(TokenMap, Opts) ->
     case maps:get(<<"scope">>, TokenMap, oidcc_scope:scopes_to_bin(Scopes)) of
         ScopeBinary when is_binary(ScopeBinary) ->
             {ok, oidcc_scope:parse(ScopeBinary)};
+        %% Some providers (e.g. Apple and Twitch) are setting the scope value
+        %% as list of string. This extends compatibility for those.
+        ScopeList when is_list(ScopeList) ->
+            {ok, ScopeList};
         ScopeOther ->
             {error, {invalid_property, {scope, ScopeOther}}}
     end.

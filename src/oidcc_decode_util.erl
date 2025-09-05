@@ -61,6 +61,8 @@ extract(Map1, [{required, Key, ParseFn} | RestKeys], Acc) ->
     end;
 extract(Map1, [{optional, Key, Default, ParseFn} | RestKeys], Acc) ->
     case maps:take(atom_to_binary(Key), Map1) of
+        {undefined, Map2} ->
+            extract(Map2, RestKeys, maps:put(Key, Default, Acc));
         {Value, Map2} ->
             case ParseFn(Value, Key) of
                 {ok, Parsed} ->

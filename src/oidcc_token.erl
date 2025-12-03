@@ -124,6 +124,10 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
 * `dpop_nonce` - if using DPoP, the `nonce` value to use in the proof claim.
 * `trusted_audiences` - if present, a list of additional audience values to
   accept. Defaults to `any` which allows any additional values.
+* `validate_azp` - if `client_id`, validate that the `azp` claim matches the
+  client id. If `any`, skip the validation. Defaults to `client_id`. If a
+  binary or a list of binaries is given, validate that the `azp` claim matches
+  one of those.
 * `token_request_claims` - Additional claims to use with the token request.
 """).
 ?DOC(#{since => <<"3.0.0">>}).
@@ -141,6 +145,7 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
         body_extension => oidcc_http_util:query_params(),
         dpop_nonce => binary(),
         trusted_audiences => [binary()] | any,
+        validate_azp => binary() | [binary()] | client_id | any,
         token_request_claims => #{binary() => binary() | integer()}
     }.
 
@@ -851,9 +856,10 @@ If you get the token passed from somewhere else, this function can validate it.
 * `iss` claim must match the issuer of the provider, or match the regex pattern if `issuer_regex` is configured in quirks.
 * `nonce` claim must match the `nonce` option.
 * `aud` claim must match the `trusted_audiences` option.
-* `azp` claim must match the client id.
 * `exp` claim must be in the future.
 * `nbf` claim must be in the past.
+* `azp` claim must match the client id by default. This can be disabled by setting the `validate_azp` option to `any`.
+  If the `validate_azp` option is set to a `binary()` or a list of binaries, the `azp` claim must match one of those values.
 
 ## Examples
 
@@ -915,11 +921,19 @@ validate_id_token(IdToken, ClientContext, Opts) when is_map(Opts) ->
             Bin when is_binary(Bin) -> [{<<"nonce">>, Nonce}]
         end,
 
+    ValidateAzp =
+        case maps:get(validate_azp, Opts, client_id) of
+            client_id -> [ClientId];
+            any -> any;
+            Binary when is_binary(Binary) -> [Binary];
+            List when is_list(List) -> List
+        end,
+
     validate_jwt(IdToken, ClientContext, ValidateOpts, fun(Claims) ->
         maybe
             ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),
             ok ?= verify_missing_required_claims(Claims),
-            ok ?= verify_azp_claim(Claims, ClientId),
+            ok ?= verify_azp_claim(Claims, ValidateAzp),
             ok
         end
     end).
@@ -1153,13 +1167,16 @@ verify_aud_claim(#{<<"aud">> := Audience} = Claims, ClientId, TrustedAudiences0)
 verify_aud_claim(Claims, ClientId, _TrustedAudiences) ->
     {error, {missing_claim, {<<"aud">>, ClientId}, Claims}}.
 
--spec verify_azp_claim(Claims, ClientId) -> ok | {error, error()} when
-    Claims :: oidcc_jwt_util:claims(), ClientId :: binary().
-verify_azp_claim(#{<<"azp">> := ClientId}, ClientId) ->
+-spec verify_azp_claim(Claims, Mode) -> ok | {error, error()} when
+    Claims :: oidcc_jwt_util:claims(), Mode :: [binary()] | any.
+verify_azp_claim(_Claims, any) ->
     ok;
-verify_azp_claim(#{<<"azp">> := _Azp} = Claims, ClientId) ->
-    {error, {missing_claim, {<<"azp">>, ClientId}, Claims}};
-verify_azp_claim(_Claims, _ClientId) ->
+verify_azp_claim(#{<<"azp">> := Azp}, AllowedAzp) when is_list(AllowedAzp) ->
+    case lists:member(Azp, AllowedAzp) of
+        true -> ok;
+        false -> {error, {missing_claim, {<<"azp">>, AllowedAzp}, #{<<"azp">> => Azp}}}
+    end;
+verify_azp_claim(_, _Mode) ->
     ok.
 
 -spec verify_exp_claim(Claims) -> ok | {error, error()} when Claims :: oidcc_jwt_util:claims().

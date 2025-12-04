@@ -112,6 +112,8 @@ defmodule Oidcc.Token do
           scope: :oidcc_scope.scopes()
         }
 
+  @type retrieve_opts() :: :oidcc_token.retrieve_opts()
+
   @doc """
   retrieve the token using the authcode received before and directly validate
   the result.
@@ -151,7 +153,7 @@ defmodule Oidcc.Token do
   @spec retrieve(
           auth_code :: String.t(),
           client_context :: ClientContext.t(),
-          opts :: :oidcc_token.retrieve_opts()
+          opts :: retrieve_opts()
         ) ::
           {:ok, t()} | {:error, :oidcc_token.error()}
   def retrieve(auth_code, client_context, opts) do
@@ -293,14 +295,14 @@ defmodule Oidcc.Token do
   @spec validate_id_token(
           id_token :: String.t(),
           client_context :: ClientContext.t(),
-          nonce :: String.t() | any
+          nonce_or_opts :: String.t() | :any | retrieve_opts()
         ) :: {:ok, :oidcc_jwt_util.claims()} | {:error, :oidcc_token.error()}
-  def validate_id_token(id_token, client_context, nonce),
+  def validate_id_token(id_token, client_context, nonce_or_opts),
     do:
       :oidcc_token.validate_id_token(
         id_token,
         ClientContext.struct_to_record(client_context),
-        nonce
+        nonce_or_opts
       )
 
   @doc """

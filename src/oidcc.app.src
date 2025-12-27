@@ -3,7 +3,10 @@
     {vsn, "3.7.0"},
     {registered, []},
     {applications, [kernel, stdlib, inets, ssl, public_key, telemetry, jose]},
-    {env, []},
+    {env, [
+        %% Optional: Custom HTTP client module implementing oidcc_http_client behaviour
+        %% {http_client, oidcc_http_client_httpc}
+    ]},
     {modules, []},
     {licenses, ["Apache-2.0"]},
     {links, []}

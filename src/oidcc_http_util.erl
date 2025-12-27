@@ -34,18 +34,21 @@
 -type httpc_error() :: term().
 
 ?DOC("""
-See `httpc:request/5`.
+HTTP request options.
 
 ## Parameters
 
 * `timeout` - timeout for request
 * `ssl` - TLS config
+* `httpc_profile` - httpc profile (only used with default `oidcc_http_client_httpc`)
+* `http_client` - custom HTTP client module implementing `oidcc_http_client` behaviour
 """).
 ?DOC(#{since => <<"3.0.0">>}).
 -type request_opts() :: #{
     timeout => timeout(),
     ssl => [ssl:tls_option()],
-    httpc_profile => atom() | pid()
+    httpc_profile => atom() | pid(),
+    http_client => oidcc_http_client:http_client()
 }.
 
 ?DOC(#{since => <<"3.0.0">>}).
@@ -98,31 +101,19 @@ when
 request(Method, Request, TelemetryOpts, RequestOpts) ->
     TelemetryTopic = maps:get(topic, TelemetryOpts),
     TelemetryExtraMeta = maps:get(extra_meta, TelemetryOpts, #{}),
-    Timeout = maps:get(timeout, RequestOpts, timer:minutes(1)),
-    SslOpts = maps:get(ssl, RequestOpts, undefined),
-    HttpProfile = maps:get(httpc_profile, RequestOpts, default),
 
-    HttpOpts0 = [{timeout, Timeout}],
-    HttpOpts =
-        case SslOpts of
-            undefined -> HttpOpts0;
-            _Opts -> [{ssl, SslOpts} | HttpOpts0]
-        end,
+    HttpClient = get_http_client(RequestOpts),
+    ClientOpts = build_client_opts(RequestOpts),
+    ClientRequest = build_client_request(Method, Request),
 
     telemetry:span(
         TelemetryTopic,
         TelemetryExtraMeta,
         fun() ->
             maybe
-                {ok, {_StatusLine, Headers, _Result} = Response} ?=
-                    httpc:request(
-                        Method,
-                        Request,
-                        HttpOpts,
-                        [{body_format, binary}],
-                        HttpProfile
-                    ),
+                {ok, Response} ?= do_request(HttpClient, ClientRequest, ClientOpts),
                 {ok, BodyAndFormat} ?= extract_successful_response(Response),
+                Headers = maps:get(headers, Response),
                 {{ok, {BodyAndFormat, Headers}}, TelemetryExtraMeta}
             else
                 {error, Reason} ->
@@ -131,40 +122,75 @@ request(Method, Request, TelemetryOpts, RequestOpts) ->
         end
     ).
 
--spec extract_successful_response({StatusLine, [HttpHeader], HttpBodyResult}) ->
+-spec get_http_client(RequestOpts) -> HttpClient when
+    RequestOpts :: request_opts(),
+    HttpClient :: oidcc_http_client:http_client().
+get_http_client(RequestOpts) ->
+    case maps:get(http_client, RequestOpts, undefined) of
+        undefined ->
+            application:get_env(oidcc, http_client, oidcc_http_client_httpc);
+        Client ->
+            Client
+    end.
+
+-spec build_client_opts(RequestOpts) -> ClientOpts when
+    RequestOpts :: request_opts(),
+    ClientOpts :: oidcc_http_client:http_client_opts().
+build_client_opts(RequestOpts) ->
+    maps:without([http_client], RequestOpts).
+
+-spec build_client_request(Method, Request) -> ClientRequest when
+    Method :: head | get | put | patch | post | trace | options | delete,
+    Request ::
+        {uri_string:uri_string(), [http_header()]}
+        | {uri_string:uri_string(), [http_header()], uri_string:uri_string(), iodata()},
+    ClientRequest :: oidcc_http_client:request().
+build_client_request(Method, {Url, Headers}) ->
+    #{method => Method, url => Url, headers => Headers};
+build_client_request(Method, {Url, Headers, ContentType, Body}) ->
+    HeadersWithContentType = [{"content-type", ContentType} | Headers],
+    #{method => Method, url => Url, headers => HeadersWithContentType, body => Body}.
+
+-spec do_request(HttpClient, Request, Opts) -> {ok, Response} | {error, term()} when
+    HttpClient :: oidcc_http_client:http_client(),
+    Request :: oidcc_http_client:request(),
+    Opts :: oidcc_http_client:http_client_opts(),
+    Response :: oidcc_http_client:response().
+do_request({Module, ExtraOpts}, Request, Opts) ->
+    Module:request(Request, maps:merge(Opts, ExtraOpts));
+do_request(Module, Request, Opts) ->
+    Module:request(Request, Opts).
+
+-spec extract_successful_response(Response) ->
     {ok, {json, term()} | {jwt, binary()}} | {error, error()}
 when
-    StatusLine :: {HttpVersion, StatusCode, string()},
-    HttpVersion :: uri_string:uri_string(),
-    StatusCode :: pos_integer(),
-    HttpHeader :: http_header(),
-    HttpBodyResult :: binary().
-extract_successful_response({{_HttpVersion, Status, _HttpStatusName}, Headers, HttpBodyResult}) when
+    Response :: oidcc_http_client:response().
+extract_successful_response(#{status := Status, headers := Headers, body := Body}) when
     Status == 200 orelse Status == 201
 ->
     case fetch_content_type(Headers) of
         json ->
-            {ok, {json, jose:decode(HttpBodyResult)}};
+            {ok, {json, jose:decode(Body)}};
         jwt ->
-            {ok, {jwt, HttpBodyResult}};
+            {ok, {jwt, Body}};
         unknown ->
             {error, invalid_content_type}
     end;
-extract_successful_response({{_HttpVersion, StatusCode, _HttpStatusName}, Headers, HttpBodyResult}) ->
-    Body =
+extract_successful_response(#{status := StatusCode, headers := Headers, body := Body}) ->
+    ParsedBody =
         case fetch_content_type(Headers) of
             json ->
-                jose:decode(HttpBodyResult);
+                jose:decode(Body);
             jwt ->
-                HttpBodyResult;
+                Body;
             unknown ->
-                HttpBodyResult
+                Body
         end,
     case proplists:lookup("dpop-nonce", Headers) of
         {"dpop-nonce", DpopNonce} ->
-            {error, {use_dpop_nonce, iolist_to_binary(DpopNonce), Body}};
+            {error, {use_dpop_nonce, iolist_to_binary(DpopNonce), ParsedBody}};
         _ ->
-            {error, {http_error, StatusCode, Body}}
+            {error, {http_error, StatusCode, ParsedBody}}
     end.
 
 -spec fetch_content_type(Headers) -> json | jwt | unknown when Headers :: [http_header()].

@@ -214,6 +214,45 @@ mix oidcc.gen.provider_configuration_worker \
 
 <!-- tabs-close -->
 
+## Options
+
+### HTTP Client
+
+By default, oidcc uses Erlang's built-in `httpc`. To use an alternative HTTP
+client, configure `http_client` in `provider_configuration_opts`:
+
+<!-- tabs-open -->
+
+### Erlang
+
+```erlang
+oidcc_provider_configuration_worker:start_link(#{
+    issuer => <<"https://accounts.google.com">>,
+    name => {local, myapp_oidcc_config_provider},
+    provider_configuration_opts => #{
+        request_opts => #{http_client => my_http_client}
+    }
+}).
+```
+
+### Elixir
+
+Using the included Req adapter (requires `{:req, "~> 0.5"}` dependency):
+
+```elixir
+Oidcc.ProviderConfiguration.Worker.start_link(%{
+  issuer: "https://accounts.google.com",
+  name: Myapp.OidccConfigProvider,
+  provider_configuration_opts: %{
+    request_opts: %{http_client: Oidcc.HttpClient.Req}
+  }
+})
+```
+
+<!-- tabs-close -->
+
+See `oidcc_http_client` / `Oidcc.HttpClient` for implementing custom adapters.
+
 ## Usage
 
 <!-- tabs-open -->

@@ -44,7 +44,8 @@ defmodule Oidcc.Mixfile do
       {:ex_doc, "~> 0.29", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false},
-      {:igniter, "~> 0.6.3", optional: true}
+      {:igniter, "~> 0.6.3", optional: true},
+      {:req, "~> 0.5", optional: true}
     ]
   end
 

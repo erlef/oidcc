@@ -154,21 +154,31 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
 -type refresh_opts_no_sub() ::
     #{
         scope => oidcc_scope:scopes(),
+        preferred_auth_methods => [oidcc_auth_util:auth_method(), ...],
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
         request_opts => oidcc_http_util:request_opts(),
         url_extension => oidcc_http_util:query_params(),
-        body_extension => oidcc_http_util:query_params()
+        body_extension => oidcc_http_util:query_params(),
+        dpop_nonce => binary(),
+        trusted_audiences => [binary()] | any,
+        validate_azp => binary() | [binary()] | client_id | any,
+        token_request_claims => #{binary() => binary() | integer()}
     }.
 
 ?DOC(#{since => <<"3.0.0">>}).
 -type refresh_opts() ::
     #{
         scope => oidcc_scope:scopes(),
+        preferred_auth_methods => [oidcc_auth_util:auth_method(), ...],
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
         expected_subject := binary(),
         request_opts => oidcc_http_util:request_opts(),
         url_extension => oidcc_http_util:query_params(),
-        body_extension => oidcc_http_util:query_params()
+        body_extension => oidcc_http_util:query_params(),
+        dpop_nonce => binary(),
+        trusted_audiences => [binary()] | any,
+        validate_azp => binary() | [binary()] | client_id | any,
+        token_request_claims => #{binary() => binary() | integer()}
     }.
 
 ?DOC("""

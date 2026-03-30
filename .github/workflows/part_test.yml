@@ -211,7 +211,7 @@ jobs:
       matrix:
         include:
           # Lowest Supported
-          - elixir: "1.14.5"
+          - elixir: "1.15.8"
             otp: "26.2.5"
             name: "lowest"
           # Latest Supported

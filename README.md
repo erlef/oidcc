@@ -25,6 +25,7 @@ OpenID Connect client library for Erlang.
 [![Coverage Status](https://coveralls.io/repos/github/erlef/oidcc/badge.svg?branch=main)](https://coveralls.io/github/erlef/oidcc?branch=main)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9602/badge)](https://www.bestpractices.dev/projects/9602)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/erlef/oidcc/badge)](https://scorecard.dev/viewer/?uri=github.com/erlef/oidcc)
+[![REUSE status](https://api.reuse.software/badge/github.com/erlef/oidcc)](https://api.reuse.software/info/github.com/erlef/oidcc)
 
 <br clear="left"/>
 

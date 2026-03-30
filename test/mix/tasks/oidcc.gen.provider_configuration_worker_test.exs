@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2025 Erlang Ecosystem Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 defmodule Mix.Tasks.Oidcc.Gen.ProviderConfigurationWorkerTest do
   use ExUnit.Case, async: true
   import Igniter.Test

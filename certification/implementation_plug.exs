@@ -1,5 +1,8 @@
 #!/usr/bin/env elixir
 
+# SPDX-FileCopyrightText: 2025 Erlang Ecosystem Foundation
+# SPDX-License-Identifier: Apache-2.0
+
 {:ok, handler_config} = :logger.get_handler_config(:default)
 
 handler_config =

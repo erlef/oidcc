@@ -1,3 +1,6 @@
+%% SPDX-FileCopyrightText: 2025 Yannis Weishaupt
+%% SPDX-License-Identifier: Apache-2.0
+
 -module(oidcc_jwt_util_test).
 
 -include_lib("eunit/include/eunit.hrl").

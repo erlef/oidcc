@@ -8,7 +8,7 @@ SPDX-License-Identifier: Apache-2.0
     align="left"
     src="assets/logo.svg"
     alt="OpenID Connect Logo"
-    width="170px"
+    width="200px"
   />
 </div>
 

@@ -50,6 +50,7 @@ retrieves_jwt_profile_token(_Config) ->
     KeyMap = jose:decode(KeyJson),
     Key = jose_jwk:from_pem(maps:get(<<"key">>, KeyMap)),
 
+    application:set_env(oidcc, max_clock_skew, 10),
     ?assertMatch(
         {ok, #oidcc_token{}},
         oidcc_token:jwt_profile(<<"231391584430604723">>, ZitadelClientContext, Key, #{
@@ -57,6 +58,7 @@ retrieves_jwt_profile_token(_Config) ->
             kid => maps:get(<<"keyId">>, KeyMap)
         })
     ),
+    application:unset_env(oidcc, max_clock_skew),
 
     ?assertMatch(
         {error, {grant_type_not_supported, jwt_bearer}},

@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df # v2.18.0
         with:
           egress-policy: audit
 
@@ -56,7 +56,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df # v2.18.0
         with:
           egress-policy: audit
 
@@ -66,7 +66,7 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: _build
           key: rebar_format-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
@@ -81,7 +81,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df # v2.18.0
         with:
           egress-policy: audit
 
@@ -91,13 +91,13 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: _build
           key: mix_format-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
           restore-keys: |
             mix_format-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: deps
           key: mix_format-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
@@ -129,7 +129,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df # v2.18.0
         with:
           egress-policy: audit
 
@@ -140,7 +140,7 @@ jobs:
           otp-version: ${{ matrix.otp }}
           rebar3-version: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
           version-type: strict
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: _build
           key: eunit-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
@@ -177,7 +177,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df # v2.18.0
         with:
           egress-policy: audit
 
@@ -188,7 +188,7 @@ jobs:
           otp-version: ${{ matrix.otp }}
           rebar3-version: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
           version-type: strict
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: _build
           key: ct-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
@@ -228,7 +228,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df # v2.18.0
         with:
           egress-policy: audit
 
@@ -240,13 +240,13 @@ jobs:
           rebar3-version: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
           elixir-version: "${{ matrix.elixir }}"
           version-type: strict
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: _build
           key: mix_test-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-${{ hashFiles('mix.exs') }}
           restore-keys: |
             mix_test-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: deps
           key: mix_test-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-${{ hashFiles('mix.exs') }}
@@ -270,7 +270,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df # v2.18.0
         with:
           egress-policy: audit
 
@@ -280,7 +280,7 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: _build
           key: mix_test_coverage-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-${{ hashFiles('mix.exs') }}
@@ -294,7 +294,7 @@ jobs:
           mkdir cover
           mv artifacts/*/*.coverdata cover
           rm -rf artifacts
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: deps
           key: mix_test_coverage-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-${{ hashFiles('mix.exs') }}
@@ -316,7 +316,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df # v2.18.0
         with:
           egress-policy: audit
 
@@ -326,7 +326,7 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: _build
           key: cover-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
@@ -352,7 +352,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df # v2.18.0
         with:
           egress-policy: audit
 
@@ -362,7 +362,7 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: _build
           key: lint-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
@@ -381,7 +381,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df # v2.18.0
         with:
           egress-policy: audit
 
@@ -391,13 +391,13 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: _build
           key: credo-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
           restore-keys: |
             credo-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: deps
           key: credo-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
@@ -407,7 +407,7 @@ jobs:
       - run: mix deps.compile
       - run: mix credo --format sarif > results.sarif
       - name: Upload SARIF file
-        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v3.29.5
+        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v3.29.5
         with:
           sarif_file: results.sarif
           category: credo
@@ -419,7 +419,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df # v2.18.0
         with:
           egress-policy: audit
 
@@ -429,13 +429,13 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: _build
           key: dialyxir-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
           restore-keys: |
             dialyxir-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: deps
           key: dialyxir-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
@@ -451,7 +451,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df # v2.18.0
         with:
           egress-policy: audit
 
@@ -461,7 +461,7 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: _build
           key: dialyzer-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
@@ -476,7 +476,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df # v2.18.0
         with:
           egress-policy: audit
 
@@ -486,7 +486,7 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: _build
           key: hank-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
@@ -501,7 +501,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+        uses: step-security/harden-runner@6c3c2f2c1c457b00c10c4848d6f5491db3b629df # v2.18.0
         with:
           egress-policy: audit
 

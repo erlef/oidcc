@@ -66,8 +66,8 @@ Configuration Options
     jwks = undefined :: jose_jwk:key() | undefined,
     issuer :: uri_string:uri_string(),
     provider_configuration_opts :: oidcc_provider_configuration:opts(),
-    configuration_refresh_timer = undefined :: timer:tref() | undefined,
-    jwks_refresh_timer = undefined :: timer:tref() | undefined,
+    configuration_refresh_timer = undefined :: reference() | undefined,
+    jwks_refresh_timer = undefined :: reference() | undefined,
     ets_table = undefined :: ets:table() | undefined,
     backoff_min = 1000 :: oidcc_backoff:min(),
     backoff_max = 30000 :: oidcc_backoff:max(),
@@ -187,7 +187,10 @@ handle_continue(
                 ProviderConfigurationOpts
             ),
         #oidcc_provider_configuration{jwks_uri = JwksUri} = Configuration,
-        {ok, NewTimer} = timer:send_after(Expiry, configuration_expired),
+        %% Route a bad expiry through `handle_backoff_retry' via the
+        %% maybe-else clause below, rather than letting it surface as a
+        %% gen_server badmatch.
+        {ok, NewTimer} ?= safe_send_after(Expiry, configuration_expired),
         ok = store_in_ets(EtsTable, provider_configuration, Configuration),
         NewState = State#state{
             provider_configuration = Configuration,
@@ -218,7 +221,7 @@ handle_continue(
     maybe
         {ok, {Jwks, Expiry}} ?=
             oidcc_provider_configuration:load_jwks(JwksUri, ProviderConfigurationOpts),
-        {ok, NewTimer} = timer:send_after(Expiry, jwks_expired),
+        {ok, NewTimer} ?= safe_send_after(Expiry, jwks_expired),
         ok = store_in_ets(EtsTable, jwks, Jwks),
         {noreply, State#state{
             jwks = Jwks,
@@ -366,11 +369,24 @@ has_kid(#jose_jwk{keys = {jose_jwk_set, Keys}}, Kid) ->
         Keys
     ).
 
--spec maybe_cancel_timer(Timer :: undefined | timer:tref()) -> ok.
+-spec maybe_cancel_timer(Timer :: undefined | reference()) -> ok.
 maybe_cancel_timer(undefined) ->
     ok;
 maybe_cancel_timer(TRef) ->
-    {ok, cancel} = timer:cancel(TRef).
+    _ = erlang:cancel_timer(TRef),
+    ok.
+
+%% Validating wrapper around `erlang:send_after/3'. The underlying call
+%% raises `badarg' when Time is not an integer in `[0, 16#FFFFFFFF]'; we
+%% guard the range up front and tag any out-of-range Expiry as
+%% `{invalid_expiry, _}' so callers can match it as a normal error inside
+%% a `maybe' expression.
+-spec safe_send_after(Expiry :: term(), Msg :: term()) ->
+    {ok, reference()} | {error, {invalid_expiry, term()}}.
+safe_send_after(Expiry, Msg) when is_integer(Expiry), Expiry >= 0, Expiry =< 16#FFFFFFFF ->
+    {ok, erlang:send_after(Expiry, self(), Msg)};
+safe_send_after(Expiry, _Msg) ->
+    {error, {invalid_expiry, Expiry}}.
 
 -spec store_in_ets(Table :: ets:table() | undefined, Key :: atom(), Value :: term()) -> ok.
 store_in_ets(undefined, _Key, _Value) ->
@@ -435,7 +451,7 @@ handle_backoff_retry(
                 [Issuer, Wait, ErrorDetails],
                 #{error => ErrorDetails}
             ),
-            timer:send_after(Wait, backoff_retry),
+            _ = erlang:send_after(Wait, self(), backoff_retry),
             {noreply, State#state{
                 backoff_state = NewBackoffState
             }}

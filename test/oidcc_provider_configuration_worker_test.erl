@@ -124,3 +124,87 @@ refreshes_with_empty_key_set_test() ->
     meck:unload(httpc),
 
     ok.
+
+%% Discovery / JWKS responses carrying `Cache-Control: max-age=0' used to
+%% crash the worker because the parser returned the atom `true' as the
+%% expiry, which then failed `timer:send_after/2'. After the parser fix
+%% (#371) plus the worker's `safe_send_after/2' guard, any such bad
+%% expiry — including the literal `max-age=0' — flows through the
+%% backoff/retry path and the worker keeps running.
+survives_cache_control_max_age_zero_test() ->
+    ok = meck:new(httpc, [no_link]),
+    DiscoveryBody = jsx:encode(#{
+        issuer => <<"https://example.com">>,
+        jwks_uri => <<"https://example.com/keys">>,
+        authorization_endpoint => <<"https://example.com/authorize">>,
+        scopes_supported => [<<"openid">>],
+        response_types_supported => [<<"code">>],
+        subject_types_supported => [<<"public">>],
+        id_token_signing_alg_values_supported => [<<"RS256">>]
+    }),
+    HttpFun =
+        fun
+            (
+                get,
+                {"https://example.com/.well-known/openid-configuration", []},
+                _HttpOpts,
+                _Opts,
+                _Profile
+            ) ->
+                {ok, {
+                    {"HTTP/1.1", 200, "OK"},
+                    [
+                        {"content-type", "application/json"},
+                        {"cache-control", "max-age=0, no-store"}
+                    ],
+                    DiscoveryBody
+                }};
+            (
+                get,
+                {<<"https://example.com/keys">>, []},
+                _HttpOpts,
+                _Opts,
+                _Profile
+            ) ->
+                {ok, {
+                    {"HTTP/1.1", 200, "OK"},
+                    [
+                        {"content-type", "application/json"},
+                        {"cache-control", "max-age=0, no-store"}
+                    ],
+                    jsx:encode(#{keys => []})
+                }}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    process_flag(trap_exit, true),
+
+    {ok, Pid} = oidcc_provider_configuration_worker:start_link(#{
+        issuer => <<"https://example.com">>,
+        backoff_type => random,
+        backoff_min => 500,
+        backoff_max => 500
+    }),
+
+    ?assertNotEqual(
+        undefined,
+        wait_until(fun() -> oidcc_provider_configuration_worker:get_provider_configuration(Pid) end)
+    ),
+    ?assert(is_process_alive(Pid)),
+
+    meck:unload(httpc),
+    ok.
+
+wait_until(Fun) ->
+    wait_until(Fun, 20).
+
+wait_until(Fun, 0) ->
+    Fun();
+wait_until(Fun, Retries) ->
+    case Fun() of
+        undefined ->
+            timer:sleep(50),
+            wait_until(Fun, Retries - 1);
+        Value ->
+            Value
+    end.

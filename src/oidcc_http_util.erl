@@ -173,14 +173,35 @@ extract_successful_response({{_HttpVersion, StatusCode, _HttpStatusName}, Header
 -spec fetch_content_type(Headers) -> json | jwt | unknown when Headers :: [http_header()].
 fetch_content_type(Headers) ->
     case proplists:lookup("content-type", Headers) of
-        {"content-type", "application/jwk-set+json" ++ _Rest} ->
-            json;
-        {"content-type", "application/json" ++ _Rest} ->
-            json;
-        {"content-type", "application/jwt" ++ _Rest} ->
-            jwt;
+        {"content-type", ContentType} ->
+            case is_json_content_type(ContentType) of
+                true ->
+                    json;
+                false ->
+                    case ContentType of
+                        "application/jwt" ++ _Rest -> jwt;
+                        _ -> unknown
+                    end
+            end;
         _Other ->
             unknown
+    end.
+
+%% RFC 6838 §4.2.8 structured-suffix syntax: any `application/<subtype>+json'
+%% is a JSON document with extra contract on top. Both `application/json' and
+%% `application/jwk-set+json' fit, plus less common variants like
+%% `application/<vendor>+json'. Match the generic pattern so providers using
+%% any `+json' subtype on discovery / JWKS responses are accepted.
+-spec is_json_content_type(ContentType :: string()) -> boolean().
+is_json_content_type(ContentType) ->
+    [MediaType | _] = string:tokens(string:lowercase(ContentType), "; "),
+    case MediaType of
+        "application/json" ->
+            true;
+        "application/" ++ _Rest ->
+            lists:suffix("+json", MediaType);
+        _ ->
+            false
     end.
 
 -spec headers_to_cache_deadline(Headers, DefaultExpiry) -> pos_integer() when

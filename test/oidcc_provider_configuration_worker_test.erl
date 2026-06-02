@@ -4,6 +4,7 @@
 -module(oidcc_provider_configuration_worker_test).
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("jose/include/jose_jwk.hrl").
 
 does_not_start_without_issuer_test() ->
     ?assertMatch(
@@ -191,6 +192,65 @@ survives_cache_control_max_age_zero_test() ->
         wait_until(fun() -> oidcc_provider_configuration_worker:get_provider_configuration(Pid) end)
     ),
     ?assert(is_process_alive(Pid)),
+
+    meck:unload(httpc),
+    ok.
+
+%% RFC 6838 §4.2.8 — `application/<subtype>+json' content-types are JSON
+%% with extra contract. Previously only `application/jwk-set+json' was
+%% special-cased; any other `+json' subtype (`application/jose+json',
+%% vendor-prefixed variants, etc.) fell into the `unknown' branch and
+%% the JWKS load failed with `invalid_content_type'.
+accepts_generic_plus_json_content_type_test() ->
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun
+            (
+                get,
+                {"https://example.com/.well-known/openid-configuration", []},
+                _HttpOpts,
+                _Opts,
+                _Profile
+            ) ->
+                {ok, {
+                    {"HTTP/1.1", 200, "OK"},
+                    [{"content-type", "application/json"}],
+                    jsx:encode(#{
+                        issuer => <<"https://example.com">>,
+                        jwks_uri => <<"https://example.com/keys">>,
+                        authorization_endpoint => <<"https://example.com/authorize">>,
+                        scopes_supported => [<<"openid">>],
+                        response_types_supported => [<<"code">>],
+                        subject_types_supported => [<<"public">>],
+                        id_token_signing_alg_values_supported => [<<"RS256">>]
+                    })
+                }};
+            (
+                get,
+                {<<"https://example.com/keys">>, []},
+                _HttpOpts,
+                _Opts,
+                _Profile
+            ) ->
+                {ok, {
+                    {"HTTP/1.1", 200, "OK"},
+                    [{"content-type", "application/vnd.example+json; charset=utf-8"}],
+                    jsx:encode(#{keys => []})
+                }}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    {ok, Pid} = oidcc_provider_configuration_worker:start_link(#{
+        issuer => <<"https://example.com">>,
+        backoff_type => random,
+        backoff_min => 500,
+        backoff_max => 500
+    }),
+
+    ?assertMatch(
+        #jose_jwk{keys = {jose_jwk_set, []}},
+        wait_until(fun() -> oidcc_provider_configuration_worker:get_jwks(Pid) end)
+    ),
 
     meck:unload(httpc),
     ok.

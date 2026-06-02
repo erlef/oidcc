@@ -187,10 +187,7 @@ handle_continue(
                 ProviderConfigurationOpts
             ),
         #oidcc_provider_configuration{jwks_uri = JwksUri} = Configuration,
-        %% Route a bad expiry through `handle_backoff_retry' via the
-        %% maybe-else clause below, rather than letting it surface as a
-        %% gen_server badmatch.
-        {ok, NewTimer} ?= safe_send_after(Expiry, configuration_expired),
+        NewTimer = erlang:send_after(Expiry, self(), configuration_expired),
         ok = store_in_ets(EtsTable, provider_configuration, Configuration),
         NewState = State#state{
             provider_configuration = Configuration,
@@ -221,7 +218,7 @@ handle_continue(
     maybe
         {ok, {Jwks, Expiry}} ?=
             oidcc_provider_configuration:load_jwks(JwksUri, ProviderConfigurationOpts),
-        {ok, NewTimer} ?= safe_send_after(Expiry, jwks_expired),
+        NewTimer = erlang:send_after(Expiry, self(), jwks_expired),
         ok = store_in_ets(EtsTable, jwks, Jwks),
         {noreply, State#state{
             jwks = Jwks,
@@ -375,18 +372,6 @@ maybe_cancel_timer(undefined) ->
 maybe_cancel_timer(TRef) ->
     _ = erlang:cancel_timer(TRef),
     ok.
-
-%% Validating wrapper around `erlang:send_after/3'. The underlying call
-%% raises `badarg' when Time is not an integer in `[0, 16#FFFFFFFF]'; we
-%% guard the range up front and tag any out-of-range Expiry as
-%% `{invalid_expiry, _}' so callers can match it as a normal error inside
-%% a `maybe' expression.
--spec safe_send_after(Expiry :: term(), Msg :: term()) ->
-    {ok, reference()} | {error, {invalid_expiry, term()}}.
-safe_send_after(Expiry, Msg) when is_integer(Expiry), Expiry >= 0, Expiry =< 16#FFFFFFFF ->
-    {ok, erlang:send_after(Expiry, self(), Msg)};
-safe_send_after(Expiry, _Msg) ->
-    {error, {invalid_expiry, Expiry}}.
 
 -spec store_in_ets(Table :: ets:table() | undefined, Key :: atom(), Value :: term()) -> ok.
 store_in_ets(undefined, _Key, _Value) ->

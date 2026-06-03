@@ -370,7 +370,7 @@ has_kid(#jose_jwk{keys = {jose_jwk_set, Keys}}, Kid) ->
 maybe_cancel_timer(undefined) ->
     ok;
 maybe_cancel_timer(TRef) ->
-    _ = erlang:cancel_timer(TRef),
+    erlang:cancel_timer(TRef),
     ok.
 
 -spec store_in_ets(Table :: ets:table() | undefined, Key :: atom(), Value :: term()) -> ok.
@@ -436,7 +436,7 @@ handle_backoff_retry(
                 [Issuer, Wait, ErrorDetails],
                 #{error => ErrorDetails}
             ),
-            _ = erlang:send_after(Wait, self(), backoff_retry),
+            erlang:send_after(Wait, self(), backoff_retry),
             {noreply, State#state{
                 backoff_state = NewBackoffState
             }}

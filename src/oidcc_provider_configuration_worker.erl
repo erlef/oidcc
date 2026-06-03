@@ -66,8 +66,8 @@ Configuration Options
     jwks = undefined :: jose_jwk:key() | undefined,
     issuer :: uri_string:uri_string(),
     provider_configuration_opts :: oidcc_provider_configuration:opts(),
-    configuration_refresh_timer = undefined :: timer:tref() | undefined,
-    jwks_refresh_timer = undefined :: timer:tref() | undefined,
+    configuration_refresh_timer = undefined :: reference() | undefined,
+    jwks_refresh_timer = undefined :: reference() | undefined,
     ets_table = undefined :: ets:table() | undefined,
     backoff_min = 1000 :: oidcc_backoff:min(),
     backoff_max = 30000 :: oidcc_backoff:max(),
@@ -187,7 +187,7 @@ handle_continue(
                 ProviderConfigurationOpts
             ),
         #oidcc_provider_configuration{jwks_uri = JwksUri} = Configuration,
-        {ok, NewTimer} = timer:send_after(Expiry, configuration_expired),
+        NewTimer = erlang:send_after(Expiry, self(), configuration_expired),
         ok = store_in_ets(EtsTable, provider_configuration, Configuration),
         NewState = State#state{
             provider_configuration = Configuration,
@@ -218,7 +218,7 @@ handle_continue(
     maybe
         {ok, {Jwks, Expiry}} ?=
             oidcc_provider_configuration:load_jwks(JwksUri, ProviderConfigurationOpts),
-        {ok, NewTimer} = timer:send_after(Expiry, jwks_expired),
+        NewTimer = erlang:send_after(Expiry, self(), jwks_expired),
         ok = store_in_ets(EtsTable, jwks, Jwks),
         {noreply, State#state{
             jwks = Jwks,
@@ -366,11 +366,12 @@ has_kid(#jose_jwk{keys = {jose_jwk_set, Keys}}, Kid) ->
         Keys
     ).
 
--spec maybe_cancel_timer(Timer :: undefined | timer:tref()) -> ok.
+-spec maybe_cancel_timer(Timer :: undefined | reference()) -> ok.
 maybe_cancel_timer(undefined) ->
     ok;
 maybe_cancel_timer(TRef) ->
-    {ok, cancel} = timer:cancel(TRef).
+    _ = erlang:cancel_timer(TRef),
+    ok.
 
 -spec store_in_ets(Table :: ets:table() | undefined, Key :: atom(), Value :: term()) -> ok.
 store_in_ets(undefined, _Key, _Value) ->
@@ -435,7 +436,7 @@ handle_backoff_retry(
                 [Issuer, Wait, ErrorDetails],
                 #{error => ErrorDetails}
             ),
-            timer:send_after(Wait, backoff_retry),
+            _ = erlang:send_after(Wait, self(), backoff_retry),
             {noreply, State#state{
                 backoff_state = NewBackoffState
             }}

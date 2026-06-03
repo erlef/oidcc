@@ -173,25 +173,73 @@ refreshes_jwks_on_missing_kid(_Config) ->
     end.
 
 refreshes_after_timeout(_Config) ->
-    {ok, YahooConfigurationPid} =
-        oidcc_provider_configuration_worker:start_link(#{
-            issuer => <<"https://api.login.yahoo.com">>,
-            provider_configuration_opts => #{fallback_expiry => 100}
-        }),
+    %% Mock the discovery / JWKS endpoints so the test does not depend on a
+    %% third-party provider being reachable from CI runners. The response
+    %% carries `Cache-Control: max-age=0' to force the worker onto the
+    %% configured `fallback_expiry' (100 ms) -- this also exercises the
+    %% cache-control parser regression covered by #371.
+    Issuer = <<"https://example.com">>,
+    DiscoveryBody = jsx:encode(#{
+        issuer => Issuer,
+        jwks_uri => <<Issuer/binary, "/keys">>,
+        authorization_endpoint => <<Issuer/binary, "/authorize">>,
+        scopes_supported => [<<"openid">>],
+        response_types_supported => [<<"code">>],
+        subject_types_supported => [<<"public">>],
+        id_token_signing_alg_values_supported => [<<"RS256">>]
+    }),
+    DiscoveryHeaders = [
+        {"content-type", "application/json"},
+        {"cache-control", "max-age=0, no-store"}
+    ],
+    JwksHeaders = [{"content-type", "application/json"}],
+    HttpFun =
+        fun
+            (
+                get,
+                {"https://example.com/.well-known/openid-configuration", []},
+                _HttpOpts,
+                _Opts,
+                _Profile
+            ) ->
+                {ok, {{"HTTP/1.1", 200, "OK"}, DiscoveryHeaders, DiscoveryBody}};
+            (
+                get,
+                {<<"https://example.com/keys">>, []},
+                _HttpOpts,
+                _Opts,
+                _Profile
+            ) ->
+                {ok, {{"HTTP/1.1", 200, "OK"}, JwksHeaders, jsx:encode(#{keys => []})}}
+        end,
+    ok = meck:new(httpc, [no_link]),
+    ok = meck:expect(httpc, request, HttpFun),
 
-    ?assertMatch(
-        #oidcc_provider_configuration{},
-        oidcc_provider_configuration_worker:get_provider_configuration(YahooConfigurationPid)
-    ),
+    try
+        {ok, Pid} =
+            oidcc_provider_configuration_worker:start_link(#{
+                issuer => Issuer,
+                provider_configuration_opts => #{fallback_expiry => 100}
+            }),
 
-    TelemetryRef =
-        telemetry_test:attach_event_handlers(self(), [[oidcc, load_configuration, start]]),
+        ?assertMatch(
+            #oidcc_provider_configuration{},
+            oidcc_provider_configuration_worker:get_provider_configuration(Pid)
+        ),
 
-    receive
-        {[oidcc, load_configuration, start], TelemetryRef, #{}, #{}} ->
-            ok
-    after 1_000 ->
-        ct:fail(should_refresh_automatically)
+        TelemetryRef =
+            telemetry_test:attach_event_handlers(
+                self(), [[oidcc, load_configuration, start]]
+            ),
+
+        receive
+            {[oidcc, load_configuration, start], TelemetryRef, #{}, #{}} ->
+                ok
+        after 1_000 ->
+            ct:fail(should_refresh_automatically)
+        end
+    after
+        meck:unload(httpc)
     end.
 
 errors_on_invalid_issuer(_Config) ->

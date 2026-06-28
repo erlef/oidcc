@@ -66,7 +66,7 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: _build
           key: rebar_format-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
@@ -91,13 +91,13 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: _build
           key: mix_format-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
           restore-keys: |
             mix_format-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: deps
           key: mix_format-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
@@ -140,7 +140,7 @@ jobs:
           otp-version: ${{ matrix.otp }}
           rebar3-version: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
           version-type: strict
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: _build
           key: eunit-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
@@ -188,7 +188,7 @@ jobs:
           otp-version: ${{ matrix.otp }}
           rebar3-version: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
           version-type: strict
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: _build
           key: ct-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
@@ -240,13 +240,13 @@ jobs:
           rebar3-version: "${{ needs.detectToolVersions.outputs.rebarVersion }}"
           elixir-version: "${{ matrix.elixir }}"
           version-type: strict
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: _build
           key: mix_test-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-${{ hashFiles('mix.exs') }}
           restore-keys: |
             mix_test-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: deps
           key: mix_test-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-${{ hashFiles('mix.exs') }}
@@ -280,7 +280,7 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: _build
           key: mix_test_coverage-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-${{ hashFiles('mix.exs') }}
@@ -294,7 +294,7 @@ jobs:
           mkdir cover
           mv artifacts/*/*.coverdata cover
           rm -rf artifacts
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: deps
           key: mix_test_coverage-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ steps.setupBEAM.outputs.elixir-version }}-${{ hashFiles('mix.exs') }}
@@ -326,7 +326,7 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: _build
           key: cover-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
@@ -362,7 +362,7 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: _build
           key: lint-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
@@ -391,13 +391,13 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: _build
           key: credo-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
           restore-keys: |
             credo-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: deps
           key: credo-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
@@ -429,13 +429,13 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: _build
           key: dialyxir-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
           restore-keys: |
             dialyxir-build-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: deps
           key: dialyxir-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('mix.exs') }}
@@ -461,7 +461,7 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: _build
           key: dialyzer-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
@@ -486,7 +486,7 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
-      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: _build
           key: hank-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}

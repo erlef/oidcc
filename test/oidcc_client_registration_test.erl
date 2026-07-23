@@ -43,7 +43,6 @@ register_test() ->
             ]
         ),
 
-    ok = meck:new(httpc, [no_link]),
     HttpFun =
         fun(
             post,
@@ -65,12 +64,15 @@ register_test() ->
             ),
             {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], ResponseJson}}
         end,
-    ok = meck:expect(httpc, request, HttpFun),
+    Adapter = {oidcc_http_adapter_test, #{request => HttpFun}},
 
     {ok, Response} = oidcc_client_registration:register(Configuration, Registration, #{
-        initial_access_token => <<"token">>
+        initial_access_token => <<"token">>,
+        request_opts => #{http_adapter => Adapter}
     }),
-    {ok, Response} = oidcc_client_registration:register(Configuration, Registration, #{}),
+    {ok, Response} = oidcc_client_registration:register(Configuration, Registration, #{
+        request_opts => #{http_adapter => Adapter}
+    }),
 
     ?assertMatch(#oidcc_client_registration_response{client_id = ClientId}, Response),
 
@@ -91,10 +93,6 @@ register_test() ->
     after 10_000 ->
         ct:fail(timeout_receive_attach_event_handlers)
     end,
-
-    true = meck:validate(httpc),
-
-    meck:unload(httpc),
 
     ok.
 

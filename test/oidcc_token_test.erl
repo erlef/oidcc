@@ -73,7 +73,6 @@ retrieve_none_test() ->
 
     ClientContext = oidcc_client_context:from_manual(Configuration, JwkSet, ClientId, ClientSecret),
 
-    ok = meck:new(httpc, [no_link]),
     HttpFun =
         fun(
             post,
@@ -95,7 +94,7 @@ retrieve_none_test() ->
             ),
             {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], TokenData}}
         end,
-    ok = meck:expect(httpc, request, HttpFun),
+    Adapter = {oidcc_http_adapter_test, #{request => HttpFun}},
 
     jose:unsecured_signing(false),
 
@@ -113,7 +112,8 @@ retrieve_none_test() ->
             #{
                 redirect_uri => LocalEndpoint,
                 url_extension => [{<<"foo">>, <<"bar">>}],
-                body_extension => [{<<"foo">>, <<"bar">>}]
+                body_extension => [{<<"foo">>, <<"bar">>}],
+                request_opts => #{http_adapter => Adapter}
             }
         )
     ),
@@ -127,10 +127,6 @@ retrieve_none_test() ->
     after 2_000 ->
         ct:fail(timeout_receive_attach_event_handlers)
     end,
-
-    true = meck:validate(httpc),
-
-    meck:unload(httpc),
 
     ok.
 

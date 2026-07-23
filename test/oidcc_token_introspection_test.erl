@@ -25,33 +25,37 @@ introspect_test() ->
 
     ClientContext = oidcc_client_context:from_manual(Configuration, Jwks, ClientId, ClientSecret),
 
-    ok = meck:new(oidcc_http_util, [passthrough]),
     HttpFun =
         fun(
             post,
             {ReqEndpoint, _Header, "application/x-www-form-urlencoded", _Body},
-            _TelemetryOpts,
-            _RequestOpts
+            _HttpOptions,
+            _RequestOptions,
+            _AdapterConfig
         ) ->
             IntrospectionEndpoint = ReqEndpoint,
-            {ok,
-                {
-                    {json, #{
-                        <<"active">> => true,
-                        <<"client_id">> => ClientId,
-                        <<"extra">> => <<"value">>
-                    }},
-                    []
-                }}
+            {ok, {
+                {"HTTP/1.1", 200, "OK"},
+                [{"content-type", "application/json"}],
+                jsx:encode(#{
+                    <<"active">> => true,
+                    <<"client_id">> => ClientId,
+                    <<"extra">> => <<"value">>
+                })
+            }}
         end,
-    ok = meck:expect(oidcc_http_util, request, HttpFun),
+    RequestOpts = #{
+        request_opts => #{
+            http_adapter => {oidcc_http_adapter_test, #{request => HttpFun}}
+        }
+    },
 
     ?assertMatch(
         {ok, #oidcc_token_introspection{active = true, extra = #{<<"extra">> := <<"value">>}}},
         oidcc_token_introspection:introspect(
             AccessToken,
             ClientContext,
-            #{}
+            RequestOpts
         )
     ),
 
@@ -60,7 +64,7 @@ introspect_test() ->
         oidcc_token_introspection:introspect(
             #oidcc_token{access = #oidcc_token_access{token = AccessToken}},
             ClientContext,
-            #{}
+            RequestOpts
         )
     ),
 
@@ -69,13 +73,9 @@ introspect_test() ->
         oidcc_token_introspection:introspect(
             #oidcc_token{access = #oidcc_token_access{token = AccessToken}},
             ClientContext,
-            #{client_self_only => true}
+            RequestOpts#{client_self_only => true}
         )
     ),
-
-    true = meck:validate(oidcc_http_util),
-
-    meck:unload(oidcc_http_util),
 
     ok.
 

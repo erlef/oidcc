@@ -37,7 +37,8 @@ See [`Oidcc.Userinfo`](`m:'Elixir.Oidcc.Userinfo'`).
 -type retrieve_opts_no_sub() ::
     #{
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
-        dpop_nonce => binary()
+        dpop_nonce => binary(),
+        request_opts => oidcc_http_util:request_opts()
     }.
 
 ?DOC("""
@@ -53,13 +54,15 @@ See https://openid.net/specs/openid-connect-core-1_0.html#UserInfoRequest
   (`sub` from id token)
 * `dpop_nonce` - if using DPoP, the `nonce` value to use in the
     proof claim
+* `request_opts` - config for userinfo and distributed-claim HTTP requests
 """).
 ?DOC(#{since => <<"3.0.0">>}).
 -type retrieve_opts() ::
     #{
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
         expected_subject => binary() | any,
-        dpop_nonce => binary()
+        dpop_nonce => binary(),
+        request_opts => oidcc_http_util:request_opts()
     }.
 
 ?DOC(#{since => <<"3.0.0">>}).

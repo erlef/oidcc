@@ -752,7 +752,6 @@ create_redirect_url_with_par_url_test() ->
     ClientContext =
         oidcc_client_context:from_manual(Configuration, Jwks, ClientId, ClientSecret),
 
-    ok = meck:new(httpc, [no_link]),
     HttpFun =
         fun(
             post,
@@ -783,18 +782,15 @@ create_redirect_url_with_par_url_test() ->
 
             {ok, {{"HTTP/1.1", 201, "OK"}, [{"content-type", "application/json"}], ParResponseData}}
         end,
-    ok = meck:expect(httpc, request, HttpFun),
+    Adapter = {oidcc_http_adapter_test, #{request => HttpFun}},
 
     RedirectUrlResponse = oidcc_authorization:create_redirect_url(ClientContext, #{
         redirect_uri => RedirectUri,
         pkce_verifier => PkceVerifier,
         state => State,
-        nonce => Nonce
+        nonce => Nonce,
+        request_opts => #{http_adapter => Adapter}
     }),
-
-    true = meck:validate(httpc),
-
-    meck:unload(httpc),
 
     ?assertMatch(
         {ok, _},

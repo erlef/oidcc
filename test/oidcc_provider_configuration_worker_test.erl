@@ -70,61 +70,61 @@ retries_with_backoff_with_invalid_issuer_test() ->
     ok.
 
 refreshes_with_empty_key_set_test() ->
-    ok = meck:new(httpc, [no_link]),
-    HttpFun =
-        fun
-            (
-                get,
-                {"https://example.com/.well-known/openid-configuration", []},
-                _HttpOpts,
-                _Opts,
-                _Profile
-            ) ->
-                {ok, {
-                    {"HTTP/1.1", 200, "OK"},
-                    [{"content-type", "application/json"}],
-                    jsx:encode(#{
-                        issuer => <<"https://example.com">>,
-                        jwks_uri => <<"https://example.com/keys">>,
-                        authorization_endpoint => <<"https://example.com/authorize">>,
-                        scopes_supported => [<<"openid">>],
-                        response_types_supported => [<<"code">>],
-                        subject_types_supported => [<<"public">>],
-                        id_token_signing_alg_values_supported => [<<"RS256">>]
-                    })
-                }};
-            (
-                get,
-                {<<"https://example.com/keys">>, []},
-                _HttpOpts,
-                _Opts,
-                _Profile
-            ) ->
-                {ok, {
-                    {"HTTP/1.1", 200, "OK"},
-                    [{"content-type", "application/json"}],
-                    jsx:encode(#{keys => []})
-                }}
-        end,
-    ok = meck:expect(httpc, request, HttpFun),
-
-    process_flag(trap_exit, true),
+    Adapter = provider_adapter(self()),
 
     {ok, Pid} = oidcc_provider_configuration_worker:start_link(#{
         issuer => <<"https://example.com">>,
+        provider_configuration_opts => #{
+            request_opts => #{http_adapter => Adapter}
+        },
         backoff_type => random,
         backoff_min => 500,
         backoff_max => 500
     }),
 
-    ok = oidcc_provider_configuration_worker:refresh_jwks_for_unknown_kid(Pid, <<"kid">>),
+    try
+        ?assertMatch(
+            #jose_jwk{keys = {jose_jwk_set, []}},
+            wait_until(fun() -> oidcc_provider_configuration_worker:get_jwks(Pid) end)
+        ),
+        assert_adapter_request(<<"https://example.com/.well-known/openid-configuration">>),
+        assert_adapter_request(<<"https://example.com/keys">>),
 
-    % Once for Metadata, once for JWKs, and once for JWK refresh
-    ?assert(meck:num_calls(httpc, request, '_') >= 3),
+        ok = oidcc_provider_configuration_worker:refresh_configuration(Pid),
+        assert_adapter_request(<<"https://example.com/.well-known/openid-configuration">>),
 
-    meck:unload(httpc),
+        ok = oidcc_provider_configuration_worker:refresh_jwks(Pid),
+        assert_adapter_request(<<"https://example.com/keys">>),
 
-    ok.
+        ok = oidcc_provider_configuration_worker:refresh_jwks_for_unknown_kid(Pid, <<"kid">>),
+        assert_adapter_request(<<"https://example.com/keys">>)
+    after
+        gen_server:stop(Pid)
+    end.
+
+refreshes_in_background_with_adapter_test() ->
+    Adapter = provider_adapter(self()),
+
+    {ok, Pid} = oidcc_provider_configuration_worker:start_link(#{
+        issuer => <<"https://example.com">>,
+        provider_configuration_opts => #{
+            fallback_expiry => 50,
+            request_opts => #{http_adapter => Adapter}
+        }
+    }),
+
+    try
+        ?assertMatch(
+            #jose_jwk{keys = {jose_jwk_set, []}},
+            wait_until(fun() -> oidcc_provider_configuration_worker:get_jwks(Pid) end)
+        ),
+        assert_adapter_request(<<"https://example.com/.well-known/openid-configuration">>),
+        assert_adapter_request(<<"https://example.com/keys">>),
+        assert_adapter_request(<<"https://example.com/.well-known/openid-configuration">>),
+        assert_adapter_request(<<"https://example.com/keys">>)
+    after
+        gen_server:stop(Pid)
+    end.
 
 %% Discovery / JWKS responses carrying `Cache-Control: max-age=0' used to
 %% crash the worker because the parser returned the atom `true' as the
@@ -268,3 +268,52 @@ wait_until(Fun, Retries) ->
         Value ->
             Value
     end.
+
+assert_adapter_request(ExpectedUrl) ->
+    receive
+        {adapter_request, ExpectedUrl} ->
+            ok
+    after 1_000 ->
+        ?assert(false)
+    end.
+
+provider_adapter(TestPid) ->
+    HttpFun =
+        fun
+            (
+                get,
+                {"https://example.com/.well-known/openid-configuration", []},
+                _HttpOpts,
+                _Opts,
+                _AdapterConfig
+            ) ->
+                TestPid !
+                    {adapter_request, <<"https://example.com/.well-known/openid-configuration">>},
+                {ok, {
+                    {"HTTP/1.1", 200, "OK"},
+                    [{"content-type", "application/json"}],
+                    jsx:encode(#{
+                        issuer => <<"https://example.com">>,
+                        jwks_uri => <<"https://example.com/keys">>,
+                        authorization_endpoint => <<"https://example.com/authorize">>,
+                        scopes_supported => [<<"openid">>],
+                        response_types_supported => [<<"code">>],
+                        subject_types_supported => [<<"public">>],
+                        id_token_signing_alg_values_supported => [<<"RS256">>]
+                    })
+                }};
+            (
+                get,
+                {<<"https://example.com/keys">>, []},
+                _HttpOpts,
+                _Opts,
+                _AdapterConfig
+            ) ->
+                TestPid ! {adapter_request, <<"https://example.com/keys">>},
+                {ok, {
+                    {"HTTP/1.1", 200, "OK"},
+                    [{"content-type", "application/json"}],
+                    jsx:encode(#{keys => []})
+                }}
+        end,
+    {oidcc_http_adapter_test, #{request => HttpFun}}.

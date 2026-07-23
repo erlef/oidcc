@@ -112,14 +112,13 @@ Adapters may emit their own telemetry. The telemetry span owned by
 """).
 
 -export_type([config/0]).
--export_type([http_header/0]).
+-export_type([header/0]).
 -export_type([http_options/0]).
 -export_type([method/0]).
 -export_type([request/0]).
 -export_type([request_body/0]).
 -export_type([request_options/0]).
 -export_type([response/0]).
--export_type([response_header/0]).
 
 ?DOC("Adapter module and adapter-specific configuration.").
 -type config() :: {module(), map()}.
@@ -127,18 +126,15 @@ Adapters may emit their own telemetry. The telemetry span owned by
 ?DOC("HTTP method accepted by `httpc:request/5`.").
 -type method() :: head | get | put | patch | post | trace | options | delete.
 
-?DOC("HTTP request header representation accepted by `httpc:request/5`.").
--type http_header() :: {Field :: [byte()], Value :: iodata()}.
-
-?DOC("HTTP response header representation returned by `httpc:request/5`.").
--type response_header() :: {Field :: [byte()], Value :: iodata()}.
+?DOC("HTTP header representation accepted and returned by `httpc:request/5`.").
+-type header() :: {Field :: [byte()], Value :: binary() | iolist()}.
 
 ?DOC("HTTP request tuple accepted by `httpc:request/5`.").
 -type request() ::
-    {uri_string:uri_string(), [http_header()]}
+    {uri_string:uri_string(), [header()]}
     | {
         uri_string:uri_string(),
-        [http_header()],
+        [header()],
         ContentType :: string(),
         request_body()
     }.
@@ -177,7 +173,7 @@ The list includes the request timeout and, when configured, TLS options.
             Status :: non_neg_integer(),
             Reason :: string()
         },
-        [response_header()],
+        [header()],
         binary()
     }}
     | {error, term()}.

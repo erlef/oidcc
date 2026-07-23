@@ -78,7 +78,7 @@ bearer_auth_header(Token) ->
 
 ?DOC(false).
 -spec request(Method, Request, TelemetryOpts, RequestOpts) ->
-    {ok, {{json, term()} | {jwt, binary()}, [oidcc_http_adapter:response_header()]}}
+    {ok, {{json, term()} | {jwt, binary()}, [oidcc_http_adapter:header()]}}
     | {error, error()}
 when
     Method :: oidcc_http_adapter:method(),
@@ -136,7 +136,7 @@ when
     StatusLine :: {HttpVersion, StatusCode, string()},
     HttpVersion :: string(),
     StatusCode :: non_neg_integer(),
-    HttpHeader :: oidcc_http_adapter:response_header(),
+    HttpHeader :: oidcc_http_adapter:header(),
     HttpBodyResult :: binary().
 extract_successful_response({{_HttpVersion, Status, _HttpStatusName}, Headers, HttpBodyResult}) when
     Status == 200 orelse Status == 201
@@ -167,7 +167,7 @@ extract_successful_response({{_HttpVersion, StatusCode, _HttpStatusName}, Header
     end.
 
 -spec fetch_content_type(Headers) -> json | jwt | unknown when
-    Headers :: [oidcc_http_adapter:response_header()].
+    Headers :: [oidcc_http_adapter:header()].
 fetch_content_type(Headers) ->
     case proplists:lookup("content-type", Headers) of
         {"content-type", ContentType} ->
@@ -205,7 +205,7 @@ is_json_content_type(ContentType) ->
     end.
 
 -spec headers_to_cache_deadline(Headers, DefaultExpiry) -> pos_integer() when
-    Headers :: [oidcc_http_adapter:response_header()], DefaultExpiry :: non_neg_integer().
+    Headers :: [oidcc_http_adapter:header()], DefaultExpiry :: non_neg_integer().
 headers_to_cache_deadline(Headers, DefaultExpiry) ->
     case proplists:lookup("cache-control", Headers) of
         {"cache-control", Cache} ->

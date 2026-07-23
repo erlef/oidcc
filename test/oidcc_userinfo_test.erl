@@ -33,8 +33,11 @@ json_test() ->
             Url = UserInfoEndpoint,
             {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], HttpBody}}
         end,
-    ok = meck:new(httpc),
-    ok = meck:expect(httpc, request, HttpFun),
+    RequestOpts = #{
+        request_opts => #{
+            http_adapter => {oidcc_http_adapter_test, #{request => HttpFun}}
+        }
+    },
 
     AccessToken = <<"opensesame">>,
     GoodToken =
@@ -58,11 +61,11 @@ json_test() ->
 
     ?assertMatch(
         {ok, #{<<"name">> := <<"joe">>}},
-        oidcc_userinfo:retrieve(GoodToken, ClientContext, #{})
+        oidcc_userinfo:retrieve(GoodToken, ClientContext, RequestOpts)
     ),
     ?assertMatch(
         {ok, #{<<"name">> := <<"joe">>}},
-        oidcc_userinfo:retrieve(AccessTokenRecord, ClientContext, #{
+        oidcc_userinfo:retrieve(AccessTokenRecord, ClientContext, RequestOpts#{
             expected_subject => GoodSub
         })
     ),
@@ -71,20 +74,20 @@ json_test() ->
         oidcc_userinfo:retrieve(
             AccessToken,
             ClientContext,
-            #{expected_subject => GoodSub}
+            RequestOpts#{expected_subject => GoodSub}
         )
     ),
 
     ?assertMatch(
         {error, bad_subject},
-        oidcc_userinfo:retrieve(BadToken, ClientContext, #{})
+        oidcc_userinfo:retrieve(BadToken, ClientContext, RequestOpts)
     ),
     ?assertMatch(
         {error, bad_subject},
         oidcc_userinfo:retrieve(
             AccessToken,
             ClientContext,
-            #{expected_subject => BadSub}
+            RequestOpts#{expected_subject => BadSub}
         )
     ),
     ?assertMatch(
@@ -92,12 +95,9 @@ json_test() ->
         oidcc_userinfo:retrieve(
             AccessToken,
             ClientContext,
-            #{expected_subject => any}
+            RequestOpts#{expected_subject => any}
         )
     ),
-
-    true = meck:validate(httpc),
-    meck:unload(httpc),
 
     ok.
 
@@ -314,36 +314,41 @@ distributed_claims_test() ->
         ),
 
     HttpFun =
-        fun(get, {Url, _Header}, _TelemetryOpts, _RequestOpts) ->
+        fun(get, {Url, _Header}, _HttpOptions, _RequestOptions, _AdapterConfig) ->
             case Url of
                 UserInfoEndpoint ->
-                    {ok,
-                        {
-                            {json, #{
-                                <<"sub">> => Sub,
-                                <<"_claim_names">> => #{
-                                    <<"first_name">> => <<"remote">>,
-                                    <<"last_name">> => <<"local">>
+                    {ok, {
+                        {"HTTP/1.1", 200, "OK"},
+                        [{"content-type", "application/json"}],
+                        jsx:encode(#{
+                            <<"sub">> => Sub,
+                            <<"_claim_names">> => #{
+                                <<"first_name">> => <<"remote">>,
+                                <<"last_name">> => <<"local">>
+                            },
+                            <<"_claim_sources">> => #{
+                                <<"remote">> => #{
+                                    <<"endpoint">> =>
+                                        <<"https://my.provider/distributed-claim">>,
+                                    <<"access_token">> => <<"acces_token">>
                                 },
-                                <<"_claim_sources">> => #{
-                                    <<"remote">> => #{
-                                        <<"endpoint">> =>
-                                            <<"https://my.provider/distributed-claim">>,
-                                        <<"access_token">> => <<"acces_token">>
-                                    },
-                                    <<"local">> => #{
-                                        <<"JWT">> => LocalToken
-                                    }
+                                <<"local">> => #{
+                                    <<"JWT">> => LocalToken
                                 }
-                            }},
-                            []
-                        }};
+                            }
+                        })
+                    }};
                 <<"https://my.provider/distributed-claim">> ->
-                    {ok, {{jwt, RemoteToken}, []}}
+                    {ok, {
+                        {"HTTP/1.1", 200, "OK"}, [{"content-type", "application/jwt"}], RemoteToken
+                    }}
             end
         end,
-    ok = meck:new(oidcc_http_util, [passthrough]),
-    ok = meck:expect(oidcc_http_util, request, HttpFun),
+    RequestOpts = #{
+        request_opts => #{
+            http_adapter => {oidcc_http_adapter_test, #{request => HttpFun}}
+        }
+    },
 
     AccessToken = <<"opensesame">>,
     Token =
@@ -358,19 +363,16 @@ distributed_claims_test() ->
 
     ?assertMatch(
         {ok, #{<<"first_name">> := <<"Joe">>, <<"last_name">> := <<"Armstrong">>}},
-        oidcc_userinfo:retrieve(Token, ClientContext, #{})
+        oidcc_userinfo:retrieve(Token, ClientContext, RequestOpts)
     ),
     ?assertMatch(
         {ok, #{<<"first_name">> := <<"Joe">>, <<"last_name">> := <<"Armstrong">>}},
         oidcc_userinfo:retrieve(
             AccessToken,
             ClientContext,
-            #{expected_subject => Sub}
+            RequestOpts#{expected_subject => Sub}
         )
     ),
-
-    true = meck:validate(oidcc_http_util),
-    meck:unload(oidcc_http_util),
 
     ok.
 

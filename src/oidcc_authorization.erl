@@ -36,6 +36,7 @@ See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
 * `redirect_uri` - redirect target after authorization is completed
 * `url_extension` - add custom query parameters to the authorization URL
 * `response_mode` - response mode to use (defaults to `<<"query">>`)
+* `request_opts` - config for the pushed authorization HTTP request
 """).
 ?MODULEDOC(#{since => <<"3.0.0">>}).
 -type opts() ::
@@ -49,7 +50,8 @@ See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
         require_purpose => boolean(),
         redirect_uri => uri_string:uri_string(),
         url_extension => oidcc_http_util:query_params(),
-        response_mode => binary()
+        response_mode => binary(),
+        request_opts => oidcc_http_util:request_opts()
     }.
 
 ?MODULEDOC(#{since => <<"3.0.0">>}).

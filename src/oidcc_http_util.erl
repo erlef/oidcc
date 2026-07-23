@@ -21,18 +21,18 @@
 ?DOC(#{since => <<"3.0.0">>}).
 -type query_params() :: [{unicode:chardata(), unicode:chardata() | true}].
 
-?DOC("See `httpc:request/5`.").
+?DOC("HTTP header representation used by OIDCC.").
 ?DOC(#{since => <<"3.0.0">>}).
 -type http_header() :: {Field :: [byte()] | binary(), Value :: iodata()}.
 
 ?DOC(#{since => <<"3.0.0">>}).
 -type error() ::
-    {http_error, StatusCode :: pos_integer(), HttpBodyResult :: binary() | map()}
+    {http_error, StatusCode :: non_neg_integer(), HttpBodyResult :: binary() | map()}
     | {use_dpop_nonce, Nonce :: binary(), HttpBodyResult :: binary() | map()}
     | invalid_content_type
     | httpc_error().
 
-?DOC("See `httpc:request/5` for additional errors.").
+?DOC("Transport error. The default adapter returns errors documented by `httpc:request/5`.").
 ?DOC(#{since => <<"3.0.0">>}).
 -type httpc_error() :: term().
 
@@ -43,12 +43,15 @@ See `httpc:request/5`.
 
 * `timeout` - timeout for request
 * `ssl` - TLS config
+* `httpc_profile` - `httpc` profile used by the default adapter
+* `http_adapter` - `{AdapterModule, AdapterConfigMap}` transport adapter
 """).
 ?DOC(#{since => <<"3.0.0">>}).
 -type request_opts() :: #{
     timeout => timeout(),
     ssl => [ssl:tls_option()],
-    httpc_profile => atom() | pid()
+    httpc_profile => atom() | pid(),
+    http_adapter => oidcc_http_adapter:config()
 }.
 
 ?DOC(#{since => <<"3.0.0">>}).
@@ -75,27 +78,11 @@ bearer_auth_header(Token) ->
 
 ?DOC(false).
 -spec request(Method, Request, TelemetryOpts, RequestOpts) ->
-    {ok, {{json, term()} | {jwt, binary()}, [http_header()]}}
+    {ok, {{json, term()} | {jwt, binary()}, [oidcc_http_adapter:header()]}}
     | {error, error()}
 when
-    Method :: head | get | put | patch | post | trace | options | delete,
-    Request ::
-        {uri_string:uri_string(), [http_header()]}
-        | {
-            uri_string:uri_string(),
-            [http_header()],
-            ContentType :: uri_string:uri_string(),
-            HttpBody
-        },
-    HttpBody ::
-        iolist()
-        | binary()
-        | {
-            fun((Accumulator :: term()) -> eof | {ok, iolist(), Accumulator :: term()}),
-            Accumulator :: term()
-        }
-        | {chunkify, fun((Accumulator :: term()) -> eof | {ok, iolist(), Accumulator :: term()}),
-            Accumulator :: term()},
+    Method :: oidcc_http_adapter:method(),
+    Request :: oidcc_http_adapter:request(),
     TelemetryOpts :: telemetry_opts(),
     RequestOpts :: request_opts().
 request(Method, Request, TelemetryOpts, RequestOpts) ->
@@ -104,6 +91,11 @@ request(Method, Request, TelemetryOpts, RequestOpts) ->
     Timeout = maps:get(timeout, RequestOpts, timer:minutes(1)),
     SslOpts = maps:get(ssl, RequestOpts, undefined),
     HttpProfile = maps:get(httpc_profile, RequestOpts, default),
+    {Adapter, AdapterConfig} = maps:get(
+        http_adapter,
+        RequestOpts,
+        {oidcc_http_adapter_httpc, #{profile => HttpProfile}}
+    ),
 
     HttpOpts0 = [{timeout, Timeout}],
     HttpOpts =
@@ -118,12 +110,16 @@ request(Method, Request, TelemetryOpts, RequestOpts) ->
         fun() ->
             maybe
                 {ok, {_StatusLine, Headers, _Result} = Response} ?=
-                    httpc:request(
-                        Method,
-                        Request,
-                        HttpOpts,
-                        [{body_format, binary}],
-                        HttpProfile
+                    erlang:apply(
+                        Adapter,
+                        request,
+                        [
+                            Method,
+                            Request,
+                            HttpOpts,
+                            [{body_format, binary}],
+                            AdapterConfig
+                        ]
                     ),
                 {ok, BodyAndFormat} ?= extract_successful_response(Response),
                 {{ok, {BodyAndFormat, Headers}}, TelemetryExtraMeta}
@@ -138,9 +134,9 @@ request(Method, Request, TelemetryOpts, RequestOpts) ->
     {ok, {json, term()} | {jwt, binary()}} | {error, error()}
 when
     StatusLine :: {HttpVersion, StatusCode, string()},
-    HttpVersion :: uri_string:uri_string(),
-    StatusCode :: pos_integer(),
-    HttpHeader :: http_header(),
+    HttpVersion :: string(),
+    StatusCode :: non_neg_integer(),
+    HttpHeader :: oidcc_http_adapter:header(),
     HttpBodyResult :: binary().
 extract_successful_response({{_HttpVersion, Status, _HttpStatusName}, Headers, HttpBodyResult}) when
     Status == 200 orelse Status == 201
@@ -170,17 +166,21 @@ extract_successful_response({{_HttpVersion, StatusCode, _HttpStatusName}, Header
             {error, {http_error, StatusCode, Body}}
     end.
 
--spec fetch_content_type(Headers) -> json | jwt | unknown when Headers :: [http_header()].
+-spec fetch_content_type(Headers) -> json | jwt | unknown when
+    Headers :: [oidcc_http_adapter:header()].
 fetch_content_type(Headers) ->
     case proplists:lookup("content-type", Headers) of
-        {"content-type", "application/jwt" ++ _Rest} ->
-            jwt;
         {"content-type", ContentType} ->
-            case is_json_content_type(ContentType) of
-                true ->
-                    json;
-                false ->
-                    unknown
+            case binary:split(iolist_to_binary(ContentType), <<";">>) of
+                [<<"application/jwt">> | _Rest] ->
+                    jwt;
+                [MediaType | _Rest] ->
+                    case is_json_content_type(MediaType) of
+                        true ->
+                            json;
+                        false ->
+                            unknown
+                    end
             end;
         _Other ->
             unknown
@@ -191,20 +191,21 @@ fetch_content_type(Headers) ->
 %% `application/jwk-set+json' fit, plus less common variants like
 %% `application/<vendor>+json'. Match the generic pattern so providers using
 %% any `+json' subtype on discovery / JWKS responses are accepted.
--spec is_json_content_type(ContentType :: string()) -> boolean().
+-spec is_json_content_type(ContentType :: binary()) -> boolean().
 is_json_content_type(ContentType) ->
-    [MediaType | _] = string:tokens(string:lowercase(ContentType), "; "),
+    MediaType = string:lowercase(string:trim(ContentType)),
     case MediaType of
-        "application/json" ->
+        <<"application/json">> ->
             true;
-        "application/" ++ _Rest ->
-            lists:suffix("+json", MediaType);
+        <<"application/", Subtype/binary>> ->
+            Size = byte_size(Subtype),
+            Size >= 5 andalso binary:part(Subtype, Size - 5, 5) =:= <<"+json">>;
         _ ->
             false
     end.
 
 -spec headers_to_cache_deadline(Headers, DefaultExpiry) -> pos_integer() when
-    Headers :: [{Header :: binary(), Value :: binary()}], DefaultExpiry :: non_neg_integer().
+    Headers :: [oidcc_http_adapter:header()], DefaultExpiry :: non_neg_integer().
 headers_to_cache_deadline(Headers, DefaultExpiry) ->
     case proplists:lookup("cache-control", Headers) of
         {"cache-control", Cache} ->

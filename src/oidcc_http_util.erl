@@ -21,9 +21,9 @@
 ?DOC(#{since => <<"3.0.0">>}).
 -type query_params() :: [{unicode:chardata(), unicode:chardata() | true}].
 
-?DOC("See `t:oidcc_http_adapter:http_header/0`.").
+?DOC("HTTP header representation used by OIDCC.").
 ?DOC(#{since => <<"3.0.0">>}).
--type http_header() :: oidcc_http_adapter:http_header().
+-type http_header() :: {Field :: [byte()] | binary(), Value :: iodata()}.
 
 ?DOC(#{since => <<"3.0.0">>}).
 -type error() ::

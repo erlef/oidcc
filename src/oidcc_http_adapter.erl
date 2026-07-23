@@ -128,7 +128,7 @@ Adapters may emit their own telemetry. The telemetry span owned by
 -type method() :: head | get | put | patch | post | trace | options | delete.
 
 ?DOC("HTTP request header representation accepted by `httpc:request/5`.").
--type http_header() :: {Field :: [byte()] | binary(), Value :: iodata()}.
+-type http_header() :: {Field :: [byte()], Value :: iodata()}.
 
 ?DOC("HTTP response header representation returned by `httpc:request/5`.").
 -type response_header() :: {Field :: [byte()], Value :: iodata()}.
@@ -139,7 +139,7 @@ Adapters may emit their own telemetry. The telemetry span owned by
     | {
         uri_string:uri_string(),
         [http_header()],
-        ContentType :: uri_string:uri_string(),
+        ContentType :: string(),
         request_body()
     }.
 

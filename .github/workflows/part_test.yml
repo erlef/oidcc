@@ -150,7 +150,9 @@ jobs:
           version-type: strict
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: _build
+          path: |
+            _build
+            !_build/test/cover
           key: eunit-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
           restore-keys: |
             eunit-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
@@ -202,7 +204,9 @@ jobs:
           version-type: strict
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: _build
+          path: |
+            _build
+            !_build/test/cover
           key: ct-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
           restore-keys: |
             ct-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
@@ -350,7 +354,9 @@ jobs:
           version-type: strict
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: _build
+          path: |
+            _build
+            !_build/test/cover
           key: cover-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-${{ hashFiles('rebar.config') }}
           restore-keys: |
             cover-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-

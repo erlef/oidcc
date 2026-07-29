@@ -1,0 +1,14 @@
+{"1.2.0",
+[{<<"jose">>,{pkg,<<"jose">>,<<"1.11.12">>},0},
+ {<<"telemetry">>,{pkg,<<"telemetry">>,<<"1.4.2">>},0},
+ {<<"telemetry_registry">>,{pkg,<<"telemetry_registry">>,<<"0.3.2">>},0}]}.
+[
+{pkg_hash,[
+ {<<"jose">>, <<"06E62B467B61D3726CBC19E9B5489F7549C37993DE846DFB3EE8259F9ED208B3">>},
+ {<<"telemetry">>, <<"A0CB522801DFFB1C49FE6E30561BADFFC7B6D0E180DB1300DF759FAA22062855">>},
+ {<<"telemetry_registry">>, <<"701576890320BE6428189BFF963E865E8F23E0FF3615EADE8F78662BE0FC003C">>}]},
+{pkg_hash_ext,[
+ {<<"jose">>, <<"31E92B653E9210B696765CDD885437457DE1ADD2A9011D92F8CF63E4641BAB7B">>},
+ {<<"telemetry">>, <<"928F6495066506077862C0D1646609EED891A4326BEE3126BA54B60AF61FEBB1">>},
+ {<<"telemetry_registry">>, <<"E7ED191EB1D115A3034AF8E1E35E4E63D5348851D556646D46CA3D1B4E16BAB9">>}]}
+].

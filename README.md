@@ -231,7 +231,8 @@ mix oidcc.gen.provider_configuration_worker \
 <!-- TODO: Uncomment when available -->
 
 - [`oidcc_cowboy`](https://hex.pm/packages/oidcc_cowboy) - Integrations for
-  [`cowboy`](https://hex.pm/packages/cowboy)
+  [`cowboy`](https://hex.pm/packages/cowboy). **Deprecated** - no longer
+  maintained.
 - [`oidcc_plug`](https://hex.pm/packages/oidcc_plug) - Integrations for
   [`plug`](https://hex.pm/packages/plug) and
   [`phoenix`](https://hex.pm/packages/phoenix)

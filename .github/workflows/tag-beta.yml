@@ -46,7 +46,7 @@ jobs:
   release:
     name: "Release"
 
-    needs: ["docs"]
+    needs: ["docs", "license"]
 
     permissions:
       contents: write

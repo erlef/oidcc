@@ -6,7 +6,7 @@ on:
     secrets:
       OID_CERTIFICATION_API_TOKEN:
         description: "OpenID Certification API Token"
-        required: true
+        required: false
 
 name: "Test"
 
@@ -537,23 +537,44 @@ jobs:
         with:
           egress-policy: audit
 
+      # The API token is unavailable to dependabot runs and to forks that have
+      # not set up certification themselves. The `secrets` context can't be
+      # used in an `if:` condition, so the token is inspected once here and
+      # only the resulting boolean is exposed to the remaining steps.
+      - name: "Check for Certification API Token"
+        id: token
+        env:
+          API_TOKEN: ${{ secrets.OID_CERTIFICATION_API_TOKEN }}
+        run: |
+          if [ -n "$API_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping certification, no API token available."
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: "${{ steps.token.outputs.present == 'true' }}"
         with:
           persist-credentials: false
       - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
         id: setupBEAM
+        if: "${{ steps.token.outputs.present == 'true' }}"
         with:
           version-file: .tool-versions
           version-type: strict
 
       - run: mkdir -p "$TMP/certification_out"
+        if: "${{ steps.token.outputs.present == 'true' }}"
         env:
           TMP: ${{ runner.temp }}
 
       # Prime Mix.install to prevent Mix Compile Locks
       - run: 'echo "" | certification/implementation_plug.exs'
+        if: "${{ steps.token.outputs.present == 'true' }}"
 
       - uses: erlef/oid_certo@e47ec90093332ecc3c11d0bdec85d5306c778c29 # v1.0.0-beta.4
+        if: "${{ steps.token.outputs.present == 'true' }}"
         with:
           command: >-
             certification/config.json
@@ -564,6 +585,7 @@ jobs:
           TMP: ${{ runner.temp }}
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: "${{ steps.token.outputs.present == 'true' }}"
         with:
           name: certification-plug
           path: "${{ runner.temp }}/certification_out"

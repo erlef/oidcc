@@ -118,7 +118,7 @@ jobs:
       matrix:
         include:
           # Lowest Supported
-          - otp: "26.0"
+          - otp: "27.0"
             name: "lowest"
           # Latest Supported
           - otp: "${{ needs.detectToolVersions.outputs.otpVersion }}"
@@ -166,7 +166,7 @@ jobs:
       matrix:
         include:
           # Lowest Supported
-          - otp: "26.0"
+          - otp: "27.0"
             name: "lowest"
           # Latest Supported
           - otp: "${{ needs.detectToolVersions.outputs.otpVersion }}"
@@ -214,8 +214,8 @@ jobs:
       matrix:
         include:
           # Lowest Supported
-          - elixir: "1.15.8"
-            otp: "26.2.5"
+          - elixir: "1.17.3"
+            otp: "27.0"
             name: "lowest"
           # Latest Supported
           - elixir: "${{ needs.detectToolVersions.outputs.elixirVersion }}"

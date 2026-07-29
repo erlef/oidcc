@@ -3,14 +3,13 @@
 
 -module(oidcc_http_adapter_httpc).
 
--include("internal/doc.hrl").
-?MODULEDOC("HTTP Client Adapter").
+-moduledoc "HTTP Client Adapter".
 
 -behaviour(oidcc_http_adapter).
 
 -export([request/5]).
 
-?DOC(false).
+-doc false.
 -spec request(Method, Request, HttpOptions, RequestOptions, AdapterConfig) ->
     oidcc_http_adapter:response()
 when

@@ -5,8 +5,7 @@
 
 -feature(maybe_expr, enable).
 
--include("internal/doc.hrl").
-?MODULEDOC("HTTP Client Utilities").
+-moduledoc "HTTP Client Utilities".
 
 -export([basic_auth_header/2]).
 -export([bearer_auth_header/1]).
@@ -17,26 +16,26 @@
     http_header/0, error/0, httpc_error/0, query_params/0, telemetry_opts/0, request_opts/0
 ]).
 
-?DOC("See `uri_string:compose_query/1`.").
-?DOC(#{since => <<"3.0.0">>}).
+-doc "See `uri_string:compose_query/1`.".
+-doc #{since => <<"3.0.0">>}.
 -type query_params() :: [{unicode:chardata(), unicode:chardata() | true}].
 
-?DOC("HTTP header representation used by OIDCC.").
-?DOC(#{since => <<"3.0.0">>}).
+-doc "HTTP header representation used by OIDCC.".
+-doc #{since => <<"3.0.0">>}.
 -type http_header() :: {Field :: [byte()] | binary(), Value :: iodata()}.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type error() ::
     {http_error, StatusCode :: non_neg_integer(), HttpBodyResult :: binary() | map()}
     | {use_dpop_nonce, Nonce :: binary(), HttpBodyResult :: binary() | map()}
     | invalid_content_type
     | httpc_error().
 
-?DOC("Transport error. The default adapter returns errors documented by `httpc:request/5`.").
-?DOC(#{since => <<"3.0.0">>}).
+-doc "Transport error. The default adapter returns errors documented by `httpc:request/5`.".
+-doc #{since => <<"3.0.0">>}.
 -type httpc_error() :: term().
 
-?DOC("""
+-doc """
 See `httpc:request/5`.
 
 ## Parameters
@@ -45,8 +44,8 @@ See `httpc:request/5`.
 * `ssl` - TLS config
 * `httpc_profile` - `httpc` profile used by the default adapter
 * `http_adapter` - `{AdapterModule, AdapterConfigMap}` transport adapter
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -type request_opts() :: #{
     timeout => timeout(),
     ssl => [ssl:tls_option()],
@@ -54,13 +53,13 @@ See `httpc:request/5`.
     http_adapter => oidcc_http_adapter:config()
 }.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type telemetry_opts() :: #{
     topic := [atom()],
     extra_meta => map()
 }.
 
-?DOC(false).
+-doc false.
 -spec basic_auth_header(User, Secret) -> http_header() when
     User :: binary(),
     Secret :: binary().
@@ -71,12 +70,12 @@ basic_auth_header(User, Secret) ->
     AuthData = base64:encode(RawAuth),
     {"authorization", [<<"Basic ">>, AuthData]}.
 
-?DOC(false).
+-doc false.
 -spec bearer_auth_header(Token) -> http_header() when Token :: binary().
 bearer_auth_header(Token) ->
     {"authorization", [<<"Bearer ">>, Token]}.
 
-?DOC(false).
+-doc false.
 -spec request(Method, Request, TelemetryOpts, RequestOpts) ->
     {ok, {{json, term()} | {jwt, binary()}, [oidcc_http_adapter:header()]}}
     | {error, error()}

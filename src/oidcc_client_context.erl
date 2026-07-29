@@ -5,8 +5,7 @@
 
 -feature(maybe_expr, enable).
 
--include("internal/doc.hrl").
-?MODULEDOC("""
+-moduledoc """
 Client Configuration for authorization, token exchange, and userinfo.
 
 For most projects, it makes sense to use `m:oidcc_provider_configuration_worker` and the high-level
@@ -17,8 +16,8 @@ To use the record, import the definition:
 ```erlang
 -include_lib(["oidcc/include/oidcc_client_context.hrl"]).
 ```
-""").
-?MODULEDOC(#{since => <<"3.0.0">>}).
+""".
+-moduledoc #{since => <<"3.0.0">>}.
 
 -include("oidcc_client_context.hrl").
 -include("oidcc_provider_configuration.hrl").
@@ -41,7 +40,7 @@ To use the record, import the definition:
 
 -type t() :: authenticated_t() | unauthenticated_t().
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type authenticated_t() :: #oidcc_client_context{
     provider_configuration :: oidcc_provider_configuration:t(),
     jwks :: jose_jwk:key(),
@@ -50,7 +49,7 @@ To use the record, import the definition:
     client_jwks :: jose_jwk:key() | none
 }.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type unauthenticated_t() :: #oidcc_client_context{
     provider_configuration :: oidcc_provider_configuration:t(),
     jwks :: jose_jwk:key(),
@@ -59,26 +58,26 @@ To use the record, import the definition:
     client_jwks :: none
 }.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type authenticated_opts() :: #{
     client_jwks => jose_jwk:key()
 }.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type unauthenticated_opts() :: #{}.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type opts() :: authenticated_opts() | unauthenticated_opts().
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type error() :: provider_not_ready.
 
-?DOC("""
+-doc """
 Create Client Context from a `m:oidcc_provider_configuration_worker`.
 
 See `from_configuration_worker/4`.
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec from_configuration_worker
     (ProviderName, ClientId, ClientSecret) -> {ok, authenticated_t()} | {error, error()} when
         ProviderName :: gen_server:server_ref(),
@@ -91,7 +90,7 @@ See `from_configuration_worker/4`.
 from_configuration_worker(ProviderName, ClientId, ClientSecret) ->
     from_configuration_worker(ProviderName, ClientId, ClientSecret, #{}).
 
-?DOC("""
+-doc """
 Create Client Context from a `m:oidcc_provider_configuration_worker`.
 
 ## Examples
@@ -123,8 +122,8 @@ Create Client Context from a `m:oidcc_provider_configuration_worker`.
     #{client_jwks => jose_jwk:generate_key(16)}
   ).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec from_configuration_worker
     (ProviderName, ClientId, ClientSecret, Opts) ->
         {ok, authenticated_t()} | {error, error()}
@@ -165,12 +164,12 @@ from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts) ->
             from_configuration_worker(Pid, ClientId, ClientSecret, Opts)
     end.
 
-?DOC("""
+-doc """
 Create Client Context manually.
 
 See `from_manual/5`.
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec from_manual
     (Configuration, Jwks, ClientId, ClientSecret) -> authenticated_t() when
         Configuration :: oidcc_provider_configuration:t(),
@@ -185,7 +184,7 @@ See `from_manual/5`.
 from_manual(Configuration, Jwks, ClientId, ClientSecret) ->
     from_manual(Configuration, Jwks, ClientId, ClientSecret, #{}).
 
-?DOC("""
+-doc """
 Create Client Context manually.
 
 ## Examples
@@ -207,8 +206,8 @@ Create Client Context manually.
     #{client_jwks => jose_jwk:generate_key(16)}
   ).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec from_manual
     (Configuration, Jwks, ClientId, ClientSecret, Opts) -> authenticated_t() when
         Configuration :: oidcc_provider_configuration:t(),
@@ -250,7 +249,7 @@ from_manual(
         client_jwks = maps:get(client_jwks, Opts, none)
     }.
 
-?DOC("""
+-doc """
 Apply OpenID Connect / OAuth2 Profiles to the context.
 
 Currently, the only supported profiles are:
@@ -276,8 +275,8 @@ ClientContext = #oidcc_client_context{} = oidcc_client_context:from_...(...),
   maps:merge(Opts, #{...})
 ).
 ```
-""").
-?DOC(#{since => <<"3.2.0">>}).
+""".
+-doc #{since => <<"3.2.0">>}.
 -spec apply_profiles(ClientContext, oidcc_profile:opts()) ->
     {ok, ClientContext, oidcc_profile:opts_no_profiles()} | {error, oidcc_profile:error()}
 when

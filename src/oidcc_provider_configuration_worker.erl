@@ -5,8 +5,7 @@
 
 -feature(maybe_expr, enable).
 
--include("internal/doc.hrl").
-?MODULEDOC("""
+-moduledoc """
 OIDC Config Provider Worker
 
 Loads and continuously refreshes the OIDC configuration and JWKs.
@@ -15,8 +14,8 @@ The worker supports reading values concurrently via an ETS table. To use
 this performance improvement, the worker has to be registered with a
 `{local, Name}`. No name / `{global, Name}` and `{via, RegModule, ViaName}`
 are not supported.
-""").
-?MODULEDOC(#{since => <<"3.0.0">>}).
+""".
+-moduledoc #{since => <<"3.0.0">>}.
 
 -behaviour(gen_server).
 
@@ -38,7 +37,7 @@ are not supported.
 
 -export_type([opts/0]).
 
-?DOC("""
+-doc """
 Configuration Options
 
 * `name` - The gen_server name of the provider.
@@ -50,8 +49,8 @@ Configuration Options
 * `backoff_type` - The backoff strategy, `stop` for no backoff and to stop,
   `exponential` for exponential, `random` for random, and `random_exponential`
   for random exponential (default: `stop`).
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -type opts() :: #{
     name => gen_server:server_name(),
     issuer := uri_string:uri_string(),
@@ -77,7 +76,7 @@ Configuration Options
 
 -type state() :: #state{}.
 
-?DOC("""
+-doc """
 Start Configuration Provider.
 
 ## Examples
@@ -109,8 +108,8 @@ init(_opts) ->
     modules => [oidcc_provider_configuration_worker]}],
   {ok, {SupFlags, ChildSpecs}}.
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec start_link(Opts :: opts()) -> gen_server:start_ret().
 start_link(Opts) ->
     case maps:get(name, Opts, undefined) of
@@ -120,7 +119,7 @@ start_link(Opts) ->
             gen_server:start_link(Name, ?MODULE, Opts, [])
     end.
 
-?DOC(false).
+-doc false.
 init(Opts) ->
     EtsTable = register_ets_table(Opts),
     maybe
@@ -138,7 +137,7 @@ init(Opts) ->
             {continue, load_configuration}}
     end.
 
-?DOC(false).
+-doc false.
 handle_call(
     get_provider_configuration, _From, #state{provider_configuration = Configuration} = State
 ) ->
@@ -146,7 +145,7 @@ handle_call(
 handle_call(get_jwks, _From, #state{jwks = Jwks} = State) ->
     {reply, Jwks, State}.
 
-?DOC(false).
+-doc false.
 handle_cast(refresh_configuration, State) ->
     {noreply, State, {continue, load_configuration}};
 handle_cast(refresh_jwks, State) ->
@@ -166,7 +165,7 @@ handle_cast({refresh_jwks_for_unknown_kid, Kid}, #state{jwks = Jwks} = State) ->
             {noreply, State}
     end.
 
-?DOC(false).
+-doc false.
 handle_continue(
     load_configuration,
     #state{
@@ -229,7 +228,7 @@ handle_continue(
         {error, Reason} -> handle_backoff_retry(jwks_load_failed, Reason, State)
     end.
 
-?DOC(false).
+-doc false.
 handle_info(backoff_retry, State) ->
     {noreply, State, {continue, load_configuration}};
 handle_info(configuration_expired, State) ->
@@ -237,18 +236,18 @@ handle_info(configuration_expired, State) ->
 handle_info(jwks_expired, State) ->
     {noreply, State#state{jwks_refresh_timer = undefined}, {continue, load_jwks}}.
 
-?DOC("Get Configuration.").
+-doc "Get Configuration.".
 -spec get_provider_configuration(Name :: gen_server:server_ref()) ->
     oidcc_provider_configuration:t() | undefined.
 get_provider_configuration(Name) ->
     lookup_in_ets_or_call(Name, provider_configuration, get_provider_configuration).
 
-?DOC("Get Parsed Jwks.").
+-doc "Get Parsed Jwks.".
 -spec get_jwks(Name :: gen_server:server_ref()) -> jose_jwk:key() | undefined.
 get_jwks(Name) ->
     lookup_in_ets_or_call(Name, jwks, get_jwks).
 
-?DOC("""
+-doc """
 Refresh Configuration.
 
 ## Examples
@@ -263,8 +262,8 @@ Refresh Configuration.
 
 oidcc_provider_configuration_worker:refresh_configuration(Pid).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec refresh_configuration(Name :: gen_server:server_ref()) -> ok.
 refresh_configuration(Name) ->
     refresh_configuration(Name, true).
@@ -277,7 +276,7 @@ refresh_configuration(Name, true) ->
     gen_server:call(Name, get_provider_configuration),
     ok.
 
-?DOC("""
+-doc """
 Refresh JWKs.
 
 ## Examples
@@ -292,8 +291,8 @@ Refresh JWKs.
 
 oidcc_provider_configuration_worker:refresh_jwks(Pid).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec refresh_jwks(Name :: gen_server:server_ref()) -> ok.
 refresh_jwks(Name) -> refresh_jwks(Name, true).
 
@@ -305,7 +304,7 @@ refresh_jwks(Name, true) ->
     gen_server:call(Name, get_jwks),
     ok.
 
-?DOC("""
+-doc """
 Refresh JWKs if the provided `Kid` is not matching any currently loaded keys.
 
 ## Examples
@@ -318,8 +317,8 @@ Refresh JWKs if the provided `Kid` is not matching any currently loaded keys.
 
 oidcc_provider_configuration_worker:refresh_jwks_for_unknown_kid(Pid, <<"kid">>).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec refresh_jwks_for_unknown_kid(Name :: gen_server:server_ref(), Kid :: binary()) ->
     ok.
 refresh_jwks_for_unknown_kid(Name, Kid) ->
@@ -345,10 +344,10 @@ get_issuer(Opts) ->
             {ok, Issuer}
     end.
 
-?DOC("""
+-doc """
 Checking of existing kid values is a bit wonky because of partial support
 in jose. See: https://github.com/potatosalad/erlang-jose/issues/28.
-""").
+""".
 -spec has_kid(Jwk :: jose_jwk:key(), Kid :: binary()) -> boolean() | unknown.
 has_kid(#jose_jwk{fields = #{<<"kid">> := Kid}}, Kid) ->
     true;

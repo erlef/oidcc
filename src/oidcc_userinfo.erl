@@ -5,8 +5,7 @@
 
 -feature(maybe_expr, enable).
 
--include("internal/doc.hrl").
-?MODULEDOC("""
+-moduledoc """
 OpenID Connect Userinfo
 
 See https://openid.net/specs/openid-connect-core-1_0.html#UserInfo
@@ -14,8 +13,8 @@ See https://openid.net/specs/openid-connect-core-1_0.html#UserInfo
 ## Telemetry
 
 See [`Oidcc.Userinfo`](`m:'Elixir.Oidcc.Userinfo'`).
-""").
-?MODULEDOC(#{since => <<"3.0.0">>}).
+""".
+-moduledoc #{since => <<"3.0.0">>}.
 
 -include("oidcc_client_context.hrl").
 -include("oidcc_provider_configuration.hrl").
@@ -32,8 +31,8 @@ See [`Oidcc.Userinfo`](`m:'Elixir.Oidcc.Userinfo'`).
 -export_type([retrieve_opts/0]).
 -export_type([retrieve_opts_no_sub/0]).
 
-?DOC("See `t:retrieve_opts/0`.").
-?DOC(#{since => <<"3.0.0">>}).
+-doc "See `t:retrieve_opts/0`.".
+-doc #{since => <<"3.0.0">>}.
 -type retrieve_opts_no_sub() ::
     #{
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
@@ -41,7 +40,7 @@ See [`Oidcc.Userinfo`](`m:'Elixir.Oidcc.Userinfo'`).
         request_opts => oidcc_http_util:request_opts()
     }.
 
-?DOC("""
+-doc """
 Configure userinfo request
 
 See https://openid.net/specs/openid-connect-core-1_0.html#UserInfoRequest
@@ -55,8 +54,8 @@ See https://openid.net/specs/openid-connect-core-1_0.html#UserInfoRequest
 * `dpop_nonce` - if using DPoP, the `nonce` value to use in the
     proof claim
 * `request_opts` - config for userinfo and distributed-claim HTTP requests
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -type retrieve_opts() ::
     #{
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
@@ -65,7 +64,7 @@ See https://openid.net/specs/openid-connect-core-1_0.html#UserInfoRequest
         request_opts => oidcc_http_util:request_opts()
     }.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type error() ::
     {distributed_claim_not_found, {ClaimSource :: binary(), ClaimName :: binary()}}
     | no_access_token
@@ -95,7 +94,7 @@ See https://openid.net/specs/openid-connect-core-1_0.html#UserInfoRequest
     metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
 }).
 
-?DOC("""
+-doc """
 Load userinfo for the given token
 
 For a high level interface using `m:oidcc_provider_configuration_worker`, see
@@ -114,8 +113,8 @@ For a high level interface using `m:oidcc_provider_configuration_worker`, see
 {ok, #{<<"sub">> => Sub}} =
   oidcc_userinfo:retrieve(Token, ClientContext, #{}).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec retrieve
     (Token, ClientContext, Opts) -> {ok, oidcc_jwt_util:claims()} | {error, error()} when
         Token :: oidcc_token:t(),

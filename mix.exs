@@ -11,7 +11,7 @@ defmodule Oidcc.Mixfile do
     [
       app: :oidcc,
       version: to_string(@props[:vsn]),
-      elixir: "~> 1.15",
+      elixir: "~> 1.17",
       erlc_options: erlc_options(Mix.env()),
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,

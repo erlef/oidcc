@@ -5,8 +5,7 @@
 
 -feature(maybe_expr, enable).
 
--include("internal/doc.hrl").
-?MODULEDOC("""
+-moduledoc """
 Dynamic Client Registration Utilities.
 
 See https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata.
@@ -22,8 +21,8 @@ To use the record, import the definition:
 ## Telemetry
 
 See [`Oidcc.ClientRegistration`](`m:'Elixir.Oidcc.ClientRegistration'`).
-""").
-?MODULEDOC(#{since => <<"3.0.0">>}).
+""".
+-moduledoc #{since => <<"3.0.0">>}.
 
 -include("oidcc_client_registration.hrl").
 -include("oidcc_provider_configuration.hrl").
@@ -35,29 +34,29 @@ See [`Oidcc.ClientRegistration`](`m:'Elixir.Oidcc.ClientRegistration'`).
 -export_type([response/0]).
 -export_type([t/0]).
 
-?DOC("""
+-doc """
 Configure configuration loading / parsing.
 
 ## Parameters
 
 * `initial_access_token` - Access Token for registration
 * `request_opts` - config for HTTP request
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -type opts() :: #{
     initial_access_token => binary() | undefined,
     request_opts => oidcc_http_util:request_opts()
 }.
 
-?DOC("""
+-doc """
 Record containing Client Registration Metadata.
 
 See https://openid.net/specs/openid-connect-registration-1_0.html#ClientMetadata and
 https://openid.net/specs/openid-connect-rpinitiated-1_0.html#ClientMetadata.
 
 All unrecognized fields are stored in `extra_fields`.
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -type t() ::
     #oidcc_client_registration{
         %% OpenID Connect Dynamic Client Registration 1.0
@@ -130,14 +129,14 @@ All unrecognized fields are stored in `extra_fields`.
         extra_fields :: #{binary() => term()}
     }.
 
-?DOC("""
+-doc """
 Record containing Client Registration Response.
 
 See https://openid.net/specs/openid-connect-registration-1_0.html#RegistrationResponse.
 
 All unrecognized fields are stored in `extra_fields`.
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -type response() ::
     #oidcc_client_registration_response{
         client_id :: erlang:binary(),
@@ -150,7 +149,7 @@ All unrecognized fields are stored in `extra_fields`.
         extra_fields :: #{binary() => term()}
     }.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type error() ::
     registration_not_supported
     | invalid_content_type
@@ -178,7 +177,7 @@ All unrecognized fields are stored in `extra_fields`.
     metadata => <<"#{issuer => uri_string:uri_string()}">>
 }).
 
-?DOC("""
+-doc """
 Register Client.
 
 ## Examples
@@ -199,8 +198,8 @@ Register Client.
     #{initial_access_token => <<"optional token you got from the provider">>}
   ).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec register(ProviderConfiguration, Registration, Opts) ->
     {ok, response()} | {error, error()}
 when

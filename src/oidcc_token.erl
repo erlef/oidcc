@@ -5,8 +5,7 @@
 
 -feature(maybe_expr, enable).
 
--include("internal/doc.hrl").
-?MODULEDOC("""
+-moduledoc """
 Facilitate OpenID Code/Token Exchanges.
 
 ## Records
@@ -20,8 +19,8 @@ To use the records, import the definition:
 ## Telemetry
 
 See [`Oidcc.Token`](`m:'Elixir.Oidcc.Token'`).
-""").
-?MODULEDOC(#{since => <<"3.0.0">>}).
+""".
+-moduledoc #{since => <<"3.0.0">>}.
 
 -include("oidcc_client_context.hrl").
 -include("oidcc_provider_configuration.hrl").
@@ -56,40 +55,40 @@ See [`Oidcc.Token`](`m:'Elixir.Oidcc.Token'`).
 -export_type([validate_jwt_opts/0]).
 -export_type([t/0]).
 
-?DOC("""
+-doc """
 ID Token Wrapper.
 
 ## Fields
 
 * `token` - The retrieved token.
 * `claims` - Unpacked claims of the verified token.
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -type id() :: #oidcc_token_id{token :: binary(), claims :: oidcc_jwt_util:claims()}.
 
-?DOC("""
+-doc """
 Access Token Wrapper.
 
 ## Fields
 
 * `token` - The retrieved token.
 * `expires` - Number of seconds the token is valid.
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -type access() ::
     #oidcc_token_access{token :: binary(), expires :: pos_integer() | undefined, type :: binary()}.
 
-?DOC("""
+-doc """
 Refresh Token Wrapper.
 
 ## Fields
 
 * `token` - The retrieved token.
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -type refresh() :: #oidcc_token_refresh{token :: binary()}.
 
-?DOC("""
+-doc """
 Token Response Wrapper.
 
 ## Fields
@@ -98,8 +97,8 @@ Token Response Wrapper.
 * `access` - `t:access/0`.
 * `refresh` - `t:refresh/0`.
 * `scope` - `t:oidcc_scope:scopes/0`.
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -type t() ::
     #oidcc_token{
         id :: oidcc_token:id() | none,
@@ -108,7 +107,7 @@ Token Response Wrapper.
         scope :: oidcc_scope:scopes()
     }.
 
-?DOC("""
+-doc """
 Options for retrieving a token.
 
 See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
@@ -132,8 +131,8 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
   binary or a list of binaries is given, validate that the `azp` claim matches
   one of those.
 * `token_request_claims` - Additional claims to use with the token request.
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -type retrieve_opts() ::
     #{
         pkce_verifier => binary(),
@@ -152,8 +151,8 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
         token_request_claims => #{binary() => binary() | integer()}
     }.
 
-?DOC("See `t:refresh_opts_no_sub/0`.").
-?DOC(#{since => <<"3.0.0">>}).
+-doc "See `t:refresh_opts_no_sub/0`.".
+-doc #{since => <<"3.0.0">>}.
 -type refresh_opts_no_sub() ::
     #{
         scope => oidcc_scope:scopes(),
@@ -168,7 +167,7 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
         token_request_claims => #{binary() => binary() | integer()}
     }.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type refresh_opts() ::
     #{
         scope => oidcc_scope:scopes(),
@@ -184,7 +183,7 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
         token_request_claims => #{binary() => binary() | integer()}
     }.
 
-?DOC("""
+-doc """
 Options for refreshing a token.
 
 See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
@@ -195,14 +194,14 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
 * `refresh_jwks` - How to handle tokens with an unknown `kid`.
   See `t:oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun/0`.
 * `expected_subject` - `sub` of the original token.
-""").
-?DOC(#{since => <<"3.2.0">>}).
+""".
+-doc #{since => <<"3.2.0">>}.
 -type validate_jarm_opts() ::
     #{
         trusted_audiences => [binary()] | any
     }.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type jwt_profile_opts() :: #{
     scope => oidcc_scope:scopes(),
     refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
@@ -212,7 +211,7 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
     body_extension => oidcc_http_util:query_params()
 }.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type client_credentials_opts() :: #{
     scope => oidcc_scope:scopes(),
     refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
@@ -221,12 +220,12 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
     body_extension => oidcc_http_util:query_params()
 }.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type authorization_headers_opts() :: #{
     dpop_nonce => binary()
 }.
 
-?DOC(#{since => <<"3.2.0">>}).
+-doc #{since => <<"3.2.0">>}.
 -type validate_jwt_opts() ::
     #{
         signing_algs => [binary()] | undefined,
@@ -236,7 +235,7 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun()
     }.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type error() ::
     {missing_claim, MissingClaim :: binary(), Claims :: oidcc_jwt_util:claims()}
     | pkce_verifier_required
@@ -340,7 +339,7 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
     metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
 }).
 
-?DOC("""
+-doc """
 Retrieve the token using the authcode received before and directly validate
 the result.
 
@@ -364,8 +363,8 @@ see `oidcc:retrieve_token/5`.
   oidcc:retrieve(AuthCode, ClientContext, #{
     redirect_uri => <<"https://example.com/callback">>}).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec retrieve(AuthCode, ClientContext, Opts) ->
     {ok, t()} | {error, error()}
 when
@@ -405,7 +404,7 @@ retrieve(AuthCode, ClientContext, Opts) ->
             {error, {grant_type_not_supported, authorization_code}}
     end.
 
-?DOC("""
+-doc """
 Validate the JARM response, returning the valid claims as a map.
 
 The response was sent to the local endpoint by the OpenId Connect provider,
@@ -427,8 +426,8 @@ using redirects.
 {ok, #oidcc_token{}} = oidcc:retrieve(AuthCode, ClientContext,
   #{redirect_uri => <<"https://redirect.example/">>}).
 ```
-""").
-?DOC(#{since => <<"3.2.0">>}).
+""".
+-doc #{since => <<"3.2.0">>}.
 -spec validate_jarm(Response, ClientContext, Opts) ->
     {ok, oidcc_jwt_util:claims()} | {error, error()}
 when
@@ -483,7 +482,7 @@ validate_jarm(Response, ClientContext, Opts) ->
         {ok, Claims}
     end.
 
-?DOC("""
+-doc """
 Refresh Token
 
 For a high level interface using `m:oidcc_provider_configuration_worker`
@@ -510,8 +509,8 @@ see `oidcc:refresh_token/5`.
                       ClientContext,
                       #{expected_subject => <<"sub_from_initial_id_token">>}).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec refresh
     (RefreshToken, ClientContext, Opts) ->
         {ok, t()} | {error, error()}
@@ -571,7 +570,7 @@ refresh(RefreshToken, ClientContext, Opts) ->
             {error, {grant_type_not_supported, refresh_token}}
     end.
 
-?DOC("""
+-doc """
 Retrieve JSON Web Token (JWT) Profile Token
 
 See [https://datatracker.ietf.org/doc/html/rfc7523#section-4]
@@ -598,8 +597,8 @@ Key = jose_jwk:from_pem(maps:get(<<"key">>, KeyMap)),
                           #{scope => [<<"scope">>],
                             kid => maps:get(<<"keyId">>, KeyMap)}).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec jwt_profile(Subject, ClientContext, Jwk, Opts) -> {ok, t()} | {error, error()} when
     Subject :: binary(),
     ClientContext :: oidcc_client_context:t(),
@@ -669,7 +668,7 @@ jwt_profile(Subject, ClientContext, Jwk, Opts) ->
             {error, {grant_type_not_supported, jwt_bearer}}
     end.
 
-?DOC("""
+-doc """
 Retrieve Client Credential Token
 
 See https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.4
@@ -689,8 +688,8 @@ see `oidcc:client_credentials_token/4`.
   oidcc_token:client_credentials(ClientContext,
                                  #{scope => [<<"scope">>]}).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec client_credentials(ClientContext, Opts) -> {ok, t()} | {error, error()} when
     ClientContext :: oidcc_client_context:authenticated_t(),
     Opts :: client_credentials_opts().
@@ -857,7 +856,7 @@ verify_access_token_map_hash(#oidcc_token{
 verify_access_token_map_hash(#oidcc_token{}) ->
     ok.
 
-?DOC("""
+-doc """
 Validate ID Token
 
 Usually the id token is validated using `retrieve/3`.
@@ -893,8 +892,8 @@ If you get the token passed from somewhere else, this function can validate it.
 You can use a regex pattern to validate the issuer claim by adding an `issuer_regex`
 to the quirks map when creating the provider configuration. See the documentation for `validate_jwt/3`
 for more details.
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec validate_id_token(IdToken, ClientContext, NonceOrOpts) ->
     {ok, Claims} | {error, error()}
 when
@@ -951,7 +950,7 @@ validate_id_token(IdToken, ClientContext, Opts) when is_map(Opts) ->
         end
     end).
 
-?DOC("""
+-doc """
 Validate JWT
 
 Validates a generic JWT (such as an access token) from the given provider.
@@ -1002,8 +1001,8 @@ to the quirks map when creating the provider configuration:
 ```
 
 This will allow tokens with issuer claims that match the regex pattern to validate successfully.
-""").
-?DOC(#{since => <<"3.2.0">>}).
+""".
+-doc #{since => <<"3.2.0">>}.
 -spec validate_jwt(Token, ClientContext, Opts) ->
     {ok, Claims} | {error, error()}
 when
@@ -1107,7 +1106,7 @@ int_validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
         end
     end.
 
-?DOC("""
+-doc """
 Authorization headers
 
 Generate a map of authorization headers to use when using the given
@@ -1124,8 +1123,8 @@ access token to access an API endpoint.
 Headers =
     oidcc:authorization_headers(AccessTokenRecord, :get, Url, ClientContext).
 ```
-""").
-?DOC(#{since => "3.2.0"}).
+""".
+-doc #{since => "3.2.0"}.
 -spec authorization_headers(AccessTokenRecord, Method, Endpoint, ClientContext) -> HeaderMap when
     AccessTokenRecord :: access(),
     Method :: post | get,

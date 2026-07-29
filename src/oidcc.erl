@@ -5,8 +5,7 @@
 
 -feature(maybe_expr, enable).
 
--include("internal/doc.hrl").
-?MODULEDOC("""
+-moduledoc """
 OpenID Connect High Level Interface
 
 ## Setup
@@ -27,8 +26,8 @@ See `m:oidcc_provider_configuration_worker` for details
 
 * `max_clock_skew` (default `0`) - Maximum allowed clock skew for JWT
   `exp` / `nbf` validation, in seconds
-""").
-?MODULEDOC(#{since => <<"3.0.0">>}).
+""".
+-moduledoc #{since => <<"3.0.0">>}.
 
 -export([client_credentials_token/4]).
 -export([create_redirect_url/4]).
@@ -39,7 +38,7 @@ See `m:oidcc_provider_configuration_worker` for details
 -export([retrieve_token/5]).
 -export([retrieve_userinfo/5]).
 
-?DOC("""
+-doc """
 Create Auth Redirect URL
 
 ## Examples
@@ -55,8 +54,8 @@ Create Auth Redirect URL
 
 %% RedirectUri = https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec create_redirect_url(
     ProviderConfigurationWorkerName,
     ClientId,
@@ -84,7 +83,7 @@ create_redirect_url(ProviderConfigurationWorkerName, ClientId, ClientSecret, Opt
         oidcc_authorization:create_redirect_url(ClientContext, OtherOpts)
     end.
 
-?DOC("""
+-doc """
 Retrieve the token using the authcode received before and directly validate
 the result.
 
@@ -105,8 +104,8 @@ using redirects.
     #{redirect_uri => <<"https://example.com/callback">>}
   ).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec retrieve_token(
     AuthCode,
     ProviderConfigurationWorkerName,
@@ -147,7 +146,7 @@ retrieve_token(
         oidcc_token:retrieve(AuthCode, ClientContext, OptsWithRefresh)
     end.
 
-?DOC("""
+-doc """
 Load userinfo for the given token.
 
 ## Examples
@@ -164,8 +163,8 @@ Load userinfo for the given token.
     #{}
   ).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec retrieve_userinfo
     (
         Token,
@@ -210,7 +209,7 @@ retrieve_userinfo(
         oidcc_userinfo:retrieve(Token, ClientContext, OtherOpts)
     end.
 
-?DOC("""
+-doc """
 Refresh Token.
 
 ## Examples
@@ -227,8 +226,8 @@ Refresh Token.
     #{expected_subject => <<"sub_from_initial_id_token">>}
   ).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec refresh_token
     (
         RefreshToken,
@@ -284,7 +283,7 @@ refresh_token(
         oidcc_token:refresh(RefreshToken, ClientContext, OptsWithRefresh)
     end.
 
-?DOC("""
+-doc """
 Introspect the given access token.
 
 ## Examples
@@ -301,8 +300,8 @@ Introspect the given access token.
     #{}
   ).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec introspect_token(
     Token,
     ProviderConfigurationWorkerName,
@@ -339,7 +338,7 @@ introspect_token(
         oidcc_token_introspection:introspect(Token, ClientContext, OtherOpts)
     end.
 
-?DOC("""
+-doc """
 Retrieve JSON Web Token (JWT) Profile Token.
 
 See https://datatracker.ietf.org/doc/html/rfc7523#section-4.
@@ -364,8 +363,8 @@ Key = jose_jwk:from_pem(maps:get(<<"key">>, KeyMap)),
     }
   ).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec jwt_profile_token(
     Subject,
     ProviderConfigurationWorkerName,
@@ -400,7 +399,7 @@ jwt_profile_token(Subject, ProviderConfigurationWorkerName, ClientId, ClientSecr
         oidcc_token:jwt_profile(Subject, ClientContext, Jwk, OptsWithRefresh)
     end.
 
-?DOC("""
+-doc """
 Retrieve Client Credential Token.
 
 See https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.4.
@@ -416,8 +415,8 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-1.3.4.
     #{scope => [<<"scope">>]}
   ).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec client_credentials_token(
     ProviderConfigurationWorkerName,
     ClientId,
@@ -448,7 +447,7 @@ client_credentials_token(ProviderConfigurationWorkerName, ClientId, ClientSecret
         oidcc_token:client_credentials(ClientContext, OptsWithRefresh)
     end.
 
-?DOC("""
+-doc """
 Create Initiate URI for Relaying Party initiated Logout.
 
 See https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout.
@@ -468,8 +467,8 @@ See https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout.
 
 %% RedirectUri = https://my.provider/logout?id_token_hint=IDToken&client_id=ClientId&post_logout_redirect_uri=https%3A%2F%2Fmy.server%2Freturn
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec initiate_logout_url(
     Token,
     ProviderConfigurationWorkerName,

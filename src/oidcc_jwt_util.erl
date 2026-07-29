@@ -5,8 +5,7 @@
 
 -feature(maybe_expr, enable).
 
--include("internal/doc.hrl").
-?MODULEDOC("JWT Utilities").
+-moduledoc "JWT Utilities".
 
 -include_lib("jose/include/jose_jwe.hrl").
 -include_lib("jose/include/jose_jwk.hrl").
@@ -33,11 +32,11 @@
 -export_type([error/0]).
 -export_type([refresh_jwks_for_unknown_kid_fun/0]).
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type refresh_jwks_for_unknown_kid_fun() ::
     fun((Jwks :: jose_jwk:key(), Kid :: binary()) -> {ok, jose_jwk:key()} | {error, term()}).
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type error() ::
     no_matching_key
     | invalid_jwt_token
@@ -46,7 +45,7 @@
     | {none_alg_used, Jwt :: #jose_jwt{}, Jws :: #jose_jws{}}
     | not_encrypted.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type claims() :: #{binary() => term()}.
 
 %% Function to decide if the jwks should be reladed to find a matching key for `Kid`
@@ -58,7 +57,7 @@
 %%
 %% Checking of jwk sets is a bit wonky because of partial support
 %% in jose. see: https://github.com/potatosalad/erlang-jose/issues/28
-?DOC(false).
+-doc false.
 -spec verify_signature(Token, AllowAlgorithms, Jwks) ->
     {ok, {Jwt, Jws}}
     | {error, error()}
@@ -116,7 +115,7 @@ verify_signature(Token, AllowAlgorithms, #jose_jwk{} = Jwks) ->
             {error, invalid_jwt_token}
     end.
 
-?DOC(false).
+-doc false.
 -spec verify_claims(Claims, ExpClaims) -> ok | {error, {missing_claim, ExpClaim, Claims}} when
     Claims :: claims(),
     ExpClaim :: {binary(), term() | {regex, binary()}},
@@ -153,7 +152,7 @@ verify_claims(Claims, ExpClaims) ->
             {error, {missing_claim, Claim, Claims}}
     end.
 
-?DOC(false).
+-doc false.
 -spec client_secret_oct_keys(AllowedAlgorithms, ClientSecret) -> jose_jwk:key() | none when
     AllowedAlgorithms :: [binary()] | undefined,
     ClientSecret :: binary() | unauthenticated.
@@ -173,7 +172,7 @@ client_secret_oct_keys(AllowedAlgorithms, ClientSecret) ->
             none
     end.
 
-?DOC(false).
+-doc false.
 -spec merge_client_secret_oct_keys(Jwks :: jose_jwk:key(), AllowedAlgorithms, ClientSecret) ->
     jose_jwk:key()
 when
@@ -187,7 +186,7 @@ merge_client_secret_oct_keys(Jwks, AllowedAlgorithms, ClientSecret) ->
             merge_jwks(Jwks, OctKeys)
     end.
 
-?DOC(false).
+-doc false.
 -spec refresh_jwks_fun(ProviderConfigurationWorkerName) ->
     refresh_jwks_for_unknown_kid_fun()
 when
@@ -201,7 +200,7 @@ refresh_jwks_fun(ProviderConfigurationWorkerName) ->
         {ok, oidcc_provider_configuration_worker:get_jwks(ProviderConfigurationWorkerName)}
     end.
 
-?DOC(false).
+-doc false.
 -spec merge_jwks(Left :: jose_jwk:key(), Right :: jose_jwk:key()) -> jose_jwk:key().
 merge_jwks(#jose_jwk{keys = {jose_jwk_set, LeftKeys}, fields = LeftFields}, #jose_jwk{
     keys = {jose_jwk_set, RightKeys}, fields = RightFields
@@ -214,13 +213,13 @@ merge_jwks(#jose_jwk{} = Left, #jose_jwk{keys = {jose_jwk_set, _RightKeys}} = Ri
 merge_jwks(Left, Right) ->
     merge_jwks(Left, #jose_jwk{keys = {jose_jwk_set, [Right]}}).
 
-?DOC(false).
+-doc false.
 -spec sign(Jwt :: #jose_jwt{}, Jwk :: jose_jwk:key(), SupportedAlgorithms :: [binary()]) ->
     {ok, binary()} | {error, no_supported_alg_or_key}.
 sign(Jwt, Jwk, SupportedAlgorithms) ->
     sign(Jwt, Jwk, SupportedAlgorithms, #{}).
 
-?DOC(false).
+-doc false.
 -spec sign(
     Jwt :: #jose_jwt{}, Jwk :: jose_jwk:key(), SupportedAlgorithms :: [binary()], JwsFields :: map()
 ) ->
@@ -270,7 +269,7 @@ sign(Jwt, Jwk, [Algorithm | RestAlgorithms], JwsFields0) ->
         _ -> sign(Jwt, Jwk, RestAlgorithms, JwsFields0)
     end.
 
-?DOC(false).
+-doc false.
 -spec decrypt_and_verify(
     Jwt :: binary(),
     Jwks :: jose_jwk:key(),
@@ -399,7 +398,7 @@ verify_decrypted_token(Jwt, SigningAlgs, Jwe, Jwks) ->
             {error, Reason}
     end.
 
-?DOC(false).
+-doc false.
 -spec encrypt(
     Jwt :: binary(),
     Jwk :: jose_jwk:key(),
@@ -455,7 +454,7 @@ encrypt(Jwt, Jwk, [Algorithm | _RestAlgorithms] = SupportedAlgorithms, Supported
         error -> encrypt(Jwt, Jwk, SupportedAlgorithms, SupportedEncValues, RestEncValues)
     end.
 
-?DOC(false).
+-doc false.
 -spec thumbprint(Jwk :: jose_jwk:key()) -> {ok, binary()} | error.
 thumbprint(Jwk) ->
     evaluate_for_all_keys(Jwk, fun
@@ -465,7 +464,7 @@ thumbprint(Jwk) ->
             {ok, jose_jwk:thumbprint(Key)}
     end).
 
-?DOC(false).
+-doc false.
 -spec sign_dpop(Jwt :: #jose_jwt{}, Jwk :: jose_jwk:key(), SigningAlgSupported :: [binary()]) ->
     {ok, binary()} | {error, no_supported_alg_or_key}.
 sign_dpop(Jwt, Jwk, SigningAlgSupported) ->
@@ -479,7 +478,7 @@ sign_dpop(Jwt, Jwk, SigningAlgSupported) ->
             })
     end).
 
-?DOC(false).
+-doc false.
 -spec evaluate_for_all_keys(Jwk :: jose_jwk:key(), fun((jose_jwk:key()) -> {ok, Result} | error)) ->
     {ok, Result} | error
 when
@@ -498,14 +497,14 @@ evaluate_for_all_keys(#jose_jwk{keys = {jose_jwk_set, Keys}}, Callback) ->
 evaluate_for_all_keys(#jose_jwk{} = Jwk, Callback) ->
     Callback(Jwk).
 
-?DOC(false).
+-doc false.
 -spec verify_not_none_alg(#jose_jws{}) -> ok | {error, none_alg_used}.
 verify_not_none_alg(#jose_jws{fields = #{<<"alg">> := <<"none">>}}) ->
     {error, none_alg_used};
 verify_not_none_alg(#jose_jws{}) ->
     ok.
 
-?DOC(false).
+-doc false.
 -spec peek_payload(binary()) -> {ok, #jose_jwt{}} | {error, invalid_jwt_token}.
 peek_payload(Jwt) ->
     try

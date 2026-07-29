@@ -5,8 +5,7 @@
 
 -feature(maybe_expr, enable).
 
--include("internal/doc.hrl").
-?MODULEDOC("""
+-moduledoc """
 OAuth Token Introspection.
 
 See https://datatracker.ietf.org/doc/html/rfc7662.
@@ -22,8 +21,8 @@ To use the records, import the definition:
 ## Telemetry
 
 See [`Oidcc.TokenIntrospection`](`m:'Elixir.Oidcc.TokenIntrospection'`).
-""").
-?MODULEDOC(#{since => <<"3.0.0">>}).
+""".
+-moduledoc #{since => <<"3.0.0">>}.
 
 -include("oidcc_client_context.hrl").
 -include("oidcc_provider_configuration.hrl").
@@ -36,12 +35,12 @@ See [`Oidcc.TokenIntrospection`](`m:'Elixir.Oidcc.TokenIntrospection'`).
 -export_type([opts/0]).
 -export_type([t/0]).
 
-?DOC("""
+-doc """
 Introspection Result.
 
 See https://datatracker.ietf.org/doc/html/rfc7662#section-2.2.
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -type t() :: #oidcc_token_introspection{
     active :: boolean(),
     client_id :: binary(),
@@ -51,7 +50,7 @@ See https://datatracker.ietf.org/doc/html/rfc7662#section-2.2.
     iss :: binary()
 }.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type opts() :: #{
     preferred_auth_methods => [oidcc_auth_util:auth_method(), ...],
     request_opts => oidcc_http_util:request_opts(),
@@ -59,7 +58,7 @@ See https://datatracker.ietf.org/doc/html/rfc7662#section-2.2.
     client_self_only => boolean()
 }.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type error() :: client_id_mismatch | introspection_not_supported | oidcc_http_util:error().
 
 -telemetry_event(#{
@@ -83,7 +82,7 @@ See https://datatracker.ietf.org/doc/html/rfc7662#section-2.2.
     metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
 }).
 
-?DOC("""
+-doc """
 Introspect the given access token.
 
 For a high level interface using `m:oidcc_provider_configuration_worker`
@@ -102,8 +101,8 @@ see `oidcc:introspect_token/5`.
 {ok, #oidcc_token_introspection{active = True}} =
   oidcc_token_introspection:introspect(AccessToken, ClientContext, #{}).
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec introspect(Token, ClientContext, Opts) ->
     {ok, t()}
     | {error, error()}

@@ -161,7 +161,7 @@ retrieve_jwt_profile_token(_Config) ->
     PrivDir = code:priv_dir(oidcc),
 
     {ok, KeyJson} = file:read_file(PrivDir ++ "/test/fixtures/zitadel-jwt-profile.json"),
-    KeyMap = jose:decode(KeyJson),
+    KeyMap = json:decode(KeyJson),
     Key = jose_jwk:from_pem(maps:get(<<"key">>, KeyMap)),
 
     application:set_env(oidcc, max_clock_skew, 10),
@@ -197,7 +197,7 @@ retrieve_client_credentials_token(_Config) ->
     #{
         <<"clientId">> := ZitadelClientCredentialsClientId,
         <<"clientSecret">> := ZitadelClientCredentialsClientSecret
-    } = jose:decode(ZitadelClientCredentialsJson),
+    } = json:decode(ZitadelClientCredentialsJson),
 
     ?assertMatch(
         {ok, _},

@@ -272,7 +272,7 @@ client_context_fixture() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/fapi2-metadata.json"),
     {ok, #oidcc_provider_configuration{} = Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk-ed25519.pem"),
 

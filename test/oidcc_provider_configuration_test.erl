@@ -113,7 +113,7 @@ decode_google_test() ->
                         <<"https://oauth2.googleapis.com/device/code">>
                 }
         }},
-        oidcc_provider_configuration:decode_configuration(jose:decode(Configuration))
+        oidcc_provider_configuration:decode_configuration(json:decode(Configuration))
     ).
 
 check_validations_test() ->
@@ -587,7 +587,7 @@ document_overrides_quirk_test() ->
         {ok, #oidcc_provider_configuration{
             issuer = <<"https://example.com">>
         }},
-        oidcc_provider_configuration:decode_configuration(jose:decode(Configuration), #{
+        oidcc_provider_configuration:decode_configuration(json:decode(Configuration), #{
             quirks => #{document_overrides => #{<<"issuer">> => <<"https://example.com">>}}
         })
     ),
@@ -598,7 +598,7 @@ issuer_regex_quirk_test() ->
     {ok, Configuration} = file:read_file(PrivDir ++ "/test/fixtures/google-metadata.json"),
     RegexPattern = <<"^https://[a-z]+\\.google\\.com$">>,
 
-    Result = oidcc_provider_configuration:decode_configuration(jose:decode(Configuration), #{
+    Result = oidcc_provider_configuration:decode_configuration(json:decode(Configuration), #{
         quirks => #{issuer_regex => RegexPattern}
     }),
 
@@ -675,7 +675,7 @@ decode_fapi2_test() ->
                 <<"userinfo_endpoint">> := <<"https://my.provider/tls/userinfo">>
             }
         }},
-        oidcc_provider_configuration:decode_configuration(jose:decode(Configuration))
+        oidcc_provider_configuration:decode_configuration(json:decode(Configuration))
     ),
 
     ok.
@@ -683,7 +683,7 @@ decode_fapi2_test() ->
 google_merge_json(Merge) ->
     PrivDir = code:priv_dir(oidcc),
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/google-metadata.json"),
-    Decoded = jose:decode(ValidConfigString),
+    Decoded = json:decode(ValidConfigString),
     maps:merge(Decoded, Merge).
 
 use_spec_defaults_in_implicit_configs_test() ->
@@ -695,7 +695,7 @@ use_spec_defaults_in_implicit_configs_test() ->
             issuer = <<"https://my.provider">>,
             token_endpoint_auth_methods_supported = [<<"client_secret_basic">>]
         }},
-        oidcc_provider_configuration:decode_configuration(jose:decode(Configuration))
+        oidcc_provider_configuration:decode_configuration(json:decode(Configuration))
     ),
 
     ok.

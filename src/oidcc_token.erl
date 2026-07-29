@@ -587,7 +587,7 @@ see {@link oidcc:jwt_profile_token/6}.
                                                  <<"client_secret">>),
 
 {ok, KeyJson} = file:read_file("jwt-profile.json"),
-KeyMap = jose:decode(KeyJson),
+KeyMap = json:decode(KeyJson),
 Key = jose_jwk:from_pem(maps:get(<<"key">>, KeyMap)),
 
 {ok, #oidcc_token{}} =

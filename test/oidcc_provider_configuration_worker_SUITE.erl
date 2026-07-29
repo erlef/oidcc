@@ -179,15 +179,17 @@ refreshes_after_timeout(_Config) ->
     %% configured `fallback_expiry' (100 ms) -- this also exercises the
     %% cache-control parser regression covered by #371.
     Issuer = <<"https://example.com">>,
-    DiscoveryBody = jsx:encode(#{
-        issuer => Issuer,
-        jwks_uri => <<Issuer/binary, "/keys">>,
-        authorization_endpoint => <<Issuer/binary, "/authorize">>,
-        scopes_supported => [<<"openid">>],
-        response_types_supported => [<<"code">>],
-        subject_types_supported => [<<"public">>],
-        id_token_signing_alg_values_supported => [<<"RS256">>]
-    }),
+    DiscoveryBody = iolist_to_binary(
+        json:encode(#{
+            issuer => Issuer,
+            jwks_uri => <<Issuer/binary, "/keys">>,
+            authorization_endpoint => <<Issuer/binary, "/authorize">>,
+            scopes_supported => [<<"openid">>],
+            response_types_supported => [<<"code">>],
+            subject_types_supported => [<<"public">>],
+            id_token_signing_alg_values_supported => [<<"RS256">>]
+        })
+    ),
     DiscoveryHeaders = [
         {"content-type", "application/json"},
         {"cache-control", "max-age=0, no-store"}
@@ -210,7 +212,11 @@ refreshes_after_timeout(_Config) ->
                 _Opts,
                 _Profile
             ) ->
-                {ok, {{"HTTP/1.1", 200, "OK"}, JwksHeaders, jsx:encode(#{keys => []})}}
+                {ok, {
+                    {"HTTP/1.1", 200, "OK"},
+                    JwksHeaders,
+                    iolist_to_binary(json:encode(#{keys => []}))
+                }}
         end,
     ok = meck:new(httpc, [no_link]),
     ok = meck:expect(httpc, request, HttpFun),

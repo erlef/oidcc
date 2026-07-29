@@ -16,7 +16,7 @@ register_test() ->
     {ok,
         #oidcc_provider_configuration{registration_endpoint = RegistrationEndpoint} =
             Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 
@@ -29,10 +29,12 @@ register_test() ->
 
     ClientId = <<"client_id">>,
 
-    ResponseJson = jose:encode(#{
-        client_id => ClientId,
-        client_id_issued_at => erlang:system_time(second)
-    }),
+    ResponseJson = iolist_to_binary(
+        json:encode(#{
+            client_id => ClientId,
+            client_id_issued_at => erlang:system_time(second)
+        })
+    ),
 
     TelemetryRef =
         telemetry_test:attach_event_handlers(
@@ -60,7 +62,7 @@ register_test() ->
                     <<"require_auth_time">> := false,
                     <<"token_endpoint_auth_method">> := <<"client_secret_basic">>
                 },
-                jose:decode(Body)
+                json:decode(Body)
             ),
             {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], ResponseJson}}
         end,
@@ -103,7 +105,7 @@ registration_not_supported_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Configuration = Configuration0#oidcc_provider_configuration{registration_endpoint = undefined},
 
@@ -129,7 +131,7 @@ registration_invalid_response_test() ->
     {ok,
         #oidcc_provider_configuration{registration_endpoint = RegistrationEndpoint} =
             Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     RedirectUri = <<"https://example.com/oidcc/callback">>,
 
@@ -171,7 +173,7 @@ registration_invalid_response_test() ->
         ) ->
             RegistrationEndpoint = ReqEndpoint,
 
-            case jose:decode(Body) of
+            case json:decode(Body) of
                 #{<<"client_name">> := <<"jwt">>} ->
                     {ok, {
                         {"HTTP/1.1", 200, "OK"},
@@ -188,13 +190,17 @@ registration_invalid_response_test() ->
                     {ok, {
                         {"HTTP/1.1", 200, "OK"},
                         [{"content-type", "application/json"}],
-                        jose:encode(#{client_id => ClientId, client_id_issued_at => <<"invalid">>})
+                        iolist_to_binary(
+                            json:encode(#{
+                                client_id => ClientId, client_id_issued_at => <<"invalid">>
+                            })
+                        )
                     }};
                 #{<<"client_name">> := <<"invalid_client_id">>} ->
                     {ok, {
                         {"HTTP/1.1", 200, "OK"},
                         [{"content-type", "application/json"}],
-                        jose:encode(#{client_id => 7})
+                        iolist_to_binary(json:encode(#{client_id => 7}))
                     }}
             end
         end,

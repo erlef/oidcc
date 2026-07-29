@@ -15,7 +15,7 @@ introspect_test() ->
     {ok,
         #oidcc_provider_configuration{introspection_endpoint = IntrospectionEndpoint} =
             Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 
@@ -37,11 +37,13 @@ introspect_test() ->
             {ok, {
                 {"HTTP/1.1", 200, "OK"},
                 [{"content-type", "application/json"}],
-                jsx:encode(#{
-                    <<"active">> => true,
-                    <<"client_id">> => ClientId,
-                    <<"extra">> => <<"value">>
-                })
+                iolist_to_binary(
+                    json:encode(#{
+                        <<"active">> => true,
+                        <<"client_id">> => ClientId,
+                        <<"extra">> => <<"value">>
+                    })
+                )
             }}
         end,
     RequestOpts = #{
@@ -86,7 +88,7 @@ introspect_inactive_test() ->
     {ok,
         #oidcc_provider_configuration{introspection_endpoint = IntrospectionEndpoint} =
             Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 
@@ -129,7 +131,7 @@ introspection_not_supported_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Configuration = Configuration0#oidcc_provider_configuration{
         introspection_endpoint = undefined
@@ -161,7 +163,7 @@ introspection_invalid_client_id_test() ->
     {ok,
         #oidcc_provider_configuration{introspection_endpoint = IntrospectionEndpoint} =
             Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 
@@ -211,7 +213,7 @@ introspection_issuer_client_id_test() ->
             issuer = Issuer
         } =
             Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 

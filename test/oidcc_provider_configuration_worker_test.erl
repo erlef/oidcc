@@ -126,15 +126,17 @@ refreshes_in_background_with_adapter_test() ->
 %% expiry — including the literal `max-age=0' — flows through the
 %% backoff/retry path and the worker keeps running.
 survives_cache_control_max_age_zero_test() ->
-    DiscoveryBody = jsx:encode(#{
-        issuer => <<"https://example.com">>,
-        jwks_uri => <<"https://example.com/keys">>,
-        authorization_endpoint => <<"https://example.com/authorize">>,
-        scopes_supported => [<<"openid">>],
-        response_types_supported => [<<"code">>],
-        subject_types_supported => [<<"public">>],
-        id_token_signing_alg_values_supported => [<<"RS256">>]
-    }),
+    DiscoveryBody = iolist_to_binary(
+        json:encode(#{
+            issuer => <<"https://example.com">>,
+            jwks_uri => <<"https://example.com/keys">>,
+            authorization_endpoint => <<"https://example.com/authorize">>,
+            scopes_supported => [<<"openid">>],
+            response_types_supported => [<<"code">>],
+            subject_types_supported => [<<"public">>],
+            id_token_signing_alg_values_supported => [<<"RS256">>]
+        })
+    ),
     HttpFun =
         fun
             (
@@ -165,7 +167,7 @@ survives_cache_control_max_age_zero_test() ->
                         {"content-type", "application/json"},
                         {"cache-control", "max-age=0, no-store"}
                     ],
-                    jsx:encode(#{keys => []})
+                    iolist_to_binary(json:encode(#{keys => []}))
                 }}
         end,
 
@@ -207,15 +209,17 @@ accepts_generic_plus_json_content_type_test() ->
                 {ok, {
                     {"HTTP/1.1", 200, "OK"},
                     [{"content-type", "application/json"}],
-                    jsx:encode(#{
-                        issuer => <<"https://example.com">>,
-                        jwks_uri => <<"https://example.com/keys">>,
-                        authorization_endpoint => <<"https://example.com/authorize">>,
-                        scopes_supported => [<<"openid">>],
-                        response_types_supported => [<<"code">>],
-                        subject_types_supported => [<<"public">>],
-                        id_token_signing_alg_values_supported => [<<"RS256">>]
-                    })
+                    iolist_to_binary(
+                        json:encode(#{
+                            issuer => <<"https://example.com">>,
+                            jwks_uri => <<"https://example.com/keys">>,
+                            authorization_endpoint => <<"https://example.com/authorize">>,
+                            scopes_supported => [<<"openid">>],
+                            response_types_supported => [<<"code">>],
+                            subject_types_supported => [<<"public">>],
+                            id_token_signing_alg_values_supported => [<<"RS256">>]
+                        })
+                    )
                 }};
             (
                 get,
@@ -227,7 +231,7 @@ accepts_generic_plus_json_content_type_test() ->
                 {ok, {
                     {"HTTP/1.1", 200, "OK"},
                     [{"content-type", "application/vnd.example+json; charset=utf-8"}],
-                    jsx:encode(#{keys => []})
+                    iolist_to_binary(json:encode(#{keys => []}))
                 }}
         end,
 
@@ -384,15 +388,17 @@ provider_adapter(TestPid, AdapterState) ->
                 {ok, {
                     {"HTTP/1.1", 200, "OK"},
                     [{"content-type", "application/json"} | AdditionalHeaders],
-                    jsx:encode(#{
-                        issuer => <<"https://example.com">>,
-                        jwks_uri => <<"https://example.com/keys">>,
-                        authorization_endpoint => <<"https://example.com/authorize">>,
-                        scopes_supported => [<<"openid">>],
-                        response_types_supported => [<<"code">>],
-                        subject_types_supported => [<<"public">>],
-                        id_token_signing_alg_values_supported => [<<"RS256">>]
-                    })
+                    iolist_to_binary(
+                        json:encode(#{
+                            issuer => <<"https://example.com">>,
+                            jwks_uri => <<"https://example.com/keys">>,
+                            authorization_endpoint => <<"https://example.com/authorize">>,
+                            scopes_supported => [<<"openid">>],
+                            response_types_supported => [<<"code">>],
+                            subject_types_supported => [<<"public">>],
+                            id_token_signing_alg_values_supported => [<<"RS256">>]
+                        })
+                    )
                 }};
             (
                 get,
@@ -406,7 +412,7 @@ provider_adapter(TestPid, AdapterState) ->
                 {ok, {
                     {"HTTP/1.1", 200, "OK"},
                     [{"content-type", "application/json"} | AdditionalHeaders],
-                    jsx:encode(#{keys => []})
+                    iolist_to_binary(json:encode(#{keys => []}))
                 }}
         end,
     {oidcc_http_adapter_test, #{request => HttpFun}}.

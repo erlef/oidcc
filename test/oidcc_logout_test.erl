@@ -12,7 +12,7 @@ initiate_url_test() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 

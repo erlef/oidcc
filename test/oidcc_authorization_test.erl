@@ -15,7 +15,7 @@ create_redirect_url_test() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
     PkcePlainConfiguration = Configuration#oidcc_provider_configuration{
         code_challenge_methods_supported = [<<"plain">>]
@@ -146,7 +146,7 @@ create_redirect_url_with_request_object_test() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, #oidcc_provider_configuration{issuer = Issuer} = Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
 
     Configuration = Configuration0#oidcc_provider_configuration{
@@ -257,7 +257,7 @@ create_redirect_url_with_request_object_and_max_clock_skew_test() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, #oidcc_provider_configuration{} = Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
 
     Configuration = Configuration0#oidcc_provider_configuration{
@@ -340,7 +340,7 @@ create_redirect_url_with_request_object_no_hmac_test() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, #oidcc_provider_configuration{} = Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
 
     Configuration = Configuration0#oidcc_provider_configuration{
@@ -414,7 +414,7 @@ create_redirect_url_with_invalid_request_object_test() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
 
     Configuration = Configuration0#oidcc_provider_configuration{
@@ -465,7 +465,7 @@ create_redirect_url_with_missing_config_request_object_test() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
 
     Configuration = Configuration0#oidcc_provider_configuration{
@@ -513,7 +513,7 @@ create_redirect_url_with_missing_config_request_object_required_test() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
 
     Configuration = Configuration0#oidcc_provider_configuration{
@@ -546,7 +546,7 @@ create_redirect_url_with_request_object_only_none_alg_test() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
 
     Configuration = Configuration0#oidcc_provider_configuration{
@@ -602,7 +602,7 @@ create_redirect_url_with_request_object_only_none_alg_unsecured_test() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
 
     Configuration = Configuration0#oidcc_provider_configuration{
@@ -691,7 +691,7 @@ create_redirect_url_with_par_required_no_url_test() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
 
     Configuration = Configuration0#oidcc_provider_configuration{
@@ -725,7 +725,7 @@ create_redirect_url_with_par_url_test() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
 
     Configuration = Configuration0#oidcc_provider_configuration{
@@ -733,10 +733,12 @@ create_redirect_url_with_par_url_test() ->
     },
 
     ParResponseData =
-        jsx:encode(#{
-            <<"request_uri">> => <<"urn:ietf:params:oauth:request_uri:par_response">>,
-            <<"expires_in">> => 60
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"request_uri">> => <<"urn:ietf:params:oauth:request_uri:par_response">>,
+                <<"expires_in">> => 60
+            })
+        ),
 
     ClientId = <<"client_id">>,
     ClientSecret = <<"at_least_32_character_client_secret">>,
@@ -824,7 +826,7 @@ create_redirect_url_with_par_error_when_required_test() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
 
     Configuration = Configuration0#oidcc_provider_configuration{
@@ -833,9 +835,11 @@ create_redirect_url_with_par_error_when_required_test() ->
     },
 
     ParResponseData =
-        jsx:encode(#{
-            <<"error">> => <<"invalid_request">>
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"error">> => <<"invalid_request">>
+            })
+        ),
 
     ClientId = <<"client_id">>,
     ClientSecret = <<"at_least_32_character_client_secret">>,
@@ -881,7 +885,7 @@ create_redirect_url_with_par_invalid_response_test() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
 
     Configuration = Configuration0#oidcc_provider_configuration{
@@ -890,7 +894,7 @@ create_redirect_url_with_par_invalid_response_test() ->
     },
 
     %% no request_uri
-    ParResponseData = jsx:encode(#{}),
+    ParResponseData = iolist_to_binary(json:encode(#{})),
 
     ClientId = <<"client_id">>,
     ClientSecret = <<"at_least_32_character_client_secret">>,
@@ -937,7 +941,7 @@ create_redirect_url_with_par_client_secret_jwt_request_object_test() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, #oidcc_provider_configuration{issuer = Issuer} = Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
 
     Configuration = Configuration0#oidcc_provider_configuration{
@@ -953,10 +957,12 @@ create_redirect_url_with_par_client_secret_jwt_request_object_test() ->
     },
 
     ParResponseData =
-        jsx:encode(#{
-            <<"request_uri">> => <<"urn:ietf:params:oauth:request_uri:par_response">>,
-            <<"expires_in">> => 60
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"request_uri">> => <<"urn:ietf:params:oauth:request_uri:par_response">>,
+                <<"expires_in">> => 60
+            })
+        ),
 
     ClientId = <<"client_id">>,
     ClientSecret = <<"at_least_32_character_client_secret">>,
@@ -1129,7 +1135,7 @@ private_key_jwt_fixture() ->
 
     {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ValidConfigString)
+        json:decode(ValidConfigString)
     ),
     Configuration = Configuration0#oidcc_provider_configuration{
         token_endpoint_auth_methods_supported = [<<"private_key_jwt">>],

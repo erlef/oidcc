@@ -347,7 +347,7 @@ See https://datatracker.ietf.org/doc/html/rfc7523#section-4.
 
 ```erlang
 {ok, KeyJson} = file:read_file("jwt-profile.json"),
-KeyMap = jose:decode(KeyJson),
+KeyMap = json:decode(KeyJson),
 Key = jose_jwk:from_pem(maps:get(<<"key">>, KeyMap)),
 
 {ok, #oidcc_token{}} =

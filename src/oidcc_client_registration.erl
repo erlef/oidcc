@@ -360,4 +360,4 @@ encode(#oidcc_client_registration{
         end,
         Map1
     ),
-    jose:encode(Map).
+    iolist_to_binary(json:encode(Map)).

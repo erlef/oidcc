@@ -30,7 +30,7 @@ retrieve_none_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ConfigurationBinary)
+        json:decode(ConfigurationBinary)
     ),
     #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
         Configuration = Configuration0#oidcc_provider_configuration{
@@ -63,13 +63,15 @@ retrieve_none_test() ->
         ),
 
     TokenData =
-        jsx:encode(#{
-            <<"access_token">> => AccessToken,
-            <<"token_type">> => <<"Bearer">>,
-            <<"id_token">> => Token,
-            <<"scope">> => <<"profile openid">>,
-            <<"expires_in">> => <<"3600">>
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>,
+                <<"expires_in">> => <<"3600">>
+            })
+        ),
 
     ClientContext = oidcc_client_context:from_manual(Configuration, JwkSet, ClientId, ClientSecret),
 
@@ -146,7 +148,7 @@ retrieve_rs256_with_rotation_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ConfigurationBinary)
+        json:decode(ConfigurationBinary)
     ),
 
     #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
@@ -188,13 +190,15 @@ retrieve_rs256_with_rotation_test() ->
         ),
 
     TokenData =
-        jsx:encode(#{
-            <<"access_token">> => AccessToken,
-            <<"token_type">> => <<"Bearer">>,
-            <<"id_token">> => Token,
-            <<"scope">> => <<"profile openid">>,
-            <<"refresh_token">> => RefreshToken
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>,
+                <<"refresh_token">> => RefreshToken
+            })
+        ),
 
     ClientContext = oidcc_client_context:from_manual(
         Configuration, JwkBeforeRefresh, ClientId, ClientSecret
@@ -264,7 +268,7 @@ retrieve_hs256_test() ->
     {ok,
         #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
             Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     ClientId = <<"client_id">>,
     ClientSecret = <<"at_least_32_character_client_secret">>,
@@ -291,13 +295,15 @@ retrieve_hs256_test() ->
     OtherJwk = jose_jwk:from_file(PrivDir ++ "/test/fixtures/openid-certification-jwks.json"),
 
     TokenData =
-        jsx:encode(#{
-            <<"access_token">> => AccessToken,
-            <<"token_type">> => <<"Bearer">>,
-            <<"id_token">> => Token,
-            <<"scope">> => <<"profile openid">>,
-            <<"refresh_token">> => RefreshToken
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>,
+                <<"refresh_token">> => RefreshToken
+            })
+        ),
 
     ClientContext = oidcc_client_context:from_manual(
         Configuration, OtherJwk, ClientId, ClientSecret
@@ -346,7 +352,7 @@ retrieve_hs256_with_max_clock_skew_test() ->
     {ok,
         #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
             Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     ClientId = <<"client_id">>,
     ClientSecret = <<"at_least_32_character_client_secret">>,
@@ -374,13 +380,15 @@ retrieve_hs256_with_max_clock_skew_test() ->
     OtherJwk = jose_jwk:from_file(PrivDir ++ "/test/fixtures/openid-certification-jwks.json"),
 
     TokenData =
-        jsx:encode(#{
-            <<"access_token">> => AccessToken,
-            <<"token_type">> => <<"Bearer">>,
-            <<"id_token">> => Token,
-            <<"scope">> => <<"profile openid">>,
-            <<"refresh_token">> => RefreshToken
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>,
+                <<"refresh_token">> => RefreshToken
+            })
+        ),
 
     ClientContext = oidcc_client_context:from_manual(
         Configuration, OtherJwk, ClientId, ClientSecret
@@ -440,7 +448,7 @@ auth_method_client_secret_jwt_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ConfigurationBinary)
+        json:decode(ConfigurationBinary)
     ),
 
     #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
@@ -477,13 +485,15 @@ auth_method_client_secret_jwt_test() ->
         ),
 
     TokenData =
-        jsx:encode(#{
-            <<"access_token">> => AccessToken,
-            <<"token_type">> => <<"Bearer">>,
-            <<"id_token">> => Token,
-            <<"scope">> => <<"profile openid">>,
-            <<"refresh_token">> => RefreshToken
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>,
+                <<"refresh_token">> => RefreshToken
+            })
+        ),
 
     ClientContext = oidcc_client_context:from_manual(Configuration, Jwk, ClientId, ClientSecret),
 
@@ -566,7 +576,7 @@ auth_method_client_secret_jwt_with_max_clock_skew_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ConfigurationBinary)
+        json:decode(ConfigurationBinary)
     ),
 
     #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
@@ -603,13 +613,15 @@ auth_method_client_secret_jwt_with_max_clock_skew_test() ->
         ),
 
     TokenData =
-        jsx:encode(#{
-            <<"access_token">> => AccessToken,
-            <<"token_type">> => <<"Bearer">>,
-            <<"id_token">> => Token,
-            <<"scope">> => <<"profile openid">>,
-            <<"refresh_token">> => RefreshToken
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>,
+                <<"refresh_token">> => RefreshToken
+            })
+        ),
 
     ClientContext = oidcc_client_context:from_manual(Configuration, Jwk, ClientId, ClientSecret),
 
@@ -666,7 +678,7 @@ auth_method_private_key_jwt_no_supported_alg_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ConfigurationBinary)
+        json:decode(ConfigurationBinary)
     ),
 
     #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
@@ -703,13 +715,15 @@ auth_method_private_key_jwt_no_supported_alg_test() ->
         ),
 
     TokenData =
-        jsx:encode(#{
-            <<"access_token">> => AccessToken,
-            <<"token_type">> => <<"Bearer">>,
-            <<"id_token">> => Token,
-            <<"scope">> => <<"profile openid">>,
-            <<"refresh_token">> => RefreshToken
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>,
+                <<"refresh_token">> => RefreshToken
+            })
+        ),
 
     ClientContext = oidcc_client_context:from_manual(Configuration, Jwk, ClientId, ClientSecret),
 
@@ -767,7 +781,7 @@ auth_method_private_key_jwt_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ConfigurationBinary)
+        json:decode(ConfigurationBinary)
     ),
 
     #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
@@ -802,13 +816,15 @@ auth_method_private_key_jwt_test() ->
         ),
 
     TokenData =
-        jsx:encode(#{
-            <<"access_token">> => AccessToken,
-            <<"token_type">> => <<"Bearer">>,
-            <<"id_token">> => Token,
-            <<"scope">> => <<"profile openid">>,
-            <<"refresh_token">> => RefreshToken
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>,
+                <<"refresh_token">> => RefreshToken
+            })
+        ),
 
     ClientJwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
     ClientJwk = ClientJwk0#jose_jwk{
@@ -907,7 +923,7 @@ auth_method_private_key_jwt_override_claims_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ConfigurationBinary)
+        json:decode(ConfigurationBinary)
     ),
 
     #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
@@ -942,13 +958,15 @@ auth_method_private_key_jwt_override_claims_test() ->
         ),
 
     TokenData =
-        jsx:encode(#{
-            <<"access_token">> => AccessToken,
-            <<"token_type">> => <<"Bearer">>,
-            <<"id_token">> => Token,
-            <<"scope">> => <<"profile openid">>,
-            <<"refresh_token">> => RefreshToken
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>,
+                <<"refresh_token">> => RefreshToken
+            })
+        ),
 
     ClientJwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
     ClientJwk = ClientJwk0#jose_jwk{
@@ -1052,7 +1070,7 @@ auth_method_private_key_jwt_with_dpop_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ConfigurationBinary)
+        json:decode(ConfigurationBinary)
     ),
 
     #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
@@ -1088,13 +1106,15 @@ auth_method_private_key_jwt_with_dpop_test() ->
         ),
 
     TokenData =
-        jsx:encode(#{
-            <<"access_token">> => AccessToken,
-            <<"token_type">> => <<"Bearer">>,
-            <<"id_token">> => Token,
-            <<"scope">> => <<"profile openid">>,
-            <<"refresh_token">> => RefreshToken
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>,
+                <<"refresh_token">> => RefreshToken
+            })
+        ),
 
     ClientJwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
     ClientJwk = ClientJwk0#jose_jwk{
@@ -1233,7 +1253,7 @@ auth_method_private_key_jwt_with_dpop_and_nonce_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ConfigurationBinary)
+        json:decode(ConfigurationBinary)
     ),
 
     #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
@@ -1270,19 +1290,23 @@ auth_method_private_key_jwt_with_dpop_and_nonce_test() ->
         ),
 
     TokenData =
-        jsx:encode(#{
-            <<"access_token">> => AccessToken,
-            <<"token_type">> => <<"Bearer">>,
-            <<"id_token">> => Token,
-            <<"scope">> => <<"profile openid">>,
-            <<"refresh_token">> => RefreshToken
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>,
+                <<"refresh_token">> => RefreshToken
+            })
+        ),
 
-    DpopNonceError = jsx:encode(#{
-        <<"error">> => <<"use_dpop_nonce">>,
-        <<"error_description">> =>
-            <<"Authorization server requires nonce in DPoP proof">>
-    }),
+    DpopNonceError = iolist_to_binary(
+        json:encode(#{
+            <<"error">> => <<"use_dpop_nonce">>,
+            <<"error_description">> =>
+                <<"Authorization server requires nonce in DPoP proof">>
+        })
+    ),
 
     ClientJwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
     ClientJwk = ClientJwk0#jose_jwk{
@@ -1439,7 +1463,7 @@ auth_method_private_key_jwt_with_invalid_dpop_nonce_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ConfigurationBinary)
+        json:decode(ConfigurationBinary)
     ),
 
     Configuration = Configuration0#oidcc_provider_configuration{
@@ -1455,11 +1479,13 @@ auth_method_private_key_jwt_with_invalid_dpop_nonce_test() ->
     DpopNonce = <<"dpop_nonce">>,
     Jwk = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 
-    DpopNonceError = jsx:encode(#{
-        <<"error">> => <<"use_dpop_nonce">>,
-        <<"error_description">> =>
-            <<"Authorization server requires nonce in DPoP proof">>
-    }),
+    DpopNonceError = iolist_to_binary(
+        json:encode(#{
+            <<"error">> => <<"use_dpop_nonce">>,
+            <<"error_description">> =>
+                <<"Authorization server requires nonce in DPoP proof">>
+        })
+    ),
 
     ClientJwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
     ClientJwk = ClientJwk0#jose_jwk{
@@ -1512,7 +1538,7 @@ auth_method_client_secret_jwt_no_alg_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ConfigurationBinary)
+        json:decode(ConfigurationBinary)
     ),
 
     Configuration = Configuration0#oidcc_provider_configuration{
@@ -1549,7 +1575,7 @@ preferred_auth_methods_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ConfigurationBinary)
+        json:decode(ConfigurationBinary)
     ),
 
     #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
@@ -1586,13 +1612,15 @@ preferred_auth_methods_test() ->
         ),
 
     TokenData =
-        jsx:encode(#{
-            <<"access_token">> => AccessToken,
-            <<"token_type">> => <<"Bearer">>,
-            <<"id_token">> => Token,
-            <<"scope">> => <<"profile openid">>,
-            <<"refresh_token">> => RefreshToken
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>,
+                <<"refresh_token">> => RefreshToken
+            })
+        ),
 
     ClientContext = oidcc_client_context:from_manual(Configuration, Jwk, ClientId, ClientSecret),
 
@@ -1649,7 +1677,7 @@ authorization_headers_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ConfigurationBinary)
+        json:decode(ConfigurationBinary)
     ),
 
     SigningAlg = [<<"RS256">>],
@@ -1791,12 +1819,14 @@ trusted_audiences_test() ->
         ),
 
     TokenData =
-        jsx:encode(#{
-            <<"access_token">> => AccessToken,
-            <<"token_type">> => <<"Bearer">>,
-            <<"id_token">> => Token,
-            <<"scope">> => <<"profile openid">>
-        }),
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>
+            })
+        ),
 
     ok = meck:new(httpc, [no_link]),
     HttpFun =
@@ -2151,7 +2181,7 @@ validate_id_token_rotation_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, #oidcc_provider_configuration{issuer = Issuer} = Configuration} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ConfigurationBinary)
+        json:decode(ConfigurationBinary)
     ),
 
     ClientId = <<"client_id">>,
@@ -2343,7 +2373,7 @@ client_context_fapi2_fixture() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/fapi2-metadata.json"),
     {ok, Configuration} = oidcc_provider_configuration:decode_configuration(
-        jose:decode(ConfigurationBinary)
+        json:decode(ConfigurationBinary)
     ),
 
     Jwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),

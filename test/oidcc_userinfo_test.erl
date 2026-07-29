@@ -15,7 +15,7 @@ json_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, #oidcc_provider_configuration{userinfo_endpoint = UserInfoEndpoint} = Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 
@@ -108,7 +108,7 @@ jwt_test() ->
     {ok,
         #oidcc_provider_configuration{userinfo_endpoint = UserInfoEndpoint, issuer = Issuer} =
             Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     JwkBeforeRefresh0 = jose_jwk:generate_key(16),
     JwkBeforeRefresh = JwkBeforeRefresh0#jose_jwk{fields = #{<<"kid">> => <<"kid1">>}},
@@ -217,7 +217,7 @@ jwt_encrypted_not_signed_test() ->
     {ok,
         #oidcc_provider_configuration{} =
             Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Jwk = jose_jwk:generate_key({rsa, 1024}),
 
@@ -285,7 +285,7 @@ distributed_claims_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, #oidcc_provider_configuration{userinfo_endpoint = UserInfoEndpoint} = Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 
@@ -320,23 +320,25 @@ distributed_claims_test() ->
                     {ok, {
                         {"HTTP/1.1", 200, "OK"},
                         [{"content-type", "application/json"}],
-                        jsx:encode(#{
-                            <<"sub">> => Sub,
-                            <<"_claim_names">> => #{
-                                <<"first_name">> => <<"remote">>,
-                                <<"last_name">> => <<"local">>
-                            },
-                            <<"_claim_sources">> => #{
-                                <<"remote">> => #{
-                                    <<"endpoint">> =>
-                                        <<"https://my.provider/distributed-claim">>,
-                                    <<"access_token">> => <<"acces_token">>
+                        iolist_to_binary(
+                            json:encode(#{
+                                <<"sub">> => Sub,
+                                <<"_claim_names">> => #{
+                                    <<"first_name">> => <<"remote">>,
+                                    <<"last_name">> => <<"local">>
                                 },
-                                <<"local">> => #{
-                                    <<"JWT">> => LocalToken
+                                <<"_claim_sources">> => #{
+                                    <<"remote">> => #{
+                                        <<"endpoint">> =>
+                                            <<"https://my.provider/distributed-claim">>,
+                                        <<"access_token">> => <<"acces_token">>
+                                    },
+                                    <<"local">> => #{
+                                        <<"JWT">> => LocalToken
+                                    }
                                 }
-                            }
-                        })
+                            })
+                        )
                     }};
                 <<"https://my.provider/distributed-claim">> ->
                     {ok, {
@@ -384,7 +386,7 @@ distributed_claims_invalid_json_resp_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, #oidcc_provider_configuration{userinfo_endpoint = UserInfoEndpoint} = Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 
@@ -466,7 +468,7 @@ distributed_claims_http_error_resp_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, #oidcc_provider_configuration{userinfo_endpoint = UserInfoEndpoint} = Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 
@@ -548,7 +550,7 @@ distributed_claims_invalid_source_mapping_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, #oidcc_provider_configuration{userinfo_endpoint = UserInfoEndpoint} = Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 
@@ -619,7 +621,7 @@ dpop_proof_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, #oidcc_provider_configuration{userinfo_endpoint = UserInfoEndpoint} = Configuration0} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Configuration = Configuration0#oidcc_provider_configuration{
         dpop_signing_alg_values_supported = [<<"RS256">>]
@@ -725,7 +727,7 @@ dpop_proof_case_insensitive_token_type_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, #oidcc_provider_configuration{userinfo_endpoint = UserInfoEndpoint} = Configuration0} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Configuration = Configuration0#oidcc_provider_configuration{
         dpop_signing_alg_values_supported = [<<"RS256">>]
@@ -789,7 +791,7 @@ dpop_proof_with_nonce_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, #oidcc_provider_configuration{userinfo_endpoint = UserInfoEndpoint} = Configuration0} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Configuration = Configuration0#oidcc_provider_configuration{
         dpop_signing_alg_values_supported = [<<"RS256">>]
@@ -815,11 +817,13 @@ dpop_proof_with_nonce_test() ->
         #{mode => urlsafe, padding => false}
     ),
     DpopNonce = <<"dpop_nonce">>,
-    DpopNonceError = jsx:encode(#{
-        <<"error">> => <<"use_dpop_nonce">>,
-        <<"error_description">> =>
-            <<"Authorization server requires nonce in DPoP proof">>
-    }),
+    DpopNonceError = iolist_to_binary(
+        json:encode(#{
+            <<"error">> => <<"use_dpop_nonce">>,
+            <<"error_description">> =>
+                <<"Authorization server requires nonce in DPoP proof">>
+        })
+    ),
 
     HttpFun =
         fun(get, {Url, Header}, _HttpOpts, _Opts, _Profile) ->
@@ -914,7 +918,7 @@ dpop_proof_with_invalid_nonce_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration0} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Configuration = Configuration0#oidcc_provider_configuration{
         dpop_signing_alg_values_supported = [<<"RS256">>]
@@ -935,11 +939,13 @@ dpop_proof_with_invalid_nonce_test() ->
     Sub = <<"123456">>,
     AccessToken = <<"opensesame">>,
     DpopNonce = <<"dpop_nonce">>,
-    DpopNonceError = jsx:encode(#{
-        <<"error">> => <<"use_dpop_nonce">>,
-        <<"error_description">> =>
-            <<"Authorization server requires nonce in DPoP proof">>
-    }),
+    DpopNonceError = iolist_to_binary(
+        json:encode(#{
+            <<"error">> => <<"use_dpop_nonce">>,
+            <<"error_description">> =>
+                <<"Authorization server requires nonce in DPoP proof">>
+        })
+    ),
 
     HttpFun =
         fun(get, _UrlHeader, _HttpOpts, _Opts, _Profile) ->
@@ -978,7 +984,7 @@ retrieve_no_access_token_test() ->
 
     {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
     {ok, Configuration} =
-        oidcc_provider_configuration:decode_configuration(jose:decode(ConfigurationBinary)),
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
 
     Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
 

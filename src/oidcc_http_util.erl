@@ -142,7 +142,7 @@ extract_successful_response({{_HttpVersion, Status, _HttpStatusName}, Headers, H
 ->
     case fetch_content_type(Headers) of
         json ->
-            {ok, {json, jose:decode(HttpBodyResult)}};
+            {ok, {json, json:decode(HttpBodyResult)}};
         jwt ->
             {ok, {jwt, HttpBodyResult}};
         unknown ->
@@ -152,7 +152,7 @@ extract_successful_response({{_HttpVersion, StatusCode, _HttpStatusName}, Header
     Body =
         case fetch_content_type(Headers) of
             json ->
-                jose:decode(HttpBodyResult);
+                json:decode(HttpBodyResult);
             jwt ->
                 HttpBodyResult;
             unknown ->

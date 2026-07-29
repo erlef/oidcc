@@ -28,10 +28,6 @@ rebar3.crashdump
 # Ignore package tarball (built via "mix hex.build").
 oidcc-*.tar
 
-# Ignore Package Lock Files (not relevant for library)
-mix.lock
-rebar.lock
-
 # Other Rebar Files
 ebin/
 log/

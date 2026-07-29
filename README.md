@@ -142,7 +142,7 @@ A security audit was performed by [SAFE-Erlang-Elixir](https://github.com/SAFE-E
 
 ## Setup
 
-**Please note that the minimum supported Erlang OTP version is OTP26.**
+**Please note that the minimum supported Erlang OTP version is OTP27.**
 
 <!-- tabs-open -->
 

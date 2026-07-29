@@ -5,8 +5,7 @@
 
 -hank([{unused_callbacks, [{request, 5}]}]).
 
--include("internal/doc.hrl").
-?MODULEDOC("""
+-moduledoc """
 HTTP transport adapter.
 
 Adapters perform the transport operation for `oidcc_http_util` and return the
@@ -109,7 +108,7 @@ while receiving the body.
 
 Adapters may emit their own telemetry. The telemetry span owned by
 `oidcc_http_util` remains authoritative for OIDCC HTTP operations.
-""").
+""".
 
 -export_type([config/0]).
 -export_type([header/0]).
@@ -120,16 +119,16 @@ Adapters may emit their own telemetry. The telemetry span owned by
 -export_type([request_options/0]).
 -export_type([response/0]).
 
-?DOC("Adapter module and adapter-specific configuration.").
+-doc "Adapter module and adapter-specific configuration.".
 -type config() :: {module(), map()}.
 
-?DOC("HTTP method accepted by `httpc:request/5`.").
+-doc "HTTP method accepted by `httpc:request/5`.".
 -type method() :: head | get | put | patch | post | trace | options | delete.
 
-?DOC("HTTP header representation accepted and returned by `httpc:request/5`.").
+-doc "HTTP header representation accepted and returned by `httpc:request/5`.".
 -type header() :: {Field :: [byte()], Value :: binary() | iolist()}.
 
-?DOC("HTTP request tuple accepted by `httpc:request/5`.").
+-doc "HTTP request tuple accepted by `httpc:request/5`.".
 -type request() ::
     {uri_string:uri_string(), [header()]}
     | {
@@ -139,7 +138,7 @@ Adapters may emit their own telemetry. The telemetry span owned by
         request_body()
     }.
 
-?DOC("HTTP request body accepted by `httpc:request/5`.").
+-doc "HTTP request body accepted by `httpc:request/5`.".
 -type request_body() ::
     iolist()
     | binary()
@@ -153,19 +152,19 @@ Adapters may emit their own telemetry. The telemetry span owned by
         Accumulator :: term()
     }.
 
-?DOC("""
+-doc """
 HTTP options constructed by `oidcc_http_util`.
 
 The list includes the request timeout and, when configured, TLS options.
-""").
+""".
 -type http_options() :: [
     {timeout, timeout()} | {ssl, [ssl:tls_option()]}
 ].
 
-?DOC("Request options passed to adapters.").
+-doc "Request options passed to adapters.".
 -type request_options() :: [{body_format, binary}].
 
-?DOC("Raw `httpc`-compatible response.").
+-doc "Raw `httpc`-compatible response.".
 -type response() ::
     {ok, {
         {
@@ -178,14 +177,14 @@ The list includes the request timeout and, when configured, TLS options.
     }}
     | {error, term()}.
 
-?DOC("""
+-doc """
 Perform an HTTP request.
 
 `Request` contains the original URL and is passed without transformation.
 `HttpOptions` and `RequestOptions` are the values constructed by
 `oidcc_http_util`. `AdapterConfig` is the map paired with the adapter module in
 `request_opts.http_adapter`.
-""").
+""".
 -callback request(
     Method :: method(),
     Request :: request(),

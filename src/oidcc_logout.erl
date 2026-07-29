@@ -5,9 +5,8 @@
 
 -feature(maybe_expr, enable).
 
--include("internal/doc.hrl").
-?MODULEDOC("Logout from the OpenID Provider.").
-?MODULEDOC(#{since => <<"3.0.0">>}).
+-moduledoc "Logout from the OpenID Provider.".
+-moduledoc #{since => <<"3.0.0">>}.
 
 -include("oidcc_client_context.hrl").
 -include("oidcc_provider_configuration.hrl").
@@ -18,10 +17,10 @@
 -export_type([error/0]).
 -export_type([initiate_url_opts/0]).
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type error() :: end_session_endpoint_not_supported.
 
-?DOC("""
+-doc """
 Configure Relaying Party initiated Logout URI.
 
 See https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout.
@@ -33,8 +32,8 @@ See https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout.
 * `state` - state to pass to the provider
 * `ui_locales` - UI locales to pass to the provider
 * `extra_query_params` - extra query params to add to the URI
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -type initiate_url_opts() :: #{
     logout_hint => binary(),
     post_logout_redirect_uri => uri_string:uri_string(),
@@ -43,7 +42,7 @@ See https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout.
     extra_query_params => oidcc_http_util:query_params()
 }.
 
-?DOC("""
+-doc """
 Initiate URI for Relaying Party initiated Logout.
 
 See https://openid.net/specs/openid-connect-rpinitiated-1_0.html#RPLogout.
@@ -71,8 +70,8 @@ see `oidcc:initiate_logout_url/4`.
 
 %% RedirectUri = https://my.provider/logout?id_token_hint=IDToken&client_id=ClientId&post_logout_redirect_uri=https%3A%2F%2Fmy.server%2Freturn
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec initiate_url(Token, ClientContext, Opts) ->
     {ok, uri_string:uri_string()} | {error, error()}
 when

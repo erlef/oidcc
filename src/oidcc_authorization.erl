@@ -5,9 +5,8 @@
 
 -feature(maybe_expr, enable).
 
--include("internal/doc.hrl").
-?MODULEDOC("Functions to start an OpenID Connect Authorization").
-?MODULEDOC(#{since => <<"3.0.0">>}).
+-moduledoc "Functions to start an OpenID Connect Authorization".
+-moduledoc #{since => <<"3.0.0">>}.
 
 -include("oidcc_client_context.hrl").
 -include("oidcc_provider_configuration.hrl").
@@ -19,7 +18,7 @@
 -export_type([error/0]).
 -export_type([opts/0]).
 
-?DOC("""
+-doc """
 Configure authorization redirect URL.
 
 See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
@@ -37,8 +36,8 @@ See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
 * `url_extension` - add custom query parameters to the authorization URL
 * `response_mode` - response mode to use (defaults to `<<"query">>`)
 * `request_opts` - config for the pushed authorization HTTP request
-""").
-?MODULEDOC(#{since => <<"3.0.0">>}).
+""".
+-moduledoc #{since => <<"3.0.0">>}.
 -type opts() ::
     #{
         scopes => oidcc_scope:scopes(),
@@ -54,7 +53,7 @@ See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
         request_opts => oidcc_http_util:request_opts()
     }.
 
-?MODULEDOC(#{since => <<"3.0.0">>}).
+-moduledoc #{since => <<"3.0.0">>}.
 -type error() ::
     {grant_type_not_supported, authorization_code}
     | par_required
@@ -85,7 +84,7 @@ See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
     metadata => <<"#{issuer => uri_string:uri_string(), client_id => binary()}">>
 }).
 
-?DOC("""
+-doc """
 Create Auth Redirect URL.
 
 For a high level interface using `m:oidcc_provider_configuration_worker`
@@ -105,8 +104,8 @@ see `oidcc:create_redirect_url/4`.
 
 %% RedirectUri = https://my.provider/auth?scope=openid&response_type=code&client_id=client_id&redirect_uri=https%3A%2F%2Fmy.server%2Freturn
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec create_redirect_url(ClientContext, Opts) -> {ok, Uri} | {error, error()} when
     ClientContext :: oidcc_client_context:t(),
     Opts :: opts(),

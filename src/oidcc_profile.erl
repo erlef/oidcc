@@ -5,9 +5,8 @@
 
 -feature(maybe_expr, enable).
 
--include("internal/doc.hrl").
-?MODULEDOC("OpenID Profile Utilities").
-?MODULEDOC(#{since => <<"3.2.0">>}).
+-moduledoc "OpenID Profile Utilities".
+-moduledoc #{since => <<"3.2.0">>}.
 
 -include("oidcc_client_context.hrl").
 -include("oidcc_provider_configuration.hrl").
@@ -19,11 +18,11 @@
 -export_type([opts_no_profiles/0]).
 -export_type([error/0]).
 
-?DOC(#{since => <<"3.2.0">>}).
+-doc #{since => <<"3.2.0">>}.
 -type profile() ::
     mtls_constrain | fapi2_security_profile | fapi2_message_signing | fapi2_connectid_au.
 
-?DOC(#{since => <<"3.2.0">>}).
+-doc #{since => <<"3.2.0">>}.
 -type opts() :: #{
     profiles => [profile()],
     require_pkce => boolean(),
@@ -32,7 +31,7 @@
     request_opts => oidcc_http_util:request_opts()
 }.
 
-?DOC(#{since => <<"3.2.0">>}).
+-doc #{since => <<"3.2.0">>}.
 -type opts_no_profiles() :: #{
     require_pkce => boolean(),
     trusted_audiences => [binary()] | any,
@@ -40,10 +39,10 @@
     request_opts => oidcc_http_util:request_opts()
 }.
 
-?DOC(#{since => <<"3.2.0">>}).
+-doc #{since => <<"3.2.0">>}.
 -type error() :: {unknown_profile, atom()}.
 
-?DOC(false).
+-doc false.
 -spec apply_profiles(ClientContext, opts()) ->
     {ok, ClientContext, opts_no_profiles()} | {error, error()}
 when

@@ -5,8 +5,7 @@
 
 -feature(maybe_expr, enable).
 
--include("internal/doc.hrl").
-?MODULEDOC("""
+-moduledoc """
 Tooling to load and parse Openid Configuration.
 
 ## Records
@@ -20,8 +19,8 @@ To use the record, import the definition:
 ## Telemetry
 
 See [`Oidcc.ProviderConfiguration`](`m:'Elixir.Oidcc.ProviderConfiguration'`).
-""").
-?MODULEDOC(#{since => <<"3.0.0">>}).
+""".
+-moduledoc #{since => <<"3.0.0">>}.
 
 -include("oidcc_provider_configuration.hrl").
 
@@ -36,7 +35,7 @@ See [`Oidcc.ProviderConfiguration`](`m:'Elixir.Oidcc.ProviderConfiguration'`).
 -export_type([quirks/0]).
 -export_type([t/0]).
 
-?DOC("""
+-doc """
 Allow Specification Non-compliance.
 
 ## Exceptions
@@ -50,30 +49,30 @@ Allow Specification Non-compliance.
   conform to the OpenID specification, such as Microsoft Entra ID where
   the issuer is 'https://login.microsoftonline.com/{tenantid}/v2.0' in the
   [OpenID configuration](https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration).
-""").
-?DOC(#{since => <<"3.1.0">>}).
+""".
+-doc #{since => <<"3.1.0">>}.
 -type quirks() :: #{
     allow_unsafe_http => boolean(),
     document_overrides => map(),
     issuer_regex => binary()
 }.
 
-?DOC("""
+-doc """
 Configure configuration loading / parsing.
 
 ## Parameters
 
 * `fallback_expiry` - How long to keep configuration cached if the server doesn't specify expiry.
 * `request_opts` - config for HTTP request.
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -type opts() :: #{
     fallback_expiry => timeout(),
     request_opts => oidcc_http_util:request_opts(),
     quirks => quirks()
 }.
 
-?DOC("""
+-doc """
 Record containing OpenID and OAuth 2.0 Configuration.
 
 See:
@@ -82,8 +81,8 @@ See:
 * https://openid.net/specs/openid-connect-rpinitiated-1_0.html#OPMetadata
 
 All unrecognized fields are stored in `extra_fields`.
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -type t() ::
     #oidcc_provider_configuration{
         issuer :: uri_string:uri_string(),
@@ -152,7 +151,7 @@ All unrecognized fields are stored in `extra_fields`.
         extra_fields :: #{binary() => term()}
     }.
 
-?DOC(#{since => <<"3.0.0">>}).
+-doc #{since => <<"3.0.0">>}.
 -type error() ::
     invalid_content_type
     | {issuer_mismatch, Issuer :: binary()}
@@ -203,7 +202,7 @@ All unrecognized fields are stored in `extra_fields`.
     metadata => <<"#{jwks_uri => uri_string:uri_string()}">>
 }).
 
-?DOC("""
+-doc """
 Load OpenID Configuration into a `t:oidcc_provider_configuration:t/0` record.
 
 ## Examples
@@ -212,8 +211,8 @@ Load OpenID Configuration into a `t:oidcc_provider_configuration:t/0` record.
 {ok, #oidcc_provider_configuration{}} =
   oidcc_provider_configuration:load_configuration("https://accounts.google.com").
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec load_configuration(Issuer, Opts) ->
     {ok, {Configuration :: t(), Expiry :: pos_integer()}} | {error, error()}
 when
@@ -262,15 +261,15 @@ load_configuration(Issuer0, Opts) ->
             {error, invalid_content_type}
     end.
 
-?DOC("See `load_configuration/2`.").
-?DOC(#{since => <<"3.1.0">>}).
+-doc "See `load_configuration/2`.".
+-doc #{since => <<"3.1.0">>}.
 -spec load_configuration(Issuer) ->
     {ok, {Configuration :: t(), Expiry :: pos_integer()}} | {error, error()}
 when
     Issuer :: uri_string:uri_string().
 load_configuration(Issuer) -> load_configuration(Issuer, #{}).
 
-?DOC("""
+-doc """
 Load JWKs into a `t:jose_jwk:key/0` record.
 
 ## Examples
@@ -279,8 +278,8 @@ Load JWKs into a `t:jose_jwk:key/0` record.
 {ok, #jose_jwk{}} =
   oidcc_provider_configuration:load_jwks("https://www.googleapis.com/oauth2/v3/certs").
 ```
-""").
-?DOC(#{since => <<"3.0.0">>}).
+""".
+-doc #{since => <<"3.0.0">>}.
 -spec load_jwks(JwksUri, Opts) ->
     {ok, {Jwks :: jose_jwk:key(), Expiry :: pos_integer()}} | {error, term()}
 when
@@ -303,7 +302,7 @@ load_jwks(JwksUri, Opts) ->
         {ok, {{_Format, _Body}, _Headers}} -> {error, invalid_content_type}
     end.
 
-?DOC("""
+-doc """
 Decode JSON into a `t:oidcc_provider_configuration:t/0` record.
 
 ## Examples
@@ -317,8 +316,8 @@ Decode JSON into a `t:oidcc_provider_configuration:t/0` record.
 {ok, #oidcc_provider_configuration{}} =
   oidcc_provider_configuration:decode_configuration(DecodedJson).
 ```
-""").
-?DOC(#{since => <<"3.1.0">>}).
+""".
+-doc #{since => <<"3.1.0">>}.
 -spec decode_configuration(Configuration, Opts) -> {ok, t()} | {error, error()} when
     Configuration :: map(), Opts :: opts().
 decode_configuration(Configuration0, Opts) ->
@@ -599,8 +598,8 @@ decode_configuration(Configuration0, Opts) ->
         }}
     end.
 
-?DOC("See `decode_configuration/2`.").
-?DOC(#{since => <<"3.0.0">>}).
+-doc "See `decode_configuration/2`.".
+-doc #{since => <<"3.0.0">>}.
 -spec decode_configuration(Configuration) -> {ok, t()} | {error, error()} when
     Configuration :: map().
 decode_configuration(Configuration) -> decode_configuration(Configuration, #{}).

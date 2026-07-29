@@ -25,5 +25,7 @@ jobs:
           egress-policy: audit
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: erlef/mix-dependency-submission@c4a36104ac7614b1b66d0da6e8a1c7d6d07bc52b # v1.3.2

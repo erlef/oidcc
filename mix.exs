@@ -47,7 +47,7 @@ defmodule Oidcc.Mixfile do
       {:ex_doc, "~> 0.29", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false},
-      {:igniter, "~> 0.6.3 or ~> 0.7.0", optional: true}
+      {:igniter, ">= 0.6.3 and < 0.9.0", optional: true}
     ]
   end
 

@@ -612,6 +612,212 @@ issuer_regex_quirk_test() ->
 
     ok.
 
+load_configuration_raw_test() ->
+    PrivDir = code:priv_dir(oidcc),
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    Document = json:decode(ConfigurationBinary),
+
+    HttpFun =
+        fun(get, _Request, _HttpOpts, _Opts, _Config) ->
+            {ok, {
+                {"HTTP/1.1", 200, "OK"},
+                [{"content-type", "application/json"}],
+                ConfigurationBinary
+            }}
+        end,
+    RequestOpts = #{
+        request_opts => #{http_adapter => {oidcc_http_adapter_test, #{request => HttpFun}}}
+    },
+
+    {ok, {Configuration, Expiry, ReturnedDocument}} =
+        oidcc_provider_configuration:load_configuration_raw(<<"https://my.provider">>, RequestOpts),
+
+    ?assertEqual(Document, ReturnedDocument),
+    ?assertMatch(#oidcc_provider_configuration{issuer = <<"https://my.provider">>}, Configuration),
+
+    %% The 2-arity function keeps returning the pair, built from the same load.
+    ?assertEqual(
+        {ok, {Configuration, Expiry}},
+        oidcc_provider_configuration:load_configuration(<<"https://my.provider">>, RequestOpts)
+    ),
+
+    ok.
+
+load_configuration_raw_returns_wire_document_test() ->
+    PrivDir = code:priv_dir(oidcc),
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+
+    HttpFun =
+        fun(get, _Request, _HttpOpts, _Opts, _Config) ->
+            {ok, {
+                {"HTTP/1.1", 200, "OK"},
+                [{"content-type", "application/json"}],
+                ConfigurationBinary
+            }}
+        end,
+
+    {ok, {Configuration, _Expiry, Document}} =
+        oidcc_provider_configuration:load_configuration_raw(<<"https://my.provider">>, #{
+            request_opts => #{http_adapter => {oidcc_http_adapter_test, #{request => HttpFun}}},
+            quirks => #{
+                document_overrides => #{
+                    <<"token_endpoint">> => <<"https://my.provider/override/token">>
+                }
+            }
+        }),
+
+    %% `document_overrides' is merged while decoding, so the record carries the
+    %% override while the document stays what the provider served.
+    ?assertMatch(
+        #oidcc_provider_configuration{token_endpoint = <<"https://my.provider/override/token">>},
+        Configuration
+    ),
+    ?assertEqual(
+        maps:get(<<"token_endpoint">>, json:decode(ConfigurationBinary)),
+        maps:get(<<"token_endpoint">>, Document)
+    ),
+
+    ok.
+
+load_jwks_raw_test() ->
+    PrivDir = code:priv_dir(oidcc),
+    {ok, JwksBinary} = file:read_file(PrivDir ++ "/test/fixtures/google-jwks.json"),
+
+    HttpFun =
+        fun(get, _Request, _HttpOpts, _Opts, _Config) ->
+            {ok, {
+                {"HTTP/1.1", 200, "OK"},
+                [{"content-type", "application/jwk-set+json"}],
+                JwksBinary
+            }}
+        end,
+    RequestOpts = #{
+        request_opts => #{http_adapter => {oidcc_http_adapter_test, #{request => HttpFun}}}
+    },
+
+    {ok, {Jwks, Expiry, Document}} =
+        oidcc_provider_configuration:load_jwks_raw(<<"https://my.provider/jwks">>, RequestOpts),
+
+    ?assertEqual(json:decode(JwksBinary), Document),
+    ?assertMatch(#{<<"keys">> := _Keys}, Document),
+    ?assertEqual(jose_jwk:from(json:decode(JwksBinary)), Jwks),
+
+    ?assertEqual(
+        {ok, {Jwks, Expiry}},
+        oidcc_provider_configuration:load_jwks(<<"https://my.provider/jwks">>, RequestOpts)
+    ),
+
+    ok.
+
+%% The issuer_regex and allow_issuer_mismatch branches return the document from
+%% their own clauses, and they are the branches multi-tenant providers take, so
+%% they are exactly the population that wants the document persisted.
+load_configuration_raw_issuer_mismatch_branches_test() ->
+    PrivDir = code:priv_dir(oidcc),
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    Document = json:decode(ConfigurationBinary),
+
+    HttpFun =
+        fun(get, _Request, _HttpOpts, _Opts, _Config) ->
+            {ok, {
+                {"HTTP/1.1", 200, "OK"},
+                [{"content-type", "application/json"}],
+                ConfigurationBinary
+            }}
+        end,
+    RequestOpts = #{http_adapter => {oidcc_http_adapter_test, #{request => HttpFun}}},
+
+    %% Requested issuer differs from the document's, accepted via issuer_regex.
+    ?assertMatch(
+        {ok, {#oidcc_provider_configuration{}, _Expiry, Document}},
+        oidcc_provider_configuration:load_configuration_raw(<<"https://other.provider">>, #{
+            request_opts => RequestOpts,
+            quirks => #{issuer_regex => <<"^https://other\\.provider$">>}
+        })
+    ),
+
+    %% Same, accepted via the deprecated allow_issuer_mismatch quirk.
+    ?assertMatch(
+        {ok, {#oidcc_provider_configuration{}, _Expiry, Document}},
+        oidcc_provider_configuration:load_configuration_raw(<<"https://other.provider">>, #{
+            request_opts => RequestOpts,
+            quirks => #{allow_issuer_mismatch => true}
+        })
+    ),
+
+    ?assertMatch(
+        {error, {issuer_mismatch, <<"https://my.provider">>}},
+        oidcc_provider_configuration:load_configuration_raw(<<"https://other.provider">>, #{
+            request_opts => RequestOpts,
+            quirks => #{issuer_regex => <<"^https://nope$">>}
+        })
+    ),
+
+    ok.
+
+%% A syntactically valid JSON document that is not an object used to reach
+%% `maps:merge/2' and kill the caller.
+load_configuration_raw_non_object_test() ->
+    Body = fun(Json) ->
+        fun(get, _Request, _HttpOpts, _Opts, _Config) ->
+            {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], Json}}
+        end
+    end,
+    Opts = fun(Json) ->
+        #{request_opts => #{http_adapter => {oidcc_http_adapter_test, #{request => Body(Json)}}}}
+    end,
+
+    ?assertEqual(
+        {error, {invalid_document, null}},
+        oidcc_provider_configuration:load_configuration(<<"https://my.provider">>, Opts(<<"null">>))
+    ),
+    ?assertEqual(
+        {error, {invalid_document, []}},
+        oidcc_provider_configuration:load_configuration(<<"https://my.provider">>, Opts(<<"[]">>))
+    ),
+    ?assertEqual(
+        {error, {invalid_document, 1}},
+        oidcc_provider_configuration:load_configuration(<<"https://my.provider">>, Opts(<<"1">>))
+    ),
+
+    %% A JWKS may legitimately be a bare array of keys, so only scalars are
+    %% rejected there.
+    ?assertMatch(
+        {ok, {_Jwks, _Expiry, [#{<<"kty">> := <<"oct">>}]}},
+        oidcc_provider_configuration:load_jwks_raw(
+            <<"https://my.provider/jwks">>,
+            Opts(<<"[{\"kty\":\"oct\",\"k\":\"AAAA\"}]">>)
+        )
+    ),
+    ?assertEqual(
+        {error, {invalid_document, null}},
+        oidcc_provider_configuration:load_jwks_raw(
+            <<"https://my.provider/jwks">>, Opts(<<"null">>)
+        )
+    ),
+
+    ok.
+
+load_configuration_raw_error_test() ->
+    HttpFun =
+        fun(get, _Request, _HttpOpts, _Opts, _Config) ->
+            {ok, {{"HTTP/1.1", 404, "Not Found"}, [], <<>>}}
+        end,
+    RequestOpts = #{
+        request_opts => #{http_adapter => {oidcc_http_adapter_test, #{request => HttpFun}}}
+    },
+
+    ?assertMatch(
+        {error, {http_error, 404, <<>>}},
+        oidcc_provider_configuration:load_configuration_raw(<<"https://my.provider">>, RequestOpts)
+    ),
+    ?assertMatch(
+        {error, {http_error, 404, <<>>}},
+        oidcc_provider_configuration:load_jwks_raw(<<"https://my.provider/jwks">>, RequestOpts)
+    ),
+
+    ok.
+
 invalid_json_configuration_test() ->
     HttpFun =
         fun(get, _Request, _HttpOpts, _Opts, _Config) ->

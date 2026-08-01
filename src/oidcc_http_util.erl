@@ -29,6 +29,7 @@
     {http_error, StatusCode :: non_neg_integer(), HttpBodyResult :: binary() | map()}
     | {use_dpop_nonce, Nonce :: binary(), HttpBodyResult :: binary() | map()}
     | invalid_content_type
+    | {invalid_json, Reason :: term()}
     | httpc_error().
 
 -doc "Transport error. The default adapter returns errors documented by `httpc:request/5`.".
@@ -142,7 +143,12 @@ extract_successful_response({{_HttpVersion, Status, _HttpStatusName}, Headers, H
 ->
     case fetch_content_type(Headers) of
         json ->
-            {ok, {json, json:decode(HttpBodyResult)}};
+            case decode_json(HttpBodyResult) of
+                {ok, Json} ->
+                    {ok, {json, Json}};
+                {error, Reason} ->
+                    {error, {invalid_json, Reason}}
+            end;
         jwt ->
             {ok, {jwt, HttpBodyResult}};
         unknown ->
@@ -152,7 +158,13 @@ extract_successful_response({{_HttpVersion, StatusCode, _HttpStatusName}, Header
     Body =
         case fetch_content_type(Headers) of
             json ->
-                json:decode(HttpBodyResult);
+                %% A provider that cannot format its own error document must not
+                %% mask the status code, which is the actual failure. Hand back
+                %% the undecoded body, exactly as the `unknown' branch does.
+                case decode_json(HttpBodyResult) of
+                    {ok, Json} -> Json;
+                    {error, _Reason} -> HttpBodyResult
+                end;
             jwt ->
                 HttpBodyResult;
             unknown ->
@@ -163,6 +175,24 @@ extract_successful_response({{_HttpVersion, StatusCode, _HttpStatusName}, Header
             {error, {use_dpop_nonce, iolist_to_binary(DpopNonce), Body}};
         _ ->
             {error, {http_error, StatusCode, Body}}
+    end.
+
+%% `json:decode/1' raises on malformed input rather than returning an error.
+%% A provider is free to serve a broken document under a JSON content type, and
+%% that must not take the calling process down with it.
+%%
+%% The guard keeps that narrow. A body that is not a binary means the adapter
+%% broke its contract, most often by dropping the `body_format' request option
+%% on the way to `httpc:request/5' and getting a string back. That is the
+%% caller's bug, not the provider's, so it keeps crashing where the stack trace
+%% still points at it instead of being reported as a malformed document.
+-spec decode_json(Body :: binary()) -> {ok, term()} | {error, term()}.
+decode_json(Body) when is_binary(Body) ->
+    try
+        {ok, json:decode(Body)}
+    catch
+        error:Reason ->
+            {error, Reason}
     end.
 
 -spec fetch_content_type(Headers) -> json | jwt | unknown when

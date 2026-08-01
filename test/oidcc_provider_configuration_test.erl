@@ -612,6 +612,36 @@ issuer_regex_quirk_test() ->
 
     ok.
 
+invalid_json_configuration_test() ->
+    HttpFun =
+        fun(get, _Request, _HttpOpts, _Opts, _Config) ->
+            {ok, {
+                {"HTTP/1.1", 200, "OK"},
+                [{"content-type", "application/json"}],
+                <<"{\"issuer\": ">>
+            }}
+        end,
+
+    ?assertMatch(
+        {error, {invalid_json, _}},
+        oidcc_provider_configuration:load_configuration(<<"https://example.com">>, #{
+            request_opts => #{
+                http_adapter => {oidcc_http_adapter_test, #{request => HttpFun}}
+            }
+        })
+    ),
+
+    ?assertMatch(
+        {error, {invalid_json, _}},
+        oidcc_provider_configuration:load_jwks(<<"https://example.com/keys">>, #{
+            request_opts => #{
+                http_adapter => {oidcc_http_adapter_test, #{request => HttpFun}}
+            }
+        })
+    ),
+
+    ok.
+
 uri_concatenation_test() ->
     ok = meck:new(httpc, [no_link]),
     HttpFun =

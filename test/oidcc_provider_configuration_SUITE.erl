@@ -30,7 +30,7 @@ load_configuration(_Config) ->
                 token_endpoint =
                     <<"https://oauth2.googleapis.com/token">>
             },
-            3_600_000
+            _Expiry
         }},
         oidcc_provider_configuration:load_configuration(
             <<"https://accounts.google.com">>,
@@ -57,13 +57,17 @@ load_jwks(_Config) ->
     ).
 
 reads_configuration_expiry(_Config) ->
-    ?assertMatch(
-        {ok, {#oidcc_provider_configuration{}, 3_600_000}},
+    {ok, {#oidcc_provider_configuration{}, Expiry}} =
         oidcc_provider_configuration:load_configuration(
             <<"https://accounts.google.com">>,
             #{}
-        )
-    ).
+        ),
+
+    %% Google serves discovery with `max-age=3600` through a CDN, so what is
+    %% left of that lifetime depends on the `Age` of the copy handed to us. The
+    %% floor keeps it usable, the ceiling proves `Age` was applied at all.
+    ?assert(Expiry >= timer:minutes(1)),
+    ?assert(Expiry =< timer:seconds(3600)).
 
 load_well_known_openid_introspections(_Config) ->
     %% Google

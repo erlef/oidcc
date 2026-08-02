@@ -32,9 +32,23 @@
 -export_type([error/0]).
 -export_type([refresh_jwks_for_unknown_kid_fun/0]).
 
+-doc """
+How to fetch a key set when a token names a `kid` the current one lacks.
+
+The three element return reports something back to whoever started the
+operation, reachable through `oidcc_token:retrieve_with_refresh/3`. `oidcc` does
+not interpret it. Without it, a function that fetched the key set has no way to
+hand the document or its expiry back to its own caller, because `oidcc` calls it
+and consumes the result.
+""".
 -doc #{since => <<"3.0.0">>}.
 -type refresh_jwks_for_unknown_kid_fun() ::
-    fun((Jwks :: jose_jwk:key(), Kid :: binary()) -> {ok, jose_jwk:key()} | {error, term()}).
+    fun(
+        (Jwks :: jose_jwk:key(), Kid :: binary()) ->
+            {ok, jose_jwk:key()}
+            | {ok, jose_jwk:key(), Info :: term()}
+            | {error, term()}
+    ).
 
 -doc #{since => <<"3.0.0">>}.
 -type error() ::

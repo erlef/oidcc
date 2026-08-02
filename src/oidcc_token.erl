@@ -35,6 +35,7 @@ See [`Oidcc.Token`](`m:'Elixir.Oidcc.Token'`).
 -export([jwt_profile/4]).
 -export([refresh/3]).
 -export([retrieve/3]).
+-export([retrieve_with_refresh/3]).
 -export([validate_jarm/3]).
 -export([validate_id_token/3]).
 -export([validate_jwt/3]).
@@ -50,6 +51,7 @@ See [`Oidcc.Token`](`m:'Elixir.Oidcc.Token'`).
 -export_type([refresh/0]).
 -export_type([refresh_opts/0]).
 -export_type([refresh_opts_no_sub/0]).
+-export_type([refresh_info/0]).
 -export_type([retrieve_opts/0]).
 -export_type([validate_jarm_opts/0]).
 -export_type([validate_jwt_opts/0]).
@@ -235,6 +237,15 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
         refresh_jwks => oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun()
     }.
 
+-doc """
+Whatever a `refresh_jwks` function reported alongside the refreshed keys.
+
+`undefined` when no refresh happened, or when the function used the two element
+return that carries only the keys. `oidcc` does not interpret it.
+""".
+-doc #{since => <<"3.9.0">>}.
+-type refresh_info() :: term() | undefined.
+
 -doc #{since => <<"3.0.0">>}.
 -type error() ::
     {missing_claim, MissingClaim :: binary(), Claims :: oidcc_jwt_util:claims()}
@@ -372,6 +383,43 @@ when
     ClientContext :: oidcc_client_context:t(),
     Opts :: retrieve_opts().
 retrieve(AuthCode, ClientContext, Opts) ->
+    case retrieve_with_refresh(AuthCode, ClientContext, Opts) of
+        {ok, Token, _Info} -> {ok, Token};
+        {error, Reason} -> {error, Reason}
+    end.
+
+-doc """
+Retrieve the token, reporting what a JWKS refresh fetched.
+
+Same as `retrieve/3`, but the third element carries whatever the `refresh_jwks`
+function returned alongside the refreshed keys, or `undefined` when no refresh
+happened. A function using the two element `{ok, Jwks}` return reports nothing.
+
+`oidcc` refreshes the keys and retries validation without re-sending the
+authorization code, which is single use, so this is the only way to learn what
+that refresh fetched. Persisting the refreshed key set is the usual reason to
+want it.
+
+## Examples
+
+```erlang
+RefreshJwks = fun(_OldJwks, _Kid) ->
+    {ok, {Jwks, Expiry, Document}} = oidcc_provider_configuration:load_jwks_raw(JwksUri, #{}),
+    {ok, Jwks, {Document, Expiry}}
+end,
+
+{ok, #oidcc_token{}, {Document, Expiry}} =
+    oidcc_token:retrieve_with_refresh(AuthCode, ClientContext, Opts#{refresh_jwks => RefreshJwks}).
+```
+""".
+-doc #{since => <<"3.9.0">>}.
+-spec retrieve_with_refresh(AuthCode, ClientContext, Opts) ->
+    {ok, t(), refresh_info()} | {error, error()}
+when
+    AuthCode :: binary(),
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: retrieve_opts().
+retrieve_with_refresh(AuthCode, ClientContext, Opts) ->
     #oidcc_client_context{
         provider_configuration = Configuration,
         client_id = ClientId
@@ -557,7 +605,7 @@ refresh(RefreshToken, ClientContext, Opts) ->
             maybe
                 {ok, Token} ?=
                     retrieve_a_token(QueryString1, ClientContext, Opts, TelemetryOpts, true),
-                {ok, TokenRecord} ?=
+                {ok, TokenRecord, _Info} ?=
                     extract_response(Token, ClientContext, maps:put(nonce, any, Opts)),
                 case TokenRecord of
                     #oidcc_token{id = #oidcc_token_id{claims = #{<<"sub">> := ExpectedSub}}} ->
@@ -653,7 +701,7 @@ jwt_profile(Subject, ClientContext, Jwk, Opts) ->
             maybe
                 {ok, Token} ?=
                     retrieve_a_token(QueryString1, ClientContext, Opts, TelemetryOpts, false),
-                {ok, TokenRecord} ?=
+                {ok, TokenRecord, _Info} ?=
                     extract_response(Token, ClientContext, maps:put(nonce, any, Opts)),
                 case TokenRecord of
                     #oidcc_token{id = none} ->
@@ -715,14 +763,16 @@ client_credentials(ClientContext, Opts) ->
             maybe
                 {ok, Token} ?=
                     retrieve_a_token(QueryString1, ClientContext, Opts, TelemetryOpts, true),
-                extract_response(Token, ClientContext, maps:put(nonce, any, Opts))
+                {ok, TokenRecord, _Info} ?=
+                    extract_response(Token, ClientContext, maps:put(nonce, any, Opts)),
+                {ok, TokenRecord}
             end;
         false ->
             {error, {grant_type_not_supported, client_credentials}}
     end.
 
 -spec extract_response(TokenResponseBody, ClientContext, Opts) ->
-    {ok, t()} | {error, error()}
+    {ok, t(), refresh_info()} | {error, error()}
 when
     TokenResponseBody :: map(),
     ClientContext :: oidcc_client_context:t(),
@@ -733,7 +783,8 @@ extract_response(TokenResponseBody, ClientContext, Opts) ->
         {ok, AccessExpire} ?= extract_expiry(TokenResponseBody),
         {ok, AccessTokenRecord} ?= extract_access_token(TokenResponseBody, AccessExpire),
         {ok, RefreshTokenRecord} ?= extract_refresh_token(TokenResponseBody),
-        {ok, {IdTokenRecord, NoneUsed}} ?= extract_id_token(TokenResponseBody, ClientContext, Opts),
+        {ok, {IdTokenRecord, NoneUsed}, Info} ?=
+            extract_id_token(TokenResponseBody, ClientContext, Opts),
         TokenRecord = #oidcc_token{
             id = IdTokenRecord,
             access = AccessTokenRecord,
@@ -747,7 +798,7 @@ extract_response(TokenResponseBody, ClientContext, Opts) ->
             true ->
                 {error, {none_alg_used, TokenRecord}};
             false ->
-                {ok, TokenRecord}
+                {ok, TokenRecord, Info}
         end
     end.
 
@@ -812,7 +863,7 @@ extract_refresh_token(TokenMap) ->
     end.
 
 -spec extract_id_token(TokenMap, ClientContext, Opts) ->
-    {ok, {TokenRecord, NoneUsed}} | {error, error()}
+    {ok, {TokenRecord, NoneUsed}, refresh_info()} | {error, error()}
 when
     TokenMap :: map(),
     ClientContext :: oidcc_client_context:t(),
@@ -822,13 +873,13 @@ when
 extract_id_token(TokenMap, ClientContext, Opts) ->
     case maps:get(<<"id_token">>, TokenMap, none) of
         none ->
-            {ok, {none, false}};
+            {ok, {none, false}, undefined};
         Token when is_binary(Token) ->
-            case validate_id_token(Token, ClientContext, Opts) of
-                {ok, OkClaims} ->
-                    {ok, {#oidcc_token_id{token = Token, claims = OkClaims}, false}};
+            case validate_id_token_with_refresh(Token, ClientContext, Opts) of
+                {ok, OkClaims, Info} ->
+                    {ok, {#oidcc_token_id{token = Token, claims = OkClaims}, false}, Info};
                 {error, {none_alg_used, NoneClaims}} ->
-                    {ok, {#oidcc_token_id{token = Token, claims = NoneClaims}, true}};
+                    {ok, {#oidcc_token_id{token = Token, claims = NoneClaims}, true}, undefined};
                 {error, Reason} ->
                     {error, Reason}
             end;
@@ -907,6 +958,19 @@ validate_id_token(IdToken, ClientContext, Nonce) when is_binary(Nonce) ->
 validate_id_token(IdToken, ClientContext, any) ->
     validate_id_token(IdToken, ClientContext, #{nonce => any});
 validate_id_token(IdToken, ClientContext, Opts) when is_map(Opts) ->
+    case validate_id_token_with_refresh(IdToken, ClientContext, Opts) of
+        {ok, Claims, _Info} -> {ok, Claims};
+        {error, Reason} -> {error, Reason}
+    end.
+
+-spec validate_id_token_with_refresh(IdToken, ClientContext, Opts) ->
+    {ok, Claims, refresh_info()} | {error, error()}
+when
+    IdToken :: binary(),
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: retrieve_opts(),
+    Claims :: oidcc_jwt_util:claims().
+validate_id_token_with_refresh(IdToken, ClientContext, Opts) ->
     #oidcc_client_context{
         provider_configuration = Configuration,
         client_id = ClientId
@@ -941,7 +1005,7 @@ validate_id_token(IdToken, ClientContext, Opts) when is_map(Opts) ->
             List when is_list(List) -> List
         end,
 
-    validate_jwt(IdToken, ClientContext, ValidateOpts, fun(Claims) ->
+    validate_jwt_with_refresh(IdToken, ClientContext, ValidateOpts, fun(Claims) ->
         maybe
             ok ?= oidcc_jwt_util:verify_claims(Claims, ExpClaims),
             ok ?= verify_missing_required_claims(Claims),
@@ -1022,6 +1086,20 @@ when
     Claims :: oidcc_jwt_util:claims(),
     AdditionalClaimValidation :: fun((Claims) -> ok | {error, error()}).
 validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
+    case validate_jwt_with_refresh(Token, ClientContext, Opts, AdditionalClaimValidation) of
+        {ok, Claims, _Info} -> {ok, Claims};
+        {error, Reason} -> {error, Reason}
+    end.
+
+-spec validate_jwt_with_refresh(Token, ClientContext, Opts, AdditionalClaimValidation) ->
+    {ok, Claims, refresh_info()} | {error, error()}
+when
+    Token :: binary(),
+    ClientContext :: oidcc_client_context:t(),
+    Opts :: validate_jwt_opts(),
+    Claims :: oidcc_jwt_util:claims(),
+    AdditionalClaimValidation :: fun((Claims) -> ok | {error, error()}).
+validate_jwt_with_refresh(Token, ClientContext, Opts, AdditionalClaimValidation) ->
     RefreshJwksFun = maps:get(refresh_jwks, Opts, undefined),
     unknown_kid_retry(
         fun(RefreshedClientContext) ->
@@ -1354,7 +1432,7 @@ rescue_none_validated_jwt(Other) ->
     Other.
 
 -spec unknown_kid_retry(Function, ClientContext, RefreshJwksFun) ->
-    {ok, Result} | {error, Error}
+    {ok, Result, refresh_info()} | {error, Error}
 when
     Function :: fun((ClientContext) -> {ok, Result} | {error, Error}),
     ClientContext :: oidcc_client_context:t(),
@@ -1364,15 +1442,32 @@ when
 unknown_kid_retry(Function, ClientContext, RefreshJwksFun) ->
     maybe
         {ok, Result} ?= Function(ClientContext),
-        {ok, Result}
+        {ok, Result, undefined}
     else
         {error, {no_matching_key_with_kid, Kid}} when RefreshJwksFun =/= undefined ->
             #oidcc_client_context{jwks = OldJwks} = ClientContext,
             maybe
-                {ok, RefreshedJwks} ?= RefreshJwksFun(OldJwks, Kid),
+                {ok, RefreshedJwks, Info} ?= refresh_jwks(RefreshJwksFun, OldJwks, Kid),
                 RefreshedClientContext = ClientContext#oidcc_client_context{jwks = RefreshedJwks},
-                Function(RefreshedClientContext)
+                {ok, Retried} ?= Function(RefreshedClientContext),
+                {ok, Retried, Info}
             end;
         {error, Reason} ->
             {error, Reason}
+    end.
+
+%% The three element return is what lets a caller learn what the refresh
+%% actually fetched. A function that only hands back a key forces anything else,
+%% the document and its expiry for instance, out through a side channel.
+-spec refresh_jwks(RefreshJwksFun, Jwks, Kid) ->
+    {ok, jose_jwk:key(), refresh_info()} | {error, term()}
+when
+    RefreshJwksFun :: oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
+    Jwks :: jose_jwk:key(),
+    Kid :: binary().
+refresh_jwks(RefreshJwksFun, Jwks, Kid) ->
+    case RefreshJwksFun(Jwks, Kid) of
+        {ok, RefreshedJwks} -> {ok, RefreshedJwks, undefined};
+        {ok, RefreshedJwks, Info} -> {ok, RefreshedJwks, Info};
+        {error, Reason} -> {error, Reason}
     end.

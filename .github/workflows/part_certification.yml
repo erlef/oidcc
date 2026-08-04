@@ -3,6 +3,16 @@
 
 on:
   workflow_call:
+    inputs:
+      oidcc_plug_version:
+        description: >-
+          `oidcc_plug` version to certify against. Either "main" for the
+          `main` branch of `erlef/oidcc_plug` or a Hex version requirement
+          such as "~> 0.5.0". Defaults to the requirement declared in
+          `certification/implementation_plug.exs`.
+        required: false
+        type: string
+        default: ""
     secrets:
       OID_CERTIFICATION_API_TOKEN:
         description: "OpenID Certification API Token"
@@ -42,6 +52,8 @@ jobs:
 
       # Prime Mix.install to prevent Mix Compile Locks
       - run: 'echo "" | certification/implementation_plug.exs'
+        env:
+          OIDCC_PLUG_VERSION: ${{ inputs.oidcc_plug_version }}
 
       - uses: erlef/oid_certo@e47ec90093332ecc3c11d0bdec85d5306c778c29 # v0.1.0-beta.4
         with:
@@ -52,6 +64,7 @@ jobs:
           api-token: ${{ secrets.OID_CERTIFICATION_API_TOKEN }}
         env:
           TMP: ${{ runner.temp }}
+          OIDCC_PLUG_VERSION: ${{ inputs.oidcc_plug_version }}
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

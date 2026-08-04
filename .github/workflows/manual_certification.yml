@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 Erlang Ecosystem Foundation
+# SPDX-License-Identifier: Apache-2.0
+
+on:
+  workflow_dispatch:
+    inputs:
+      oidcc_plug_version:
+        description: >-
+          `oidcc_plug` version to certify against. Either "main" for the
+          `main` branch of `erlef/oidcc_plug` or a Hex version requirement
+          such as "~> 0.5.0". Defaults to the requirement declared in
+          `certification/implementation_plug.exs`.
+        required: false
+        type: string
+        default: ""
+
+name: "Manual Certification"
+
+permissions:
+  contents: read
+
+jobs:
+  certification:
+    name: "Certification"
+
+    permissions:
+      contents: read
+
+    uses: ./.github/workflows/part_certification.yml
+    with:
+      oidcc_plug_version: ${{ inputs.oidcc_plug_version }}
+    secrets:
+      OID_CERTIFICATION_API_TOKEN: ${{ secrets.OID_CERTIFICATION_API_TOKEN }}

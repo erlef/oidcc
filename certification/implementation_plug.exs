@@ -16,10 +16,40 @@ handler_config =
 Mix.start()
 Mix.shell(Mix.Shell.Quiet)
 
+default_oidcc_plug_version = "~> 0.5.0"
+
+# Allows conformance testing against an unreleased `oidcc_plug`.
+#
+# * unset / `""` - the default version requirement above
+# * `"main"` - the `main` branch of `erlef/oidcc_plug`
+# * anything else - a Hex version requirement (`"~> 0.3.1"`, `"0.3.1"`, ...)
+oidcc_plug_dep =
+  case "OIDCC_PLUG_VERSION" |> System.get_env(default_oidcc_plug_version) |> String.trim() do
+    "" ->
+      {:oidcc_plug, default_oidcc_plug_version}
+
+    "main" ->
+      {:oidcc_plug, github: "erlef/oidcc_plug", branch: "main"}
+
+    version ->
+      case Version.parse_requirement(version) do
+        {:ok, _requirement} ->
+          {:oidcc_plug, version}
+
+        :error ->
+          raise """
+          Invalid OIDCC_PLUG_VERSION: #{inspect(version)}
+
+          Expected "main" (erlef/oidcc_plug main branch) or a Hex version \
+          requirement such as ">= 0.0.0" or "~> 0.5.0".\
+          """
+      end
+  end
+
 Mix.install([
   {:bandit, "~> 1.0"},
   {:oidcc, path: Path.dirname(__DIR__), override: true},
-  {:oidcc_plug, "~> 0.3.1"},
+  oidcc_plug_dep,
   {:jason, "~> 1.4"},
   {:phoenix_live_view, "~> 1.0"},
   {:phoenix, "~> 1.7"}

@@ -28,8 +28,12 @@ See [`Oidcc.ProviderConfiguration`](`m:'Elixir.Oidcc.ProviderConfiguration'`).
 -export([decode_configuration/2]).
 -export([load_configuration/1]).
 -export([load_configuration/2]).
+-export([load_configuration_raw/2]).
 -export([load_jwks/2]).
+-export([load_jwks_raw/2]).
 
+-export_type([document/0]).
+-export_type([jwks_document/0]).
 -export_type([error/0]).
 -export_type([opts/0]).
 -export_type([quirks/0]).
@@ -151,10 +155,32 @@ All unrecognized fields are stored in `extra_fields`.
         extra_fields :: #{binary() => term()}
     }.
 
+-doc """
+Decoded JSON document as served by the provider.
+
+This is the document the endpoint returned, before `oidcc` merges
+`document_overrides` into it or coerces it into a record. Unlike a decoded
+record it can be re-encoded losslessly, which is what makes it suitable for
+persisting the provider's metadata.
+""".
+-doc #{since => <<"3.9.0">>}.
+-type document() :: #{binary() => term()}.
+
+-doc """
+Decoded JWKS document as served by the provider.
+
+RFC 7517 section 5 defines a JWK Set as a JSON object with a `keys` member, but
+`jose_jwk:from/1` also accepts a bare array of keys and some providers serve
+one, so both shapes reach the caller.
+""".
+-doc #{since => <<"3.9.0">>}.
+-type jwks_document() :: document() | [term()].
+
 -doc #{since => <<"3.0.0">>}.
 -type error() ::
     invalid_content_type
     | {issuer_mismatch, Issuer :: binary()}
+    | {invalid_document, Document :: term()}
     | oidcc_decode_util:error()
     | oidcc_http_util:error().
 
@@ -218,7 +244,39 @@ Load OpenID Configuration into a `t:oidcc_provider_configuration:t/0` record.
 when
     Issuer :: uri_string:uri_string(),
     Opts :: opts().
-load_configuration(Issuer0, Opts) ->
+load_configuration(Issuer, Opts) ->
+    case load_configuration_raw(Issuer, Opts) of
+        {ok, {Configuration, Expiry, _Document}} -> {ok, {Configuration, Expiry}};
+        {error, Reason} -> {error, Reason}
+    end.
+
+-doc """
+Load OpenID Configuration, keeping the document the provider served.
+
+Same as `load_configuration/2`, but additionally returns the decoded JSON
+document. The record cannot be re-encoded losslessly - `extra_fields` holds only
+the keys the decoder did not recognize, every other key is coerced into a typed
+record field, and `issuer_regex` is not an OpenID Discovery field at all - so
+callers that persist provider metadata need the document itself.
+
+## Examples
+
+```erlang
+{ok, {#oidcc_provider_configuration{}, _Expiry, #{<<"issuer">> := Issuer}}} =
+  oidcc_provider_configuration:load_configuration_raw(
+    "https://accounts.google.com",
+    #{}
+  ).
+```
+""".
+-doc #{since => <<"3.9.0">>}.
+-spec load_configuration_raw(Issuer, Opts) ->
+    {ok, {Configuration :: t(), Expiry :: pos_integer(), Document :: document()}}
+    | {error, error()}
+when
+    Issuer :: uri_string:uri_string(),
+    Opts :: opts().
+load_configuration_raw(Issuer0, Opts) ->
     Issuer = binary:list_to_bin([Issuer0]),
     TelemetryOpts = #{topic => [oidcc, load_configuration], extra_meta => #{issuer => Issuer}},
     RequestOpts = maps:get(request_opts, Opts, #{}),
@@ -235,6 +293,10 @@ load_configuration(Issuer0, Opts) ->
     maybe
         {ok, {{json, ConfigurationMap}, Headers}} ?=
             oidcc_http_util:request(get, Request, TelemetryOpts, RequestOpts),
+        %% A JSON document that is not an object is not a discovery document.
+        %% Without this it reaches `maps:merge/2' inside `decode_configuration/2'
+        %% and a provider answering with `null' takes the caller down.
+        true ?= is_map(ConfigurationMap) orelse {invalid_document, ConfigurationMap},
         Expiry = oidcc_http_util:headers_to_cache_deadline(Headers, DefaultExpiry),
         {ok,
             #oidcc_provider_configuration{issuer = ConfigIssuer, issuer_regex = ConfigIssuerRegex} =
@@ -242,20 +304,23 @@ load_configuration(Issuer0, Opts) ->
             decode_configuration(ConfigurationMap, #{quirks => Quirks}),
         case ConfigIssuer of
             Issuer ->
-                {ok, {Configuration, Expiry}};
+                {ok, {Configuration, Expiry, ConfigurationMap}};
             _ when is_binary(ConfigIssuerRegex) ->
                 case re:run(Issuer, ConfigIssuerRegex, [{capture, none}]) of
                     match ->
-                        {ok, {Configuration, Expiry}};
+                        {ok, {Configuration, Expiry, ConfigurationMap}};
                     nomatch ->
                         {error, {issuer_mismatch, ConfigIssuer}}
                 end;
-            _DifferentIssuer when AllowIssuerMismatch -> {ok, {Configuration, Expiry}};
+            _DifferentIssuer when AllowIssuerMismatch ->
+                {ok, {Configuration, Expiry, ConfigurationMap}};
             DifferentIssuer when not AllowIssuerMismatch ->
                 {error, {issuer_mismatch, DifferentIssuer}}
         end
     else
         {error, Reason} ->
+            {error, Reason};
+        {invalid_document, _Document} = Reason ->
             {error, Reason};
         {ok, {{_Format, _Body}, _Headers}} ->
             {error, invalid_content_type}
@@ -286,19 +351,54 @@ when
     JwksUri :: uri_string:uri_string(),
     Opts :: opts().
 load_jwks(JwksUri, Opts) ->
+    case load_jwks_raw(JwksUri, Opts) of
+        {ok, {Jwks, Expiry, _Document}} -> {ok, {Jwks, Expiry}};
+        {error, Reason} -> {error, Reason}
+    end.
+
+-doc """
+Load JWKs, keeping the document the provider served.
+
+Same as `load_jwks/2`, but additionally returns the decoded JSON document, for
+callers that persist the key set rather than only using it.
+
+## Examples
+
+```erlang
+{ok, {#jose_jwk{}, _Expiry, #{<<"keys">> := _Keys}}} =
+  oidcc_provider_configuration:load_jwks_raw(
+    "https://www.googleapis.com/oauth2/v3/certs",
+    #{}
+  ).
+```
+""".
+-doc #{since => <<"3.9.0">>}.
+-spec load_jwks_raw(JwksUri, Opts) ->
+    {ok, {Jwks :: jose_jwk:key(), Expiry :: pos_integer(), Document :: jwks_document()}}
+    | {error, error()}
+when
+    JwksUri :: uri_string:uri_string(),
+    Opts :: opts().
+load_jwks_raw(JwksUri, Opts) ->
     TelemetryOpts = #{topic => [oidcc, load_jwks], extra_meta => #{jwks_uri => JwksUri}},
     RequestOpts = maps:get(request_opts, Opts, #{}),
 
     DefaultExpiry = maps:get(fallback_expiry, Opts, ?DEFAULT_CONFIG_EXPIRY),
 
     maybe
-        {ok, {{json, JwksBinary}, Headers}} ?=
+        {ok, {{json, JwksMap}, Headers}} ?=
             oidcc_http_util:request(get, {JwksUri, []}, TelemetryOpts, RequestOpts),
+        %% `jose_jwk:from/1' takes an object or a bare array of keys and raises
+        %% on anything else, so a provider answering with a scalar would take
+        %% the caller down.
+        true ?=
+            (is_map(JwksMap) orelse is_list(JwksMap)) orelse {invalid_document, JwksMap},
         Expiry = oidcc_http_util:headers_to_cache_deadline(Headers, DefaultExpiry),
-        Jwks = jose_jwk:from(JwksBinary),
-        {ok, {Jwks, Expiry}}
+        Jwks = jose_jwk:from(JwksMap),
+        {ok, {Jwks, Expiry, JwksMap}}
     else
         {error, Reason} -> {error, Reason};
+        {invalid_document, _Document} = Reason -> {error, Reason};
         {ok, {{_Format, _Body}, _Headers}} -> {error, invalid_content_type}
     end.
 

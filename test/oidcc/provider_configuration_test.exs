@@ -15,10 +15,37 @@ defmodule Oidcc.ProviderConfigurationTest do
     end
   end
 
+  describe inspect(&ProviderConfiguration.load_configuration_raw/2) do
+    test "works" do
+      assert {:ok,
+              {%ProviderConfiguration{issuer: "https://accounts.google.com"}, _expiry, document}} =
+               ProviderConfiguration.load_configuration_raw("https://accounts.google.com", %{})
+
+      assert %{"issuer" => "https://accounts.google.com"} = document
+    end
+
+    test "returns a document that decodes back into the same struct" do
+      assert {:ok, {configuration, _expiry, document}} =
+               ProviderConfiguration.load_configuration_raw("https://accounts.google.com", %{})
+
+      assert {:ok, ^configuration} = ProviderConfiguration.decode_configuration(document)
+    end
+  end
+
   describe inspect(&ProviderConfiguration.load_jwks/2) do
     test "works" do
       assert {:ok, {%JOSE.JWK{}, _expiry}} =
                ProviderConfiguration.load_jwks("https://www.googleapis.com/oauth2/v3/certs", %{})
+    end
+  end
+
+  describe inspect(&ProviderConfiguration.load_jwks_raw/2) do
+    test "works" do
+      assert {:ok, {%JOSE.JWK{}, _expiry, %{"keys" => _keys}}} =
+               ProviderConfiguration.load_jwks_raw(
+                 "https://www.googleapis.com/oauth2/v3/certs",
+                 %{}
+               )
     end
   end
 

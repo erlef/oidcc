@@ -152,6 +152,42 @@ defmodule Oidcc.ProviderConfiguration do
   end
 
   @doc """
+  Load OpenID Configuration, keeping the document the provider served
+
+  Same as `load_configuration/2`, but additionally returns the decoded JSON
+  document. The struct cannot be re-encoded losslessly - `extra_fields` holds
+  only the keys the decoder did not recognize, every other key is coerced into a
+  typed field, and `issuer_regex` is not an OpenID Discovery field at all - so
+  callers that persist provider metadata need the document itself.
+
+  ## Examples
+
+      iex> {:ok, {
+      ...>   %ProviderConfiguration{issuer: "https://accounts.google.com"},
+      ...>   _expiry,
+      ...>   %{"issuer" => "https://accounts.google.com"}
+      ...> }} = Oidcc.ProviderConfiguration.load_configuration_raw(
+      ...>   "https://accounts.google.com",
+      ...>   %{}
+      ...> )
+  """
+  @doc since: "3.9.0"
+  @spec load_configuration_raw(
+          issuer :: :uri_string.uri_string(),
+          opts :: :oidcc_provider_configuration.opts()
+        ) ::
+          {:ok,
+           {configuration :: t(), expiry :: pos_integer(),
+            document :: :oidcc_provider_configuration.document()}}
+          | {:error, :oidcc_provider_configuration.error()}
+  def load_configuration_raw(issuer, opts \\ %{}) do
+    with {:ok, {configuration, expiry, document}} <-
+           :oidcc_provider_configuration.load_configuration_raw(issuer, opts) do
+      {:ok, {record_to_struct(configuration), expiry, document}}
+    end
+  end
+
+  @doc """
   Load JWKs
 
   ## Examples
@@ -170,6 +206,36 @@ defmodule Oidcc.ProviderConfiguration do
     with {:ok, {jwks, expiry}} <-
            :oidcc_provider_configuration.load_jwks(jwks_uri, opts) do
       {:ok, {JOSE.JWK.from_record(jwks), expiry}}
+    end
+  end
+
+  @doc """
+  Load JWKs, keeping the document the provider served
+
+  Same as `load_jwks/2`, but additionally returns the decoded JSON document, for
+  callers that persist the key set rather than only using it.
+
+  ## Examples
+
+      iex> {:ok, {%JOSE.JWK{}, _expiry, %{"keys" => _keys}}} =
+      ...>   Oidcc.ProviderConfiguration.load_jwks_raw(
+      ...>     "https://www.googleapis.com/oauth2/v3/certs",
+      ...>     %{}
+      ...>   )
+  """
+  @doc since: "3.9.0"
+  @spec load_jwks_raw(
+          jwks_uri :: :uri_string.uri_string(),
+          opts :: :oidcc_provider_configuration.opts()
+        ) ::
+          {:ok,
+           {jwks :: JOSE.JWK.t(), expiry :: pos_integer(),
+            document :: :oidcc_provider_configuration.jwks_document()}}
+          | {:error, :oidcc_provider_configuration.error()}
+  def load_jwks_raw(jwks_uri, opts \\ %{}) do
+    with {:ok, {jwks, expiry, document}} <-
+           :oidcc_provider_configuration.load_jwks_raw(jwks_uri, opts) do
+      {:ok, {JOSE.JWK.from_record(jwks), expiry, document}}
     end
   end
 

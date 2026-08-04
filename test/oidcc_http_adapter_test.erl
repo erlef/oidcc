@@ -106,6 +106,131 @@ adapter_error_normalization_test() ->
         )
     ).
 
+adapter_invalid_json_response_test() ->
+    TruncatedFun =
+        fun(
+            get,
+            {<<"https://example.com/.well-known/openid-configuration">>, []},
+            _HttpOptions,
+            _RequestOptions,
+            _Config
+        ) ->
+            {ok, {
+                {"HTTP/1.1", 200, "OK"},
+                [{"content-type", "application/json"}],
+                <<"{\"issuer\": ">>
+            }}
+        end,
+    ?assertMatch(
+        {error, {invalid_json, _}},
+        oidcc_http_util:request(
+            get,
+            {<<"https://example.com/.well-known/openid-configuration">>, []},
+            telemetry_opts(adapter_invalid_json),
+            #{http_adapter => {?MODULE, #{request => TruncatedFun}}}
+        )
+    ),
+
+    TrailingGarbageFun =
+        fun(post, _Request, _HttpOptions, _RequestOptions, _Config) ->
+            {ok, {
+                {"HTTP/1.1", 201, "Created"},
+                [{"content-type", "application/jwk-set+json"}],
+                <<"{} not json">>
+            }}
+        end,
+    ?assertMatch(
+        {error, {invalid_json, _}},
+        oidcc_http_util:request(
+            post,
+            {<<"https://example.com/register">>, [], "application/json", <<"{}">>},
+            telemetry_opts(adapter_invalid_json_trailing),
+            #{http_adapter => {?MODULE, #{request => TrailingGarbageFun}}}
+        )
+    ).
+
+%% A malformed body on a non-2xx response must not hide the status code, which
+%% is the actual failure, so the undecoded body is handed back instead.
+adapter_invalid_json_error_response_test() ->
+    Body = <<"{\"error\": ">>,
+    ErrorFun =
+        fun(_Method, _Request, _HttpOptions, _RequestOptions, _Config) ->
+            {ok, {
+                {"HTTP/1.1", 500, "Internal Server Error"},
+                [{"content-type", "application/json"}],
+                Body
+            }}
+        end,
+    ?assertEqual(
+        {error, {http_error, 500, Body}},
+        oidcc_http_util:request(
+            get,
+            {<<"https://example.com">>, []},
+            telemetry_opts(adapter_invalid_json_error),
+            #{http_adapter => {?MODULE, #{request => ErrorFun}}}
+        )
+    ),
+
+    DpopNonceFun =
+        fun(_Method, _Request, _HttpOptions, _RequestOptions, _Config) ->
+            {ok, {
+                {"HTTP/1.1", 400, "Bad Request"},
+                [{"content-type", "application/json"}, {"dpop-nonce", <<"nonce-value">>}],
+                Body
+            }}
+        end,
+    ?assertEqual(
+        {error, {use_dpop_nonce, <<"nonce-value">>, Body}},
+        oidcc_http_util:request(
+            get,
+            {<<"https://example.com">>, []},
+            telemetry_opts(adapter_invalid_json_dpop_nonce),
+            #{http_adapter => {?MODULE, #{request => DpopNonceFun}}}
+        )
+    ).
+
+%% An adapter returning a non-binary body has broken its contract. That is not a
+%% malformed document, and reporting it as one would hide the caller's bug and
+%% put a value outside `error()' into `{http_error, _, Body}'.
+adapter_non_binary_body_still_crashes_test() ->
+    NonBinaryFun =
+        fun(_Method, _Request, _HttpOptions, _RequestOptions, _Config) ->
+            {ok, {
+                {"HTTP/1.1", 200, "OK"},
+                [{"content-type", "application/json"}],
+                "{\"valid\": true}"
+            }}
+        end,
+
+    ?assertError(
+        function_clause,
+        oidcc_http_util:request(
+            get,
+            {<<"https://example.com">>, []},
+            telemetry_opts(adapter_non_binary_body),
+            #{http_adapter => {?MODULE, #{request => NonBinaryFun}}}
+        )
+    ),
+
+    ErrorStatusFun =
+        fun(_Method, _Request, _HttpOptions, _RequestOptions, _Config) ->
+            {ok, {
+                {"HTTP/1.1", 500, "Internal Server Error"},
+                [{"content-type", "application/json"}],
+                "{\"error\": \"x\"}"
+            }}
+        end,
+
+    ?assertError(
+        function_clause,
+        oidcc_http_util:request(
+            get,
+            {<<"https://example.com">>, []},
+            telemetry_opts(adapter_non_binary_error_body),
+            #{http_adapter => {?MODULE, #{request => ErrorStatusFun}}}
+        )
+    ).
+
 adapter_telemetry_test() ->
     {ok, _} = application:ensure_all_started(telemetry),
     Topic = [oidcc, adapter_telemetry],
@@ -178,6 +303,31 @@ adapter_telemetry_test() ->
             Topic,
             ProtocolFailureMetadata,
             ProtocolFailureMetadata#{error => ProtocolFailure}
+        ),
+
+        InvalidJsonMetadata = #{issuer => <<"https://invalid-json.example">>},
+        InvalidJsonFun =
+            fun(_Method, _Request, _HttpOptions, _RequestOptions, _Config) ->
+                {ok, {
+                    {"HTTP/1.1", 200, "OK"},
+                    [{"content-type", "application/json"}],
+                    <<"{\"issuer\": ">>
+                }}
+            end,
+        {error, InvalidJson} =
+            oidcc_http_util:request(
+                get,
+                {<<"https://invalid-json.example">>, []},
+                #{topic => Topic, extra_meta => InvalidJsonMetadata},
+                #{http_adapter => {?MODULE, #{request => InvalidJsonFun}}}
+            ),
+        ?assertMatch({invalid_json, _}, InvalidJson),
+        %% A malformed body is reported through the `stop' event like any other
+        %% error, rather than raising and emitting `exception'.
+        assert_span(
+            Topic,
+            InvalidJsonMetadata,
+            InvalidJsonMetadata#{error => InvalidJson}
         )
     after
         telemetry:detach(HandlerId)

@@ -818,6 +818,117 @@ load_configuration_raw_error_test() ->
 
     ok.
 
+%% A response arriving with almost none of its `max-age` left reports a deadline
+%% near zero. Callers drive a refresh timer off it, so the loaders floor it
+%% rather than scheduling an immediate reload.
+minimum_refresh_floors_stale_response_test() ->
+    PrivDir = code:priv_dir(oidcc),
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+
+    Load = fun(CacheHeaders, Opts) ->
+        HttpFun =
+            fun(get, _Request, _HttpOpts, _Opts, _Config) ->
+                {ok, {
+                    {"HTTP/1.1", 200, "OK"},
+                    [{"content-type", "application/json"} | CacheHeaders],
+                    ConfigurationBinary
+                }}
+            end,
+        oidcc_provider_configuration:load_configuration(
+            <<"https://my.provider">>,
+            maps:merge(Opts, #{
+                request_opts => #{
+                    http_adapter => {oidcc_http_adapter_test, #{request => HttpFun}}
+                }
+            })
+        )
+    end,
+
+    Stale = [{"cache-control", "max-age=3600"}, {"age", "3599"}],
+
+    ?assertMatch(
+        {ok, {#oidcc_provider_configuration{}, 60_000}},
+        Load(Stale, #{})
+    ),
+    %% The floor never raises the interval above what the caller asked for as a
+    %% fallback, so a caller wanting a shorter one still gets it.
+    ?assertMatch(
+        {ok, {#oidcc_provider_configuration{}, 5_000}},
+        Load(Stale, #{fallback_expiry => 5_000})
+    ),
+
+    %% A lifetime comfortably above the floor is passed through, less its Age.
+    ?assertMatch(
+        {ok, {#oidcc_provider_configuration{}, 240_000}},
+        Load([{"cache-control", "max-age=300"}, {"age", "60"}], #{})
+    ),
+
+    %% `max-age=0, no-store` still lands on the fallback, as issue #370 needs.
+    ?assertMatch(
+        {ok, {#oidcc_provider_configuration{}, 12_345}},
+        Load([{"cache-control", "max-age=0, no-store"}], #{fallback_expiry => 12_345})
+    ),
+
+    ok.
+
+%% The measurement that matters: a nearly-stale provider must not turn the
+%% worker into a request loop.
+stale_response_does_not_loop_test() ->
+    Counter = atomics:new(1, []),
+    DiscoveryBody = iolist_to_binary(
+        json:encode(#{
+            issuer => <<"https://example.com">>,
+            jwks_uri => <<"https://example.com/keys">>,
+            authorization_endpoint => <<"https://example.com/authorize">>,
+            scopes_supported => [<<"openid">>],
+            response_types_supported => [<<"code">>],
+            subject_types_supported => [<<"public">>],
+            id_token_signing_alg_values_supported => [<<"RS256">>]
+        })
+    ),
+    Headers = [
+        {"content-type", "application/json"},
+        {"cache-control", "max-age=3600"},
+        {"age", "3599"}
+    ],
+    HttpFun =
+        fun(get, {Url, []}, _HttpOpts, _Opts, _Profile) ->
+            atomics:add(Counter, 1, 1),
+            Body =
+                case iolist_to_binary(Url) of
+                    <<"https://example.com/keys">> ->
+                        iolist_to_binary(json:encode(#{keys => []}));
+                    _Discovery ->
+                        DiscoveryBody
+                end,
+            {ok, {{"HTTP/1.1", 200, "OK"}, Headers, Body}}
+        end,
+
+    {ok, Pid} =
+        oidcc_provider_configuration_worker:start_link(#{
+            issuer => <<"https://example.com">>,
+            provider_configuration_opts => #{
+                request_opts => #{
+                    http_adapter => {oidcc_http_adapter_test, #{request => HttpFun}}
+                }
+            }
+        }),
+
+    try
+        ?assertNotEqual(
+            undefined,
+            oidcc_provider_configuration_worker:get_provider_configuration(Pid)
+        ),
+        timer:sleep(1_000),
+        %% One discovery plus one JWKS load. Without the floor this was a
+        %% sustained one request per second per endpoint.
+        ?assert(atomics:get(Counter, 1) =< 4)
+    after
+        gen_server:stop(Pid)
+    end,
+
+    ok.
+
 invalid_json_configuration_test() ->
     HttpFun =
         fun(get, _Request, _HttpOpts, _Opts, _Config) ->

@@ -186,6 +186,7 @@ one, so both shapes reach the caller.
     | oidcc_http_util:error().
 
 -define(DEFAULT_CONFIG_EXPIRY, timer:minutes(15)).
+-define(MINIMUM_REFRESH, timer:minutes(1)).
 
 -telemetry_event(#{
     event => [oidcc, load_configuration, start],
@@ -298,7 +299,7 @@ load_configuration_raw(Issuer0, Opts) ->
         %% Without this it reaches `maps:merge/2' inside `decode_configuration/2'
         %% and a provider answering with `null' takes the caller down.
         true ?= is_map(ConfigurationMap) orelse {invalid_document, ConfigurationMap},
-        Expiry = oidcc_http_util:headers_to_cache_deadline(Headers, DefaultExpiry),
+        Expiry = cache_deadline(Headers, DefaultExpiry),
         {ok,
             #oidcc_provider_configuration{issuer = ConfigIssuer, issuer_regex = ConfigIssuerRegex} =
                 Configuration} ?=
@@ -394,7 +395,7 @@ load_jwks_raw(JwksUri, Opts) ->
         %% the caller down.
         true ?=
             (is_map(JwksMap) orelse is_list(JwksMap)) orelse {invalid_document, JwksMap},
-        Expiry = oidcc_http_util:headers_to_cache_deadline(Headers, DefaultExpiry),
+        Expiry = cache_deadline(Headers, DefaultExpiry),
         Jwks = jose_jwk:from(JwksMap),
         {ok, {Jwks, Expiry, JwksMap}}
     else
@@ -402,6 +403,20 @@ load_jwks_raw(JwksUri, Opts) ->
         {invalid_document, _Document} = Reason -> {error, Reason};
         {ok, {{_Format, _Body}, _Headers}} -> {error, invalid_content_type}
     end.
+
+%% `headers_to_cache_deadline/2' reports what is honestly left of the response's
+%% lifetime, which can be nothing. Callers of this module drive a refresh timer
+%% off the result, so a deadline near zero is a request loop rather than a fresh
+%% document.
+-spec cache_deadline(Headers, DefaultExpiry) -> pos_integer() when
+    Headers :: [oidcc_http_adapter:header()],
+    DefaultExpiry :: pos_integer().
+cache_deadline(Headers, DefaultExpiry) ->
+    Deadline = oidcc_http_util:headers_to_cache_deadline(Headers, DefaultExpiry),
+    %% Bounded by the fallback so a caller asking for a short refresh interval
+    %% still gets it: the floor is there to stop a near-zero deadline, not to
+    %% overrule an interval the caller chose deliberately.
+    max(Deadline, min(?MINIMUM_REFRESH, DefaultExpiry)).
 
 -doc """
 Decode JSON into a `t:oidcc_provider_configuration:t/0` record.

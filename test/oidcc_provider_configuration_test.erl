@@ -894,6 +894,65 @@ uri_concatenation_test() ->
 
     ok.
 
+%% OpenID Connect Discovery 1.0 section 2 gives the Issuer Identifier as a URL
+%% with no query or fragment. Such an issuer used to build a discovery URL
+%% pointing at a different path on the same host.
+issuer_query_and_fragment_rejected_test() ->
+    Self = self(),
+    HttpFun =
+        fun(get, {ReqEndpoint, _Header}, _HttpOpts, _Opts, _Config) ->
+            Self ! {req, iolist_to_binary(ReqEndpoint)},
+            {ok, {{"HTTP/1.1", 501, "Not Implemented"}, [], <<>>}}
+        end,
+    Opts = #{
+        request_opts => #{http_adapter => {oidcc_http_adapter_test, #{request => HttpFun}}}
+    },
+
+    lists:foreach(
+        fun(Issuer) ->
+            ?assertEqual(
+                {error, {invalid_issuer, Issuer}},
+                oidcc_provider_configuration:load_configuration(Issuer, Opts)
+            )
+        end,
+        [
+            <<"https://example.com/realm?tenant=other">>,
+            <<"https://example.com/realm#frag">>,
+            <<"https://example.com/realm?tenant=other#frag">>,
+            <<"https://example.com?tenant=other">>,
+            <<"https://example.com/?tenant=other">>,
+            <<"https://example.com/realm/?tenant=other">>
+        ]
+    ),
+
+    %% Rejected before the request is built, so nothing was fetched.
+    receive
+        {req, Endpoint} -> ?assert({unexpected_request, Endpoint} =:= no_request)
+    after 0 -> ok
+    end,
+
+    %% An issuer without either component resolves exactly as before.
+    lists:foreach(
+        fun({Issuer, Expected}) ->
+            oidcc_provider_configuration:load_configuration(Issuer, Opts),
+            receive
+                {req, Got} -> ?assertEqual(Expected, Got)
+            after 0 -> ?assert({no_request_for, Issuer} =:= request_made)
+            end
+        end,
+        [
+            {<<"https://example.com">>, <<"https://example.com/.well-known/openid-configuration">>},
+            {<<"https://example.com/">>,
+                <<"https://example.com/.well-known/openid-configuration">>},
+            {<<"https://example.com/realm">>,
+                <<"https://example.com/realm/.well-known/openid-configuration">>},
+            {<<"https://example.com/realm/">>,
+                <<"https://example.com/realm/.well-known/openid-configuration">>}
+        ]
+    ),
+
+    ok.
+
 decode_fapi2_test() ->
     PrivDir = code:priv_dir(oidcc),
 

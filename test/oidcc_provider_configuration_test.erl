@@ -1005,6 +1005,124 @@ uri_concatenation_test() ->
 
     ok.
 
+%% OpenID Connect Discovery 1.0 section 2 gives the Issuer Identifier as a URL
+%% with no query or fragment. Such an issuer used to build a discovery URL
+%% pointing at a different path on the same host.
+issuer_query_and_fragment_rejected_test() ->
+    Self = self(),
+    HttpFun =
+        fun(get, {ReqEndpoint, _Header}, _HttpOpts, _Opts, _Config) ->
+            Self ! {req, iolist_to_binary(ReqEndpoint)},
+            {ok, {{"HTTP/1.1", 501, "Not Implemented"}, [], <<>>}}
+        end,
+    Opts = #{
+        request_opts => #{http_adapter => {oidcc_http_adapter_test, #{request => HttpFun}}}
+    },
+
+    lists:foreach(
+        fun(Issuer) ->
+            ?assertEqual(
+                {error, {invalid_issuer, Issuer}},
+                oidcc_provider_configuration:load_configuration(Issuer, Opts)
+            )
+        end,
+        [
+            <<"https://example.com/realm?tenant=other">>,
+            <<"https://example.com/realm#frag">>,
+            <<"https://example.com/realm?tenant=other#frag">>,
+            <<"https://example.com?tenant=other">>,
+            <<"https://example.com/?tenant=other">>,
+            <<"https://example.com/realm/?tenant=other">>
+        ]
+    ),
+
+    %% Rejected before the request is built, so nothing was fetched.
+    receive
+        {req, Endpoint} -> ?assert({unexpected_request, Endpoint} =:= no_request)
+    after 0 -> ok
+    end,
+
+    %% An issuer without either component resolves exactly as before.
+    lists:foreach(
+        fun({Issuer, Expected}) ->
+            oidcc_provider_configuration:load_configuration(Issuer, Opts),
+            receive
+                {req, Got} -> ?assertEqual(Expected, Got)
+            after 0 -> ?assert({no_request_for, Issuer} =:= request_made)
+            end
+        end,
+        [
+            {<<"https://example.com">>, <<"https://example.com/.well-known/openid-configuration">>},
+            {<<"https://example.com/">>,
+                <<"https://example.com/.well-known/openid-configuration">>},
+            {<<"https://example.com/realm">>,
+                <<"https://example.com/realm/.well-known/openid-configuration">>},
+            {<<"https://example.com/realm/">>,
+                <<"https://example.com/realm/.well-known/openid-configuration">>}
+        ]
+    ),
+
+    ok.
+
+%% An issuer that fails to parse is not evidence of a query or a fragment.
+%% Microsoft Entra ID documents its issuer with a `{tenantid}` placeholder,
+%% which `uri_string:parse/1` rejects on the braces.
+unparseable_issuer_accepted_test() ->
+    Entra = <<"https://login.microsoftonline.com/{tenantid}/v2.0">>,
+
+    ?assertMatch(
+        {error, {invalid_issuer, Entra}},
+        oidcc_provider_configuration:decode_configuration(
+            google_merge_json(#{<<"issuer">> => Entra})
+        )
+    ),
+
+    ?assertMatch(
+        {ok, #oidcc_provider_configuration{issuer = Entra}},
+        oidcc_provider_configuration:decode_configuration(
+            google_merge_json(#{<<"issuer">> => Entra}),
+            #{quirks => #{issuer_regex => <<"^https://login.microsoftonline.com/[^/]+/v2\\.0$">>}}
+        )
+    ),
+
+    ok.
+
+%% The issuer a provider states in its own document gets the same check, unless
+%% `issuer_regex` says the issuer is not literal.
+document_issuer_query_and_fragment_rejected_test() ->
+    WithQuery = <<"https://my.provider/realm?tenant=other">>,
+    WithFragment = <<"https://my.provider/realm#frag">>,
+
+    ?assertEqual(
+        {error, {invalid_issuer, WithQuery}},
+        oidcc_provider_configuration:decode_configuration(
+            google_merge_json(#{<<"issuer">> => WithQuery})
+        )
+    ),
+    ?assertEqual(
+        {error, {invalid_issuer, WithFragment}},
+        oidcc_provider_configuration:decode_configuration(
+            google_merge_json(#{<<"issuer">> => WithFragment})
+        )
+    ),
+
+    %% `issuer_regex` opts the provider out.
+    ?assertMatch(
+        {ok, #oidcc_provider_configuration{issuer = WithQuery}},
+        oidcc_provider_configuration:decode_configuration(
+            google_merge_json(#{<<"issuer">> => WithQuery}),
+            #{quirks => #{issuer_regex => <<"^https://my.provider">>}}
+        )
+    ),
+
+    %% An ordinary issuer is untouched.
+    ?assertMatch(
+        {ok, #oidcc_provider_configuration{issuer = <<"https://accounts.google.com">>}},
+        oidcc_provider_configuration:decode_configuration(google_merge_json(#{}))
+    ),
+
+    ok.
+
 decode_fapi2_test() ->
     PrivDir = code:priv_dir(oidcc),
 

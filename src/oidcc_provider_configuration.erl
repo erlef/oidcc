@@ -180,6 +180,7 @@ one, so both shapes reach the caller.
 -type error() ::
     invalid_content_type
     | {issuer_mismatch, Issuer :: binary()}
+    | {invalid_issuer, Issuer :: binary()}
     | {invalid_document, Document :: term()}
     | oidcc_decode_util:error()
     | oidcc_http_util:error().
@@ -282,9 +283,6 @@ load_configuration_raw(Issuer0, Opts) ->
     TelemetryOpts = #{topic => [oidcc, load_configuration], extra_meta => #{issuer => Issuer}},
     RequestOpts = maps:get(request_opts, Opts, #{}),
 
-    RequestUrl = url_join(".well-known/openid-configuration", Issuer),
-    Request = {RequestUrl, []},
-
     Quirks = maps:get(quirks, Opts, #{}),
     % this quirk is deprecated, but we keep the support for backwards compatibility.
     AllowIssuerMismatch = maps:get(allow_issuer_mismatch, Quirks, false),
@@ -292,6 +290,9 @@ load_configuration_raw(Issuer0, Opts) ->
     DefaultExpiry = maps:get(fallback_expiry, Opts, ?DEFAULT_CONFIG_EXPIRY),
 
     maybe
+        ok ?= validate_issuer(Issuer),
+        RequestUrl = url_join(".well-known/openid-configuration", Issuer),
+        Request = {RequestUrl, []},
         {ok, {{json, ConfigurationMap}, Headers}} ?=
             oidcc_http_util:request(get, Request, TelemetryOpts, RequestOpts),
         %% A JSON document that is not an object is not a discovery document.
@@ -633,6 +634,7 @@ decode_configuration(Configuration0, Opts) ->
                 ],
                 #{}
             ),
+        ok ?= validate_document_issuer(Issuer, IssuerRegex),
         {ok, #oidcc_provider_configuration{
             issuer = Issuer,
             issuer_regex = IssuerRegex,
@@ -792,6 +794,34 @@ parse_claim_types_supported(Setting, Field) ->
                 error
         end
     ).
+
+%% OpenID Connect Discovery 1.0 section 2 defines the Issuer Identifier as a URL
+%% "with no query or fragment components", and `url_join/2' below relies on that.
+%% It decides whether to append a trailing slash by looking at the last byte of
+%% the whole issuer, so with either component present the slash lands there
+%% instead of on the path. RFC 3986 merging then drops the base query and strips
+%% the last path segment, and `https://idp.example.com/oauth2/default?tenant=b'
+%% fetches `https://idp.example.com/oauth2/.well-known/openid-configuration'.
+%% That is a different tenant's document from the same host, reported as nothing
+%% worse than an issuer mismatch further along.
+-spec validate_issuer(Issuer :: binary()) -> ok | {error, error()}.
+validate_issuer(Issuer) ->
+    case uri_string:parse(Issuer) of
+        #{query := _Query} -> {error, {invalid_issuer, Issuer}};
+        #{fragment := _Fragment} -> {error, {invalid_issuer, Issuer}};
+        #{} -> ok;
+        {error, _Reason, _Term} -> {error, {invalid_issuer, Issuer}}
+    end.
+
+%% The issuer a provider states in its own document, checked the same way. A
+%% caller that set `issuer_regex' has already said the issuer is not to be read
+%% at face value, so leave those alone.
+-spec validate_document_issuer(Issuer, IssuerRegex) -> ok | {error, error()} when
+    Issuer :: uri_string:uri_string(), IssuerRegex :: binary() | undefined.
+validate_document_issuer(_Issuer, IssuerRegex) when is_binary(IssuerRegex) ->
+    ok;
+validate_document_issuer(Issuer, _IssuerRegex) ->
+    validate_issuer(Issuer).
 
 -spec url_join(RefURI :: uri_string:uri_string(), BaseURI :: uri_string:uri_string()) ->
     uri_string:uri_string().

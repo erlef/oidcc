@@ -117,7 +117,7 @@ load_well_known_openid_introspections(_Config) ->
 
     %% Microsoft
     ?assertMatch(
-        {error, {issuer_mismatch, _}},
+        {error, {invalid_issuer, <<"https://login.microsoftonline.com/{tenantid}/v2.0">>}},
         oidcc_provider_configuration:load_configuration(
             <<"https://login.microsoftonline.com/common/v2.0">>,
             #{}
@@ -125,6 +125,13 @@ load_well_known_openid_introspections(_Config) ->
     ),
     ?assertMatch(
         {ok, {#oidcc_provider_configuration{}, _}},
+        oidcc_provider_configuration:load_configuration(
+            <<"https://login.microsoftonline.com/common/v2.0">>,
+            #{quirks => #{issuer_regex => <<"^https://login.microsoftonline.com/[^/]+/v2\\.0$">>}}
+        )
+    ),
+    ?assertMatch(
+        {error, {invalid_issuer, <<"https://login.microsoftonline.com/{tenantid}/v2.0">>}},
         oidcc_provider_configuration:load_configuration(
             <<"https://login.microsoftonline.com/common/v2.0">>,
             #{quirks => #{allow_issuer_mismatch => true}}

@@ -168,6 +168,50 @@ defmodule Oidcc.Token do
   end
 
   @doc """
+  Retrieve the token, reporting what a JWKS refresh fetched
+
+  Same as `retrieve/3`, but the third element carries whatever the
+  `refresh_jwks` function returned alongside the refreshed keys, or `:undefined`
+  when no refresh happened.
+
+  oidcc refreshes the keys and retries validation without re-sending the
+  authorization code, which is single use, so this is the only way to learn what
+  that refresh fetched. Persisting the refreshed key set is the usual reason to
+  want it.
+
+  ## Examples
+
+      refresh_jwks = fn _old_jwks, _kid ->
+        {:ok, {jwks, expiry, document}} =
+          Oidcc.ProviderConfiguration.load_jwks_raw(jwks_uri, %{})
+
+        {:ok, JOSE.JWK.to_record(jwks), {document, expiry}}
+      end
+
+      {:ok, %Oidcc.Token{}, {document, expiry}} =
+        Oidcc.Token.retrieve_with_refresh(auth_code, client_context, %{
+          redirect_uri: "https://my.server/return",
+          refresh_jwks: refresh_jwks
+        })
+
+  """
+  @doc since: "3.9.0"
+  @spec retrieve_with_refresh(
+          auth_code :: String.t(),
+          client_context :: ClientContext.t(),
+          opts :: retrieve_opts()
+        ) ::
+          {:ok, t(), :oidcc_token.refresh_info()} | {:error, :oidcc_token.error()}
+  def retrieve_with_refresh(auth_code, client_context, opts) do
+    client_context = ClientContext.struct_to_record(client_context)
+
+    case :oidcc_token.retrieve_with_refresh(auth_code, client_context, opts) do
+      {:ok, token, info} -> {:ok, record_to_struct(token), info}
+      {:error, reason} -> {:error, reason} |> normalize_token_response()
+    end
+  end
+
+  @doc """
   Validate the JARM response, returning the valid claims as a map.
 
   the response was sent to the local endpoint by the OpenId Connect provider,

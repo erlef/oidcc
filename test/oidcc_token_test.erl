@@ -2389,3 +2389,92 @@ client_context_fapi2_fixture() ->
     oidcc_client_context:from_manual(Configuration, Jwk, ClientId, ClientSecret, #{
         client_jwks => ClientJwk
     }).
+
+%% A refresh function that fetched a key set has no way to hand the document or
+%% its expiry back to its own caller, because oidcc calls it and consumes the
+%% result. The three element return reports it through retrieve_with_refresh/3.
+retrieve_with_refresh_reports_refresh_info_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    OldJwk0 = jose_jwk:generate_key(16),
+    OldJwk = OldJwk0#jose_jwk{fields = #{<<"kid">> => <<"old">>}},
+    NewJwk0 = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    NewJwk = NewJwk0#jose_jwk{fields = #{<<"kid">> => <<"new">>}},
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, #oidcc_provider_configuration{issuer = Issuer} = Configuration} = oidcc_provider_configuration:decode_configuration(
+        json:decode(ConfigurationBinary)
+    ),
+
+    ClientId = <<"client_id">>,
+    ClientContext = oidcc_client_context:from_manual(
+        Configuration, OldJwk, ClientId, <<"client_secret">>
+    ),
+
+    Claims = #{
+        <<"iss">> => Issuer,
+        <<"sub">> => <<"sub">>,
+        <<"aud">> => ClientId,
+        <<"iat">> => erlang:system_time(second),
+        <<"exp">> => erlang:system_time(second) + 10
+    },
+    {_Jws, IdToken} =
+        jose_jws:compact(
+            jose_jwt:sign(
+                NewJwk, #{<<"alg">> => <<"RS256">>, <<"kid">> => <<"new">>}, jose_jwt:from(Claims)
+            )
+        ),
+
+    HttpFun =
+        fun(post, _Request, _HttpOpts, _Opts, _Config) ->
+            {ok, {
+                {"HTTP/1.1", 200, "OK"},
+                [{"content-type", "application/json"}],
+                iolist_to_binary(
+                    json:encode(#{
+                        <<"access_token">> => <<"access">>,
+                        <<"token_type">> => <<"Bearer">>,
+                        <<"id_token">> => IdToken,
+                        <<"scope">> => <<"openid">>
+                    })
+                )
+            }}
+        end,
+    Opts = #{
+        redirect_uri => <<"https://my.server/return">>,
+        request_opts => #{http_adapter => {oidcc_http_adapter_test, #{request => HttpFun}}}
+    },
+
+    %% Reporting nothing keeps the two element return working.
+    Quiet = fun(_Jwks, <<"new">>) -> {ok, NewJwk} end,
+    ?assertMatch(
+        {ok, #oidcc_token{}, undefined},
+        oidcc_token:retrieve_with_refresh(<<"code">>, ClientContext, Opts#{refresh_jwks => Quiet})
+    ),
+
+    %% Reporting the document and its expiry hands them to the caller.
+    Reporting =
+        fun(_Jwks, <<"new">>) -> {ok, NewJwk, {#{<<"keys">> => []}, 300_000}} end,
+    ?assertMatch(
+        {ok, #oidcc_token{}, {#{<<"keys">> := []}, 300_000}},
+        oidcc_token:retrieve_with_refresh(
+            <<"code">>, ClientContext, Opts#{refresh_jwks => Reporting}
+        )
+    ),
+
+    %% No refresh needed, nothing reported.
+    DirectContext = oidcc_client_context:from_manual(
+        Configuration, NewJwk, ClientId, <<"client_secret">>
+    ),
+    ?assertMatch(
+        {ok, #oidcc_token{}, undefined},
+        oidcc_token:retrieve_with_refresh(<<"code">>, DirectContext, Opts)
+    ),
+
+    %% retrieve/3 is unchanged.
+    ?assertMatch(
+        {ok, #oidcc_token{}},
+        oidcc_token:retrieve(<<"code">>, ClientContext, Opts#{refresh_jwks => Reporting})
+    ),
+
+    ok.

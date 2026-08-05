@@ -634,6 +634,7 @@ decode_configuration(Configuration0, Opts) ->
                 ],
                 #{}
             ),
+        ok ?= validate_document_issuer(Issuer, IssuerRegex),
         {ok, #oidcc_provider_configuration{
             issuer = Issuer,
             issuer_regex = IssuerRegex,
@@ -809,8 +810,23 @@ validate_issuer(Issuer) ->
         #{query := _Query} -> {error, {invalid_issuer, Issuer}};
         #{fragment := _Fragment} -> {error, {invalid_issuer, Issuer}};
         #{} -> ok;
-        {error, _Reason, _Term} -> {error, {invalid_issuer, Issuer}}
+        %% Nothing that failed to parse is evidence of a query or a fragment,
+        %% and this check has no opinion beyond those two. Microsoft Entra ID
+        %% documents its issuer as
+        %% `https://login.microsoftonline.com/{tenantid}/v2.0', which has
+        %% neither and still fails `uri_string:parse/1' on the braces.
+        {error, _Reason, _Term} -> ok
     end.
+
+%% The issuer a provider states in its own document, checked the same way. A
+%% caller that set `issuer_regex' has already said the issuer is not to be read
+%% at face value, so leave those alone.
+-spec validate_document_issuer(Issuer, IssuerRegex) -> ok | {error, error()} when
+    Issuer :: uri_string:uri_string(), IssuerRegex :: binary() | undefined.
+validate_document_issuer(_Issuer, IssuerRegex) when is_binary(IssuerRegex) ->
+    ok;
+validate_document_issuer(Issuer, _IssuerRegex) ->
+    validate_issuer(Issuer).
 
 -spec url_join(RefURI :: uri_string:uri_string(), BaseURI :: uri_string:uri_string()) ->
     uri_string:uri_string().

@@ -1064,6 +1064,58 @@ issuer_query_and_fragment_rejected_test() ->
 
     ok.
 
+%% An issuer that fails to parse is not evidence of a query or a fragment.
+%% Microsoft Entra ID documents its issuer with a `{tenantid}` placeholder,
+%% which `uri_string:parse/1` rejects on the braces.
+unparseable_issuer_accepted_test() ->
+    Entra = <<"https://login.microsoftonline.com/{tenantid}/v2.0">>,
+    ?assertMatch({error, invalid_uri, _}, uri_string:parse(Entra)),
+
+    ?assertMatch(
+        {ok, #oidcc_provider_configuration{issuer = Entra}},
+        oidcc_provider_configuration:decode_configuration(
+            google_merge_json(#{<<"issuer">> => Entra})
+        )
+    ),
+
+    ok.
+
+%% The issuer a provider states in its own document gets the same check, unless
+%% `issuer_regex` says the issuer is not literal.
+document_issuer_query_and_fragment_rejected_test() ->
+    WithQuery = <<"https://my.provider/realm?tenant=other">>,
+    WithFragment = <<"https://my.provider/realm#frag">>,
+
+    ?assertEqual(
+        {error, {invalid_issuer, WithQuery}},
+        oidcc_provider_configuration:decode_configuration(
+            google_merge_json(#{<<"issuer">> => WithQuery})
+        )
+    ),
+    ?assertEqual(
+        {error, {invalid_issuer, WithFragment}},
+        oidcc_provider_configuration:decode_configuration(
+            google_merge_json(#{<<"issuer">> => WithFragment})
+        )
+    ),
+
+    %% `issuer_regex` opts the provider out.
+    ?assertMatch(
+        {ok, #oidcc_provider_configuration{issuer = WithQuery}},
+        oidcc_provider_configuration:decode_configuration(
+            google_merge_json(#{<<"issuer">> => WithQuery}),
+            #{quirks => #{issuer_regex => <<"^https://my.provider">>}}
+        )
+    ),
+
+    %% An ordinary issuer is untouched.
+    ?assertMatch(
+        {ok, #oidcc_provider_configuration{issuer = <<"https://accounts.google.com">>}},
+        oidcc_provider_configuration:decode_configuration(google_merge_json(#{}))
+    ),
+
+    ok.
+
 decode_fapi2_test() ->
     PrivDir = code:priv_dir(oidcc),
 

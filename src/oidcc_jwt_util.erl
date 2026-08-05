@@ -23,6 +23,7 @@
 -export([sign/3]).
 -export([sign/4]).
 -export([sign_dpop/3]).
+-export([signing_alg_to_digest/2]).
 -export([thumbprint/1]).
 -export([verify_claims/2]).
 -export([verify_not_none_alg/1]).
@@ -52,7 +53,8 @@ and consumes the result.
 
 -doc #{since => <<"3.0.0">>}.
 -type error() ::
-    no_matching_key
+    {unsupported_signing_alg, Alg :: atom()}
+    | no_matching_key
     | invalid_jwt_token
     | {no_matching_key_with_kid, Kid :: binary()}
     | none_alg_used
@@ -73,14 +75,15 @@ and consumes the result.
 %% in jose. see: https://github.com/potatosalad/erlang-jose/issues/28
 -doc false.
 -spec verify_signature(Token, AllowAlgorithms, Jwks) ->
-    {ok, {Jwt, Jws}}
+    {ok, {Jwt, Jws, Jwk}}
     | {error, error()}
 when
     Token :: binary(),
     AllowAlgorithms :: [binary()],
     Jwks :: jose_jwk:key(),
     Jwt :: #jose_jwt{},
-    Jws :: #jose_jws{}.
+    Jws :: #jose_jws{},
+    Jwk :: jose_jwk:key().
 verify_signature(Token, AllowAlgorithms, #jose_jwk{keys = {jose_jwk_set, Keys}}) ->
     lists:foldl(
         fun
@@ -114,7 +117,7 @@ verify_signature(Token, AllowAlgorithms, #jose_jwk{} = Jwks) ->
             #jose_jwk{} ->
                 case jose_jwt:verify_strict(Jwks, AllowAlgorithms, Token) of
                     {true, Jwt, Jws} ->
-                        {ok, {Jwt, Jws}};
+                        {ok, {Jwt, Jws, Jwks}};
                     {false, Jwt, #jose_jws{alg = {jose_jws_alg_none, none}} = Jws} ->
                         {error, {none_alg_used, Jwt, Jws}};
                     {false, _Jwt, _Jws} ->
@@ -291,7 +294,7 @@ sign(Jwt, Jwk, [Algorithm | RestAlgorithms], JwsFields0) ->
     EncryptionAlgs :: [binary()] | undefined,
     EncryptionEncs :: [binary()] | undefined
 ) ->
-    {ok, {#jose_jwt{}, #jose_jwe{} | #jose_jws{}}} | {error, error()}.
+    {ok, {#jose_jwt{}, #jose_jwe{} | #jose_jws{}, jose_jwk:key() | none}} | {error, error()}.
 decrypt_and_verify(Jwt, Jwks, SigningAlgs, EncryptionAlgs, EncryptionEncs) ->
     %% we call jwe_peek_protected/1 before `decrypt/4' so that we can
     %% handle unencrypted tokens in the case where SupportedAlgorithms /
@@ -402,9 +405,9 @@ verify_decrypted_token(Jwt, SigningAlgs, Jwe, Jwks) ->
             %% encrypted + signed (nested) JWT
             {ok, Result};
         {error, invalid_jwt_token} ->
-            %% encrypted JWT
+            %% encrypted JWT, not signed: there is no signing key
             try
-                {ok, {jose_jwt:from_binary(Jwt), Jwe}}
+                {ok, {jose_jwt:from_binary(Jwt), Jwe, none}}
             catch
                 _ -> {error, invalid_jwt_token}
             end;
@@ -517,6 +520,63 @@ verify_not_none_alg(#jose_jws{fields = #{<<"alg">> := <<"none">>}}) ->
     {error, none_alg_used};
 verify_not_none_alg(#jose_jws{}) ->
     ok.
+
+%% Digest used by the given JWS signing algorithm.
+%%
+%% Used to derive the hash algorithm for the `at_hash' / `c_hash' claims, which
+%% are defined in terms of "the hash algorithm used in the `alg' Header
+%% Parameter of the ID Token's JOSE Header".
+%%
+%% Most algorithms name their digest in the `alg' itself. `EdDSA' does not, so
+%% it is derived from the curve of the key the token was signed with.
+%%
+%% See https://openid.net/specs/openid-connect-core-1_0.html#CodeIDToken
+-doc false.
+-spec signing_alg_to_digest(Alg, Jwk) ->
+    {ok, crypto:sha2()} | {error, {unsupported_signing_alg, atom()}}
+when
+    Alg :: atom(),
+    Jwk :: jose_jwk:key() | none.
+signing_alg_to_digest('RS256', _Jwk) ->
+    {ok, sha256};
+signing_alg_to_digest('RS384', _Jwk) ->
+    {ok, sha384};
+signing_alg_to_digest('RS512', _Jwk) ->
+    {ok, sha512};
+signing_alg_to_digest('PS256', _Jwk) ->
+    {ok, sha256};
+signing_alg_to_digest('PS384', _Jwk) ->
+    {ok, sha384};
+signing_alg_to_digest('PS512', _Jwk) ->
+    {ok, sha512};
+%% `ES512' uses the P-521 curve, but still hashes with SHA-512.
+signing_alg_to_digest('ES256', _Jwk) ->
+    {ok, sha256};
+signing_alg_to_digest('ES384', _Jwk) ->
+    {ok, sha384};
+signing_alg_to_digest('ES512', _Jwk) ->
+    {ok, sha512};
+signing_alg_to_digest('HS256', _Jwk) ->
+    {ok, sha256};
+signing_alg_to_digest('HS384', _Jwk) ->
+    {ok, sha384};
+signing_alg_to_digest('HS512', _Jwk) ->
+    {ok, sha512};
+%% OpenID Connect Core does not define which digest to use for `EdDSA': the
+%% `alg' header only says "EdDSA", so it can only be derived from the key's
+%% curve. There is an unpublished OpenID WG proposal to standardise this; in
+%% the meantime this follows the de-facto behaviour of using SHA-512 for
+%% Ed25519.
+%%
+%% Ed448 uses SHAKE256, which is not a `crypto:sha2()', and is therefore
+%% rejected rather than silently hashed with the wrong digest.
+signing_alg_to_digest('EdDSA', #jose_jwk{kty = {jose_jwk_kty_okp_ed25519, _Key}}) ->
+    {ok, sha512};
+signing_alg_to_digest('EdDSA', #jose_jwk{kty = {jose_jwk_kty_okp_ed25519ph, _Key}}) ->
+    {ok, sha512};
+%% `ES256K' is not an OpenID Connect signing algorithm.
+signing_alg_to_digest(Alg, _Jwk) ->
+    {error, {unsupported_signing_alg, Alg}}.
 
 -doc false.
 -spec peek_payload(binary()) -> {ok, #jose_jwt{}} | {error, invalid_jwt_token}.

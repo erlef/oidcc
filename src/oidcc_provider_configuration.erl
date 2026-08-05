@@ -810,12 +810,7 @@ validate_issuer(Issuer) ->
         #{query := _Query} -> {error, {invalid_issuer, Issuer}};
         #{fragment := _Fragment} -> {error, {invalid_issuer, Issuer}};
         #{} -> ok;
-        %% Nothing that failed to parse is evidence of a query or a fragment,
-        %% and this check has no opinion beyond those two. Microsoft Entra ID
-        %% documents its issuer as
-        %% `https://login.microsoftonline.com/{tenantid}/v2.0', which has
-        %% neither and still fails `uri_string:parse/1' on the braces.
-        {error, _Reason, _Term} -> ok
+        {error, _Reason, _Term} -> {error, {invalid_issuer, Issuer}}
     end.
 
 %% The issuer a provider states in its own document, checked the same way. A

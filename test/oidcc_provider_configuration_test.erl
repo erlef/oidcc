@@ -1069,12 +1069,19 @@ issuer_query_and_fragment_rejected_test() ->
 %% which `uri_string:parse/1` rejects on the braces.
 unparseable_issuer_accepted_test() ->
     Entra = <<"https://login.microsoftonline.com/{tenantid}/v2.0">>,
-    ?assertMatch({error, invalid_uri, _}, uri_string:parse(Entra)),
+
+    ?assertMatch(
+        {error, {invalid_issuer, Entra}},
+        oidcc_provider_configuration:decode_configuration(
+            google_merge_json(#{<<"issuer">> => Entra})
+        )
+    ),
 
     ?assertMatch(
         {ok, #oidcc_provider_configuration{issuer = Entra}},
         oidcc_provider_configuration:decode_configuration(
-            google_merge_json(#{<<"issuer">> => Entra})
+            google_merge_json(#{<<"issuer">> => Entra}),
+            #{quirks => #{issuer_regex => <<"^https://login.microsoftonline.com/[^/]+/v2\\.0$">>}}
         )
     ),
 

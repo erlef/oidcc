@@ -518,7 +518,7 @@ validate_jarm(Response, ClientContext, Opts) ->
     %% 5. validate signature (valid, not <<"none">> alg)
     %% 6. continue processing
     maybe
-        {ok, {#jose_jwt{fields = Claims}, Jws}} ?=
+        {ok, {#jose_jwt{fields = Claims}, Jws, _Jwk}} ?=
             oidcc_jwt_util:decrypt_and_verify(
                 Response, Jwks, SigningAlgSupported, EncryptionAlgSupported, EncryptionEncSupported
             ),
@@ -783,7 +783,7 @@ extract_response(TokenResponseBody, ClientContext, Opts) ->
         {ok, AccessExpire} ?= extract_expiry(TokenResponseBody),
         {ok, AccessTokenRecord} ?= extract_access_token(TokenResponseBody, AccessExpire),
         {ok, RefreshTokenRecord} ?= extract_refresh_token(TokenResponseBody),
-        {ok, {IdTokenRecord, NoneUsed}, Info} ?=
+        {ok, {IdTokenRecord, IdTokenJwk, NoneUsed}, Info} ?=
             extract_id_token(TokenResponseBody, ClientContext, Opts),
         TokenRecord = #oidcc_token{
             id = IdTokenRecord,
@@ -791,7 +791,7 @@ extract_response(TokenResponseBody, ClientContext, Opts) ->
             refresh = RefreshTokenRecord,
             scope = Scopes
         },
-        ok ?= verify_access_token_map_hash(TokenRecord),
+        ok ?= verify_access_token_map_hash(TokenRecord, IdTokenJwk),
         %% If none alg was used, continue with checks to allow the user to decide
         %% if he wants to use the result
         case NoneUsed of
@@ -863,23 +863,25 @@ extract_refresh_token(TokenMap) ->
     end.
 
 -spec extract_id_token(TokenMap, ClientContext, Opts) ->
-    {ok, {TokenRecord, NoneUsed}, refresh_info()} | {error, error()}
+    {ok, {TokenRecord, Jwk, NoneUsed}, refresh_info()} | {error, error()}
 when
     TokenMap :: map(),
     ClientContext :: oidcc_client_context:t(),
     Opts :: retrieve_opts(),
-    TokenRecord :: id(),
+    TokenRecord :: id() | none,
+    Jwk :: jose_jwk:key() | none,
     NoneUsed :: boolean().
 extract_id_token(TokenMap, ClientContext, Opts) ->
     case maps:get(<<"id_token">>, TokenMap, none) of
         none ->
-            {ok, {none, false}, undefined};
+            {ok, {none, none, false}, undefined};
         Token when is_binary(Token) ->
             case validate_id_token_with_refresh(Token, ClientContext, Opts) of
-                {ok, OkClaims, Info} ->
-                    {ok, {#oidcc_token_id{token = Token, claims = OkClaims}, false}, Info};
+                {ok, {OkClaims, Jwk}, Info} ->
+                    {ok, {#oidcc_token_id{token = Token, claims = OkClaims}, Jwk, false}, Info};
                 {error, {none_alg_used, NoneClaims}} ->
-                    {ok, {#oidcc_token_id{token = Token, claims = NoneClaims}, true}, undefined};
+                    {ok, {#oidcc_token_id{token = Token, claims = NoneClaims}, none, true},
+                        undefined};
                 {error, Reason} ->
                     {error, Reason}
             end;
@@ -887,25 +889,62 @@ extract_id_token(TokenMap, ClientContext, Opts) ->
             {error, {invalid_property, {id_token, Other}}}
     end.
 
--spec verify_access_token_map_hash(TokenRecord :: t()) ->
-    ok | {error, error()}.
-verify_access_token_map_hash(#oidcc_token{
-    id =
-        #oidcc_token_id{
-            claims =
-                #{<<"at_hash">> := ExpectedHash}
-        },
-    access = #oidcc_token_access{token = AccessToken}
-}) ->
-    <<BinHash:16/binary, _Rest/binary>> = crypto:hash(sha256, AccessToken),
-    case base64:encode(BinHash, #{mode => urlsafe, padding => false}) of
-        ExpectedHash ->
-            ok;
-        _Other ->
-            {error, bad_access_token_hash}
+-spec verify_access_token_map_hash(TokenRecord, Jwk) ->
+    ok | {error, error()}
+when
+    TokenRecord :: t(),
+    Jwk :: jose_jwk:key() | none.
+verify_access_token_map_hash(
+    #oidcc_token{
+        id =
+            #oidcc_token_id{
+                token = IdToken,
+                claims =
+                    #{<<"at_hash">> := ExpectedHash}
+            },
+        access = #oidcc_token_access{token = AccessToken}
+    },
+    Jwk
+) ->
+    maybe
+        {ok, Digest} ?= id_token_hash_digest(IdToken, Jwk),
+        %% The hash is truncated to its left-most half, the length of which
+        %% depends on the digest used. For SHA-256 this is the left-most 128
+        %% bits.
+        %% See https://openid.net/specs/openid-connect-core-1_0.html#CodeIDToken
+        Hash = crypto:hash(Digest, AccessToken),
+        BinHash = binary:part(Hash, 0, byte_size(Hash) div 2),
+        case base64:encode(BinHash, #{mode => urlsafe, padding => false}) of
+            ExpectedHash ->
+                ok;
+            _Other ->
+                {error, bad_access_token_hash}
+        end
     end;
-verify_access_token_map_hash(#oidcc_token{}) ->
+verify_access_token_map_hash(#oidcc_token{}, _Jwk) ->
     ok.
+
+%% Digest to use for the `at_hash' claim of the given ID token.
+%%
+%% The digest is derived from the `alg' header of the ID token, which has
+%% already been checked against the allowed signing algorithms when the
+%% signature was verified.
+%%
+%% `EdDSA' does not name a digest, so it is derived from the curve of the key
+%% the token was signed with.
+-spec id_token_hash_digest(IdToken, Jwk) ->
+    {ok, crypto:sha2()} | {error, oidcc_jwt_util:error()}
+when
+    IdToken :: binary(),
+    Jwk :: jose_jwk:key() | none.
+id_token_hash_digest(_IdToken, none) ->
+    %% Encrypted without a nested signature, or the `none' algorithm was used:
+    %% there is no signing algorithm to derive a digest from, so an `at_hash'
+    %% cannot be verified.
+    {error, {unsupported_signing_alg, undefined}};
+id_token_hash_digest(IdToken, Jwk) ->
+    #jose_jws{alg = {_Module, Alg}} = jose_jwt:peek_protected(IdToken),
+    oidcc_jwt_util:signing_alg_to_digest(Alg, Jwk).
 
 -doc """
 Validate ID Token
@@ -959,12 +998,12 @@ validate_id_token(IdToken, ClientContext, any) ->
     validate_id_token(IdToken, ClientContext, #{nonce => any});
 validate_id_token(IdToken, ClientContext, Opts) when is_map(Opts) ->
     case validate_id_token_with_refresh(IdToken, ClientContext, Opts) of
-        {ok, Claims, _Info} -> {ok, Claims};
+        {ok, {Claims, _Jwk}, _Info} -> {ok, Claims};
         {error, Reason} -> {error, Reason}
     end.
 
 -spec validate_id_token_with_refresh(IdToken, ClientContext, Opts) ->
-    {ok, Claims, refresh_info()} | {error, error()}
+    {ok, {Claims, jose_jwk:key() | none}, refresh_info()} | {error, error()}
 when
     IdToken :: binary(),
     ClientContext :: oidcc_client_context:t(),
@@ -1087,12 +1126,12 @@ when
     AdditionalClaimValidation :: fun((Claims) -> ok | {error, error()}).
 validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
     case validate_jwt_with_refresh(Token, ClientContext, Opts, AdditionalClaimValidation) of
-        {ok, Claims, _Info} -> {ok, Claims};
+        {ok, {Claims, _Jwk}, _Info} -> {ok, Claims};
         {error, Reason} -> {error, Reason}
     end.
 
 -spec validate_jwt_with_refresh(Token, ClientContext, Opts, AdditionalClaimValidation) ->
-    {ok, Claims, refresh_info()} | {error, error()}
+    {ok, {Claims, jose_jwk:key() | none}, refresh_info()} | {error, error()}
 when
     Token :: binary(),
     ClientContext :: oidcc_client_context:t(),
@@ -1112,7 +1151,7 @@ validate_jwt_with_refresh(Token, ClientContext, Opts, AdditionalClaimValidation)
     ).
 
 -spec int_validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
-    {ok, Claims} | {error, error()}
+    {ok, {Claims, jose_jwk:key() | none}} | {error, error()}
 when
     Token :: binary(),
     ClientContext :: oidcc_client_context:t(),
@@ -1155,7 +1194,7 @@ int_validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
     TrustedAudiences = maps:get(trusted_audiences, Opts, any),
 
     maybe
-        {ok, {#jose_jwt{fields = Claims}, Jws}} ?=
+        {ok, {#jose_jwt{fields = Claims}, Jws, Jwk}} ?=
             rescue_none_validated_jwt(
                 oidcc_jwt_util:decrypt_and_verify(
                     Token, Jwks, SigningAlgs, EncryptionAlgs, EncryptionEncs
@@ -1178,9 +1217,9 @@ int_validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
             #jose_jws{alg = {jose_jws_alg_none, none}} ->
                 {error, {none_alg_used, Claims}};
             #jose_jws{} ->
-                {ok, Claims};
+                {ok, {Claims, Jwk}};
             #jose_jwe{} ->
-                {ok, Claims}
+                {ok, {Claims, none}}
         end
     end.
 
@@ -1422,12 +1461,16 @@ add_pkce_verifier(BodyQs, _Opts, _ClientContext) ->
     {ok, BodyQs}.
 
 -spec rescue_none_validated_jwt(Result) -> Response when
-    Response :: {ok, {#jose_jwt{}, #jose_jwe{} | #jose_jws{}}} | {error, oidcc_jwt_util:error()},
-    Result :: {ok, {#jose_jwt{}, #jose_jwe{} | #jose_jws{}}} | {error, oidcc_jwt_util:error()}.
+    Response ::
+        {ok, {#jose_jwt{}, #jose_jwe{} | #jose_jws{}, jose_jwk:key() | none}}
+        | {error, oidcc_jwt_util:error()},
+    Result ::
+        {ok, {#jose_jwt{}, #jose_jwe{} | #jose_jws{}, jose_jwk:key() | none}}
+        | {error, oidcc_jwt_util:error()}.
 rescue_none_validated_jwt({ok, Valid}) ->
     {ok, Valid};
 rescue_none_validated_jwt({error, {none_alg_used, Jwt0, Jws0}}) ->
-    {ok, {Jwt0, Jws0}};
+    {ok, {Jwt0, Jws0, none}};
 rescue_none_validated_jwt(Other) ->
     Other.
 

@@ -278,7 +278,7 @@ validate_userinfo_token(UserinfoToken, ClientContext, Opts) ->
                 _ ->
                     Jwks2
             end,
-        {ok, {#jose_jwt{fields = Claims}, JwsOrJwe}} ?=
+        {ok, {#jose_jwt{fields = Claims}, JwsOrJwe, _Jwk}} ?=
             oidcc_jwt_util:decrypt_and_verify(
                 UserinfoToken,
                 Jwks,

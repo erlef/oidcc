@@ -1740,8 +1740,10 @@ authorization_headers_test() ->
         oidcc_jwt_util:verify_signature(DpopProofWithNonce, SigningAlg, ClientJwk)
     ),
 
-    {ok, {DpopJwt, DpopJws}} = oidcc_jwt_util:verify_signature(DpopProof, SigningAlg, ClientJwk),
-    {ok, {DpopJwtWithNonce, DpopJwsWithNonce}} = oidcc_jwt_util:verify_signature(
+    {ok, {DpopJwt, DpopJws, _DpopJwk}} = oidcc_jwt_util:verify_signature(
+        DpopProof, SigningAlg, ClientJwk
+    ),
+    {ok, {DpopJwtWithNonce, DpopJwsWithNonce, _DpopJwkWithNonce}} = oidcc_jwt_util:verify_signature(
         DpopProofWithNonce, SigningAlg, ClientJwk
     ),
 
@@ -2365,6 +2367,303 @@ validate_jwt_with_regex_issuer_test() ->
         {error, {missing_claim, {<<"iss">>, {regex, RegexPattern}}, _}},
         oidcc_token:validate_jwt(JwtFun(NoMatch2), ClientContext, Opts)
     ),
+
+    ok.
+
+at_hash_signing_alg_test_() ->
+    %% https://openid.net/specs/openid-connect-core-1_0.html#CodeIDToken
+    %%
+    %% `at_hash' is the base64url encoding of the *left-most half* of the hash
+    %% of the access token, where the hash algorithm is the one used in the
+    %% `alg' header of the ID Token's JOSE header.
+    %%
+    %% Both the digest *and* the truncation length therefore depend on `alg':
+    %%
+    %%   *256 -> sha256, 32 byte digest, left-most 16 bytes
+    %%   *384 -> sha384, 48 byte digest, left-most 24 bytes
+    %%   *512 -> sha512, 64 byte digest, left-most 32 bytes
+    %%
+    %% The "left-most 128 bits" in the spec is an example given for RS256, not
+    %% a fixed length.
+    %%
+    %% Note that ES512 uses P-521 (not P-512) but still hashes with SHA-512.
+    %%
+    %% EdDSA is deliberately excluded here, see `at_hash_eddsa_test_/0'.
+    {timeout, 60, [
+        {binary_to_list(Alg), fun() -> at_hash_signing_alg(Alg, Digest, KeyType) end}
+     || {Alg, Digest, KeyType} <- [
+            {<<"RS256">>, sha256, rsa},
+            {<<"RS384">>, sha384, rsa},
+            {<<"RS512">>, sha512, rsa},
+            {<<"PS256">>, sha256, rsa},
+            {<<"PS384">>, sha384, rsa},
+            {<<"PS512">>, sha512, rsa},
+            {<<"ES256">>, sha256, {ec, <<"P-256">>}},
+            {<<"ES384">>, sha384, {ec, <<"P-384">>}},
+            {<<"ES512">>, sha512, {ec, <<"P-521">>}},
+            {<<"HS256">>, sha256, oct},
+            {<<"HS384">>, sha384, oct},
+            {<<"HS512">>, sha512, oct}
+        ]
+    ]}.
+
+at_hash_eddsa_test_() ->
+    %% OpenID Connect Core does not define which hash to use for EdDSA: the
+    %% `alg' header only says "EdDSA", so the digest can only be derived from
+    %% the key's curve (Ed25519 -> SHA-512, Ed448 -> SHAKE256).
+    %%
+    %% There is an unpublished OpenID WG proposal to standardise this. In the
+    %% meantime the de-facto behaviour (e.g. panva/oidc-token-hash) is to use
+    %% SHA-512 for Ed25519, which is what we assert here.
+    {timeout, 60, [
+        {"EdDSA (Ed25519)", fun() ->
+            at_hash_signing_alg(<<"EdDSA">>, sha512, ed25519)
+        end}
+    ]}.
+
+at_hash_signing_alg(Alg, Digest, KeyType) ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, _} = application:ensure_all_started(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        json:decode(ConfigurationBinary)
+    ),
+
+    #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
+        Configuration = Configuration0#oidcc_provider_configuration{
+            token_endpoint_auth_methods_supported = [<<"client_secret_post">>],
+            id_token_signing_alg_values_supported = [Alg]
+        },
+
+    ClientId = <<"client_id">>,
+    %% HS* derives the signing key from the client secret, so it must be long
+    %% enough for the largest digest we sign with (HS512 -> 64 bytes).
+    ClientSecret = binary:copy(<<"client_secret">>, 8),
+    LocalEndpoint = <<"https://my.server/auth">>,
+    AuthCode = <<"1234567890">>,
+    AccessToken = <<"access_token">>,
+
+    %% Derived from the spec rather than from the implementation, so that this
+    %% stays an independent check of the implementation.
+    FullHash = crypto:hash(Digest, AccessToken),
+    LeftMostHalf = binary:part(FullHash, 0, byte_size(FullHash) div 2),
+    AtHash = base64:encode(LeftMostHalf, #{mode => urlsafe, padding => false}),
+
+    Claims =
+        #{
+            <<"iss">> => Issuer,
+            <<"sub">> => <<"sub">>,
+            <<"aud">> => ClientId,
+            <<"iat">> => erlang:system_time(second),
+            <<"exp">> => erlang:system_time(second) + 10,
+            <<"at_hash">> => AtHash
+        },
+
+    %% Key used to sign the ID token. For HS* the provider and the client share
+    %% the client secret as the signing key.
+    SigningJwk =
+        case KeyType of
+            rsa ->
+                jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem");
+            ed25519 ->
+                jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk-ed25519.pem");
+            {ec, Curve} ->
+                jose_jwk:generate_key({ec, Curve});
+            oct ->
+                jose_jwk:from_oct(ClientSecret)
+        end,
+
+    Jwt = jose_jwt:from(Claims),
+    Jws = #{<<"alg">> => Alg},
+    {_Jws, Token} = jose_jws:compact(jose_jwt:sign(SigningJwk, Jws, Jwt)),
+
+    TokenData =
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>
+            })
+        ),
+
+    ClientContext = oidcc_client_context:from_manual(
+        Configuration, SigningJwk, ClientId, ClientSecret
+    ),
+
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(post, {ReqTokenEndpoint, _Header, _ContentType, _Body}, _HttpOpts, _Opts, _Profile) ->
+            TokenEndpoint = ReqTokenEndpoint,
+            {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], TokenData}}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    try
+        ?assertMatch(
+            {ok, #oidcc_token{
+                id = #oidcc_token_id{token = Token},
+                access = #oidcc_token_access{token = AccessToken}
+            }},
+            oidcc_token:retrieve(
+                AuthCode,
+                ClientContext,
+                #{redirect_uri => LocalEndpoint}
+            )
+        )
+    after
+        meck:unload(httpc)
+    end,
+
+    ok.
+
+at_hash_none_alg_test() ->
+    %% An unsigned token has no signing algorithm, and therefore no hash
+    %% algorithm to verify the `at_hash' claim with. The claim must not be
+    %% silently accepted.
+    PrivDir = code:priv_dir(oidcc),
+
+    jose:unsecured_signing(true),
+
+    {ok, _} = application:ensure_all_started(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        json:decode(ConfigurationBinary)
+    ),
+
+    #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
+        Configuration = Configuration0#oidcc_provider_configuration{
+            token_endpoint_auth_methods_supported = [<<"client_secret_post">>]
+        },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"client_secret">>,
+    LocalEndpoint = <<"https://my.server/auth">>,
+    AuthCode = <<"1234567890">>,
+    AccessToken = <<"access_token">>,
+
+    Claims =
+        #{
+            <<"iss">> => Issuer,
+            <<"sub">> => <<"sub">>,
+            <<"aud">> => ClientId,
+            <<"iat">> => erlang:system_time(second),
+            <<"exp">> => erlang:system_time(second) + 10,
+            %% Correct SHA-256 hash of the access token, which must still not be
+            %% accepted, since the token is unsigned.
+            <<"at_hash">> => <<"hrOQHuo3oE6FR82RIiX1SA">>
+        },
+
+    Jwk = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+    Jwt = jose_jwt:from(Claims),
+    {_Jws, Token} = jose_jws:compact(jose_jwt:sign(Jwk, #{<<"alg">> => <<"none">>}, Jwt)),
+
+    TokenData =
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>
+            })
+        ),
+
+    ClientContext = oidcc_client_context:from_manual(Configuration, Jwk, ClientId, ClientSecret),
+
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(post, {ReqTokenEndpoint, _Header, _ContentType, _Body}, _HttpOpts, _Opts, _Profile) ->
+            TokenEndpoint = ReqTokenEndpoint,
+            {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], TokenData}}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    try
+        ?assertMatch(
+            {error, {unsupported_signing_alg, undefined}},
+            oidcc_token:retrieve(
+                AuthCode,
+                ClientContext,
+                #{redirect_uri => LocalEndpoint}
+            )
+        )
+    after
+        meck:unload(httpc),
+        jose:unsecured_signing(false)
+    end,
+
+    ok.
+
+at_hash_encrypted_not_signed_test() ->
+    %% A token that is encrypted but not signed has no signing algorithm, and
+    %% therefore no hash algorithm to verify the `at_hash' claim with. The claim
+    %% must not be silently accepted.
+    #oidcc_client_context{client_id = ClientId, jwks = Jwk, provider_configuration = Configuration0} =
+        ClientContext0 = client_context_fapi2_fixture(),
+
+    #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
+        Configuration = Configuration0#oidcc_provider_configuration{
+            token_endpoint_auth_methods_supported = [<<"client_secret_post">>],
+            id_token_encryption_alg_values_supported = [<<"RSA-OAEP">>],
+            id_token_encryption_enc_values_supported = [<<"A256GCM">>]
+        },
+
+    ClientContext = ClientContext0#oidcc_client_context{provider_configuration = Configuration},
+
+    LocalEndpoint = <<"https://my.server/auth">>,
+    AuthCode = <<"1234567890">>,
+    AccessToken = <<"access_token">>,
+
+    Claims =
+        #{
+            <<"iss">> => Issuer,
+            <<"sub">> => <<"sub">>,
+            <<"aud">> => ClientId,
+            <<"iat">> => erlang:system_time(second),
+            <<"exp">> => erlang:system_time(second) + 10,
+            %% Correct SHA-256 hash of the access token, which must still not be
+            %% accepted, since the token is not signed.
+            <<"at_hash">> => <<"hrOQHuo3oE6FR82RIiX1SA">>
+        },
+
+    %% Encrypted directly, without a nested signature.
+    {_, IdTokenJwt} = jose_jwt:to_binary(Claims),
+    Jwe = #{<<"alg">> => <<"RSA-OAEP">>, <<"enc">> => <<"A256GCM">>},
+    {_Jwe, Token} = jose_jwe:compact(jose_jwk:block_encrypt(IdTokenJwt, Jwe, Jwk)),
+
+    TokenData =
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>
+            })
+        ),
+
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(post, {ReqTokenEndpoint, _Header, _ContentType, _Body}, _HttpOpts, _Opts, _Profile) ->
+            TokenEndpoint = ReqTokenEndpoint,
+            {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], TokenData}}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    try
+        ?assertMatch(
+            {error, {unsupported_signing_alg, undefined}},
+            oidcc_token:retrieve(
+                AuthCode,
+                ClientContext,
+                #{redirect_uri => LocalEndpoint}
+            )
+        )
+    after
+        meck:unload(httpc)
+    end,
 
     ok.
 

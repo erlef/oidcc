@@ -1487,14 +1487,10 @@ unknown_kid_retry(Function, ClientContext, RefreshJwksFun) ->
         {ok, Result} ?= Function(ClientContext),
         {ok, Result, undefined}
     else
+        {error, no_matching_key} when RefreshJwksFun =/= undefined ->
+            do_refresh_jwks_and_retry(Function, ClientContext, RefreshJwksFun, undefined);
         {error, {no_matching_key_with_kid, Kid}} when RefreshJwksFun =/= undefined ->
-            #oidcc_client_context{jwks = OldJwks} = ClientContext,
-            maybe
-                {ok, RefreshedJwks, Info} ?= refresh_jwks(RefreshJwksFun, OldJwks, Kid),
-                RefreshedClientContext = ClientContext#oidcc_client_context{jwks = RefreshedJwks},
-                {ok, Retried} ?= Function(RefreshedClientContext),
-                {ok, Retried, Info}
-            end;
+            do_refresh_jwks_and_retry(Function, ClientContext, RefreshJwksFun, Kid);
         {error, Reason} ->
             {error, Reason}
     end.
@@ -1513,4 +1509,22 @@ refresh_jwks(RefreshJwksFun, Jwks, Kid) ->
         {ok, RefreshedJwks} -> {ok, RefreshedJwks, undefined};
         {ok, RefreshedJwks, Info} -> {ok, RefreshedJwks, Info};
         {error, Reason} -> {error, Reason}
+    end.
+
+-spec do_refresh_jwks_and_retry(Function, ClientContext, RefreshJwksFun, Kid) ->
+    {ok, Result, refresh_info()} | {error, Error}
+when
+    Function :: fun((ClientContext) -> {ok, Result} | {error, Error}),
+    ClientContext :: oidcc_client_context:t(),
+    RefreshJwksFun :: oidcc_jwt_util:refresh_jwks_for_unknown_kid_fun(),
+    Kid :: binary(),
+    Result :: term(),
+    Error :: term().
+do_refresh_jwks_and_retry(Function, ClientContext, RefreshJwksFun, Kid) ->
+    #oidcc_client_context{jwks = OldJwks} = ClientContext,
+    maybe
+        {ok, RefreshedJwks, Info} ?= refresh_jwks(RefreshJwksFun, OldJwks, Kid),
+        RefreshedClientContext = ClientContext#oidcc_client_context{jwks = RefreshedJwks},
+        {ok, Retried} ?= Function(RefreshedClientContext),
+        {ok, Retried, Info}
     end.

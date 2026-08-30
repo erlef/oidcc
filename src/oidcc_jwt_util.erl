@@ -58,6 +58,7 @@ and consumes the result.
     | invalid_jwt_token
     | {no_matching_key_with_kid, Kid :: binary()}
     | none_alg_used
+    | signature_required
     | {none_alg_used, Jwt :: #jose_jwt{}, Jws :: #jose_jws{}}
     | not_encrypted.
 
@@ -405,7 +406,10 @@ verify_decrypted_token(Jwt, SigningAlgs, Jwe, Jwks) ->
             %% encrypted + signed (nested) JWT
             {ok, Result};
         {error, invalid_jwt_token} ->
-            %% encrypted JWT, not signed: there is no signing key
+            %% Encrypted JWT, not signed. Whether that is acceptable depends on
+            %% the token: only the UserInfo response "MAY be encrypted without
+            %% also being signed". The callers that require a signature reject
+            %% the `#jose_jwe{}' returned here.
             try
                 {ok, {jose_jwt:from_binary(Jwt), Jwe, none}}
             catch
@@ -515,11 +519,17 @@ evaluate_for_all_keys(#jose_jwk{} = Jwk, Callback) ->
     Callback(Jwk).
 
 -doc false.
--spec verify_not_none_alg(#jose_jws{}) -> ok | {error, none_alg_used}.
+%% An encrypted token without a nested signature is refused for the same reason
+%% as the `none' algorithm: anyone holding the recipient's public encryption key
+%% can produce one, so it does not authenticate the issuer.
+-spec verify_not_none_alg(#jose_jws{} | #jose_jwe{}) ->
+    ok | {error, none_alg_used | signature_required}.
 verify_not_none_alg(#jose_jws{fields = #{<<"alg">> := <<"none">>}}) ->
     {error, none_alg_used};
 verify_not_none_alg(#jose_jws{}) ->
-    ok.
+    ok;
+verify_not_none_alg(#jose_jwe{}) ->
+    {error, signature_required}.
 
 %% Digest used by the given JWS signing algorithm.
 %%

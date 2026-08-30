@@ -2597,10 +2597,9 @@ at_hash_none_alg_test() ->
 
     ok.
 
-at_hash_encrypted_not_signed_test() ->
-    %% A token that is encrypted but not signed has no signing algorithm, and
-    %% therefore no hash algorithm to verify the `at_hash' claim with. The claim
-    %% must not be silently accepted.
+id_token_encrypted_not_signed_test() ->
+    %% An encrypted ID token must be a Nested JWT, signed and then encrypted.
+    %% Rejected even though every claim, `at_hash' included, is valid.
     #oidcc_client_context{client_id = ClientId, jwks = Jwk, provider_configuration = Configuration0} =
         ClientContext0 = client_context_fapi2_fixture(),
 
@@ -2624,8 +2623,8 @@ at_hash_encrypted_not_signed_test() ->
             <<"aud">> => ClientId,
             <<"iat">> => erlang:system_time(second),
             <<"exp">> => erlang:system_time(second) + 10,
-            %% Correct SHA-256 hash of the access token, which must still not be
-            %% accepted, since the token is not signed.
+            %% Correct SHA-256 hash of the access token, so that the rejection
+            %% cannot be attributed to a failing `at_hash' check.
             <<"at_hash">> => <<"hrOQHuo3oE6FR82RIiX1SA">>
         },
 
@@ -2654,7 +2653,7 @@ at_hash_encrypted_not_signed_test() ->
 
     try
         ?assertMatch(
-            {error, {unsupported_signing_alg, undefined}},
+            {error, signature_required},
             oidcc_token:retrieve(
                 AuthCode,
                 ClientContext,
@@ -2664,6 +2663,121 @@ at_hash_encrypted_not_signed_test() ->
     after
         meck:unload(httpc)
     end,
+
+    ok.
+
+%% Without an `at_hash' nothing else in the validation depends on the signing
+%% algorithm, so this is the case that used to pass validation.
+id_token_encrypted_not_signed_without_at_hash_test() ->
+    #oidcc_client_context{client_id = ClientId, jwks = Jwk, provider_configuration = Configuration0} =
+        ClientContext0 = client_context_fapi2_fixture(),
+
+    #oidcc_provider_configuration{token_endpoint = TokenEndpoint, issuer = Issuer} =
+        Configuration = Configuration0#oidcc_provider_configuration{
+            token_endpoint_auth_methods_supported = [<<"client_secret_post">>],
+            id_token_encryption_alg_values_supported = [<<"RSA-OAEP">>],
+            id_token_encryption_enc_values_supported = [<<"A256GCM">>]
+        },
+
+    ClientContext = ClientContext0#oidcc_client_context{provider_configuration = Configuration},
+
+    LocalEndpoint = <<"https://my.server/auth">>,
+    AuthCode = <<"1234567890">>,
+    AccessToken = <<"access_token">>,
+
+    Claims =
+        #{
+            <<"iss">> => Issuer,
+            <<"sub">> => <<"sub">>,
+            <<"aud">> => ClientId,
+            <<"iat">> => erlang:system_time(second),
+            <<"exp">> => erlang:system_time(second) + 10
+        },
+
+    %% Encrypted directly, without a nested signature.
+    {_, IdTokenJwt} = jose_jwt:to_binary(Claims),
+    Jwe = #{<<"alg">> => <<"RSA-OAEP">>, <<"enc">> => <<"A256GCM">>},
+    {_Jwe, Token} = jose_jwe:compact(jose_jwk:block_encrypt(IdTokenJwt, Jwe, Jwk)),
+
+    TokenData =
+        iolist_to_binary(
+            json:encode(#{
+                <<"access_token">> => AccessToken,
+                <<"token_type">> => <<"Bearer">>,
+                <<"id_token">> => Token,
+                <<"scope">> => <<"profile openid">>
+            })
+        ),
+
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(post, {ReqTokenEndpoint, _Header, _ContentType, _Body}, _HttpOpts, _Opts, _Profile) ->
+            TokenEndpoint = ReqTokenEndpoint,
+            {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], TokenData}}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    try
+        ?assertMatch(
+            {error, signature_required},
+            oidcc_token:retrieve(
+                AuthCode,
+                ClientContext,
+                #{redirect_uri => LocalEndpoint}
+            )
+        ),
+        %% The same token is refused through the direct validation entry point.
+        ?assertMatch(
+            {error, signature_required},
+            oidcc_token:validate_id_token(Token, ClientContext, any)
+        )
+    after
+        meck:unload(httpc)
+    end,
+
+    ok.
+
+%% A JARM response "is either signed, or signed and encrypted", and travels
+%% through the browser, so an encrypted only response is attacker reachable.
+validate_jarm_encrypted_not_signed_test() ->
+    #oidcc_client_context{client_id = ClientId, provider_configuration = Configuration0} =
+        ClientContext0 = client_context_fapi2_fixture(),
+
+    #oidcc_provider_configuration{issuer = Issuer} =
+        Configuration = Configuration0#oidcc_provider_configuration{
+            authorization_encryption_alg_values_supported = [<<"RSA-OAEP-256">>],
+            authorization_encryption_enc_values_supported = [<<"A256GCM">>]
+        },
+
+    EncJwk0 = jose_jwk:generate_key({rsa, 2048}),
+    EncJwk = EncJwk0#jose_jwk{fields = #{<<"use">> => <<"enc">>}},
+
+    ClientContext = ClientContext0#oidcc_client_context{
+        provider_configuration = Configuration,
+        jwks = EncJwk
+    },
+
+    JarmClaims = #{
+        <<"iss">> => Issuer,
+        <<"aud">> => ClientId,
+        <<"code">> => <<"injected_authorization_code">>,
+        <<"exp">> => erlang:system_time(second) + 10
+    },
+
+    %% Encrypted directly, without a nested signature.
+    {_, JarmJwt} = jose_jwt:to_binary(JarmClaims),
+    {_Jwe, Response} = jose_jwe:compact(
+        jose_jwk:block_encrypt(
+            JarmJwt,
+            jose_jwe:from_map(#{<<"alg">> => <<"RSA-OAEP-256">>, <<"enc">> => <<"A256GCM">>}),
+            EncJwk
+        )
+    ),
+
+    ?assertMatch(
+        {error, signature_required},
+        oidcc_token:validate_jarm(Response, ClientContext, #{})
+    ),
 
     ok.
 

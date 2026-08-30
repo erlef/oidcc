@@ -253,6 +253,7 @@ return that carries only the keys. `oidcc` does not interpret it.
     | no_supported_auth_method
     | bad_access_token_hash
     | sub_invalid
+    | signature_required
     | token_expired
     | token_not_yet_valid
     | {none_alg_used, Token :: t()}
@@ -515,7 +516,7 @@ validate_jarm(Response, ClientContext, Opts) ->
     %% 2. validate <<"iss">> claim
     %% 3. validate <<"aud">> claim
     %% 4. validate <<"exp">> claim
-    %% 5. validate signature (valid, not <<"none">> alg)
+    %% 5. validate signature (valid, not <<"none">> alg, not encrypted only)
     %% 6. continue processing
     maybe
         {ok, {#jose_jwt{fields = Claims}, Jws, _Jwk}} ?=
@@ -1219,7 +1220,11 @@ int_validate_jwt(Token, ClientContext, Opts, AdditionalClaimValidation) ->
             #jose_jws{} ->
                 {ok, {Claims, Jwk}};
             #jose_jwe{} ->
-                {ok, {Claims, none}}
+                %% Encrypted without a nested signature: "If the ID Token is
+                %% encrypted, it MUST be signed then encrypted, with the result
+                %% being a Nested JWT."
+                %% https://openid.net/specs/openid-connect-core-1_0.html#IDToken
+                {error, signature_required}
         end
     end.
 

@@ -5,6 +5,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("jose/include/jose_jwk.hrl").
+-include_lib("oidcc/include/oidcc_provider_configuration.hrl").
 
 does_not_start_without_issuer_test() ->
     ?assertMatch(
@@ -247,6 +248,72 @@ accepts_generic_plus_json_content_type_test() ->
                 ?assertMatch(
                     #jose_jwk{keys = {jose_jwk_set, []}},
                     wait_until(fun() -> oidcc_provider_configuration_worker:get_jwks(Pid) end)
+                )
+            end
+        )
+    end).
+
+replaces_changed_configuration_in_ets_test() ->
+    Name = ?FUNCTION_NAME,
+    Requests = atomics:new(1, []),
+    HttpFun =
+        fun
+            (
+                get,
+                {"https://example.com/.well-known/openid-configuration", []},
+                _HttpOpts,
+                _Opts,
+                _Profile
+            ) ->
+                Scopes =
+                    case atomics:add_get(Requests, 1, 1) of
+                        1 -> [<<"openid">>];
+                        _ -> [<<"openid">>, <<"email">>]
+                    end,
+                {ok, {
+                    {"HTTP/1.1", 200, "OK"},
+                    [{"content-type", "application/json"}],
+                    iolist_to_binary(
+                        json:encode(#{
+                            issuer => <<"https://example.com">>,
+                            jwks_uri => <<"https://example.com/keys">>,
+                            authorization_endpoint => <<"https://example.com/authorize">>,
+                            scopes_supported => Scopes,
+                            response_types_supported => [<<"code">>],
+                            subject_types_supported => [<<"public">>],
+                            id_token_signing_alg_values_supported => [<<"RS256">>]
+                        })
+                    )
+                }};
+            (
+                get,
+                {<<"https://example.com/keys">>, []},
+                _HttpOpts,
+                _Opts,
+                _Profile
+            ) ->
+                {ok, {
+                    {"HTTP/1.1", 200, "OK"},
+                    [{"content-type", "application/json"}],
+                    iolist_to_binary(json:encode(#{keys => []}))
+                }}
+        end,
+
+    with_httpc_mock(HttpFun, fun() ->
+        with_live_provider_worker(
+            #{
+                issuer => <<"https://example.com">>,
+                name => {local, Name}
+            },
+            fun(_Pid) ->
+                ok = oidcc_provider_configuration_worker:refresh_configuration(Name),
+                ?assertMatch(
+                    [
+                        {provider_configuration, #oidcc_provider_configuration{
+                            scopes_supported = [<<"openid">>, <<"email">>]
+                        }}
+                    ],
+                    ets:lookup(Name, provider_configuration)
                 )
             end
         )

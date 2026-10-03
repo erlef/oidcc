@@ -93,7 +93,7 @@ parse_setting_uri_https(Setting, Field) when is_binary(Setting) ->
     case uri_string:parse(Setting) of
         #{scheme := <<"https">>} ->
             {ok, Setting};
-        #{scheme := _Scheme} ->
+        _Other ->
             {error, {invalid_config_property, {uri_https, Field}}}
     end;
 parse_setting_uri_https(_Setting, Field) ->

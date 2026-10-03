@@ -48,11 +48,11 @@ priv_handle_retry(exponential, _Min, Max, State) ->
     {Wait, Wait};
 priv_handle_retry(random_exponential, Min, Max, undefined) ->
     Lower = max(Min, Max div 3),
-    priv_handle_retry(random_exponential, Min, Max, {Lower, Lower});
+    priv_handle_retry(random_exponential, Min, Max, {Min, Lower});
 priv_handle_retry(random_exponential, _Min, Max, {Prev, Lower}) ->
     NextMin = min(Prev, Lower),
     NextMax = min(Prev * 3, Max),
     Next = rand(NextMin, NextMax),
-    priv_handle_retry(random, NextMin, NextMax, {Next, Lower}).
+    {Next, {Next, Lower}}.
 
 rand(Min, Max) -> rand:uniform(Max - Min + 1) + Min - 1.

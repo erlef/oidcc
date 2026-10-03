@@ -84,6 +84,18 @@ rand_exp_backoff_in_min_max_test() ->
         calculate_backoffs(20, random_exponential, Min, Max)
     ).
 
+rand_exp_backoff_starts_near_min_test() ->
+    Min = 1000,
+    Max = 30000,
+    lists:foreach(
+        fun(_) ->
+            [{wait, Wait} | _] = calculate_backoffs(1, random_exponential, Min, Max),
+            ?assert(Wait >= Min),
+            ?assert(Wait =< Min * 3)
+        end,
+        lists:seq(1, 100)
+    ).
+
 rand_exp_backoff_increase_until_third_max_test() ->
     Min = 1000,
     Max = 30000,

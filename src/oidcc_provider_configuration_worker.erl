@@ -151,6 +151,12 @@ handle_cast(refresh_configuration, State) ->
 handle_cast(refresh_jwks, State) ->
     {noreply, State, {continue, load_jwks}};
 handle_cast(
+    {refresh_jwks_for_unknown_kid, _Kid}, #state{provider_configuration = undefined} = State
+) ->
+    {noreply, State};
+handle_cast({refresh_jwks_for_unknown_kid, _Kid}, #state{jwks = undefined} = State) ->
+    {noreply, State, {continue, load_jwks}};
+handle_cast(
     {refresh_jwks_for_unknown_kid, _Kid},
     #state{jwks = #jose_jwk{keys = {jose_jwk_set, []}}} = State
 ) ->
@@ -229,8 +235,8 @@ handle_continue(
     end.
 
 -doc false.
-handle_info(backoff_retry, State) ->
-    {noreply, State, {continue, load_configuration}};
+handle_info({backoff_retry, Continue}, State) ->
+    {noreply, State, {continue, Continue}};
 handle_info(configuration_expired, State) ->
     {noreply, State#state{jwks_refresh_timer = undefined}, {continue, load_configuration}};
 handle_info(jwks_expired, State) ->
@@ -408,6 +414,11 @@ register_ets_table(Opts) ->
             undefined
     end.
 
+-spec retry_continue(ErrorType) -> load_configuration | load_jwks when
+    ErrorType :: jwks_load_failed | configuration_load_failed.
+retry_continue(configuration_load_failed) -> load_configuration;
+retry_continue(jwks_load_failed) -> load_jwks.
+
 -spec handle_backoff_retry(ErrorType, Reason, State) ->
     {stop, {ErrorType, Reason}, State} | {noreply, State}
 when
@@ -435,7 +446,7 @@ handle_backoff_retry(
                 [Issuer, Wait, ErrorDetails],
                 #{error => ErrorDetails}
             ),
-            erlang:send_after(Wait, self(), backoff_retry),
+            erlang:send_after(Wait, self(), {backoff_retry, retry_continue(ErrorType)}),
             {noreply, State#state{
                 backoff_state = NewBackoffState
             }}

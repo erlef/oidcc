@@ -403,7 +403,7 @@ get_ets_table_name(_Ref) ->
 register_ets_table(Opts) ->
     case maps:get(name, Opts, undefined) of
         {local, Name} ->
-            ets:new(Name, [named_table, bag, protected, {read_concurrency, true}]);
+            ets:new(Name, [named_table, set, protected, {read_concurrency, true}]);
         _OtherName ->
             undefined
     end.

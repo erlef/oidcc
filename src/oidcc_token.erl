@@ -133,6 +133,9 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
   binary or a list of binaries is given, validate that the `azp` claim matches
   one of those.
 * `token_request_claims` - Additional claims to use with the token request.
+* `audience` - `aud` claim of the client assertion when authenticating with
+  `private_key_jwt` or `client_secret_jwt`. Defaults to the issuer. Some
+  providers require the token endpoint.
 """.
 -doc #{since => <<"3.0.0">>}.
 -type retrieve_opts() ::
@@ -150,7 +153,8 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
         dpop_nonce => binary(),
         trusted_audiences => [binary()] | any,
         validate_azp => binary() | [binary()] | client_id | any,
-        token_request_claims => #{binary() => binary() | integer()}
+        token_request_claims => #{binary() => binary() | integer()},
+        audience => binary()
     }.
 
 -doc "See `t:refresh_opts_no_sub/0`.".
@@ -166,7 +170,8 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
         dpop_nonce => binary(),
         trusted_audiences => [binary()] | any,
         validate_azp => binary() | [binary()] | client_id | any,
-        token_request_claims => #{binary() => binary() | integer()}
+        token_request_claims => #{binary() => binary() | integer()},
+        audience => binary()
     }.
 
 -doc #{since => <<"3.0.0">>}.
@@ -182,7 +187,8 @@ See https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.3.
         dpop_nonce => binary(),
         trusted_audiences => [binary()] | any,
         validate_azp => binary() | [binary()] | client_id | any,
-        token_request_claims => #{binary() => binary() | integer()}
+        token_request_claims => #{binary() => binary() | integer()},
+        audience => binary()
     }.
 
 -doc """

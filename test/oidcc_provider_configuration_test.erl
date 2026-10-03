@@ -168,6 +168,26 @@ check_validations_test() ->
     ),
 
     ?assertMatch(
+        {error, {invalid_config_property, {uri_https, userinfo_endpoint}}},
+        oidcc_provider_configuration:decode_configuration(
+            google_merge_json(#{
+                <<"userinfo_endpoint">> =>
+                    <<"/userinfo">>
+            })
+        )
+    ),
+
+    ?assertMatch(
+        {error, {invalid_config_property, {uri_https, userinfo_endpoint}}},
+        oidcc_provider_configuration:decode_configuration(
+            google_merge_json(#{
+                <<"userinfo_endpoint">> =>
+                    <<"https://op.example/user info">>
+            })
+        )
+    ),
+
+    ?assertMatch(
         {error, {invalid_config_property, {uri, jwks_uri}}},
         oidcc_provider_configuration:decode_configuration(
             google_merge_json(#{

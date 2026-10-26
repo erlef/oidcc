@@ -220,9 +220,11 @@ handle_continue(
 
     maybe_cancel_timer(OldTimer),
 
+    LoadResult = oidcc_provider_configuration:load_jwks(JwksUri, ProviderConfigurationOpts),
+    ok = drop_queued_unknown_kid_refreshes(),
+
     maybe
-        {ok, {Jwks, Expiry}} ?=
-            oidcc_provider_configuration:load_jwks(JwksUri, ProviderConfigurationOpts),
+        {ok, {Jwks, Expiry}} ?= LoadResult,
         NewTimer = erlang:send_after(Expiry, self(), jwks_expired),
         ok = store_in_ets(EtsTable, jwks, Jwks),
         {noreply, State#state{
@@ -375,6 +377,18 @@ has_kid(#jose_jwk{keys = {jose_jwk_set, Keys}}, Kid) ->
     );
 has_kid(#jose_jwk{}, _Kid) ->
     unknown.
+
+%% A queued request was sent before the fetch finished. Another fetch for it
+%% would only repeat the one that just ran. The pattern relies on the
+%% `gen_server:cast/2' message format.
+-spec drop_queued_unknown_kid_refreshes() -> ok.
+drop_queued_unknown_kid_refreshes() ->
+    receive
+        {'$gen_cast', {refresh_jwks_for_unknown_kid, _Kid}} ->
+            drop_queued_unknown_kid_refreshes()
+    after 0 ->
+        ok
+    end.
 
 -spec maybe_cancel_timer(Timer :: undefined | reference()) -> ok.
 maybe_cancel_timer(undefined) ->

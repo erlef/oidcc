@@ -30,17 +30,14 @@ from_configuration_worker_reads_from_ets_test() ->
         }),
         try
             #jose_jwk{} = oidcc_provider_configuration_worker:get_jwks(Pid),
-            ok = sys:suspend(Pid),
-            try
+            with_suspended_worker(Pid, fun() ->
                 ?assertMatch(
                     {ok, #oidcc_client_context{}},
                     oidcc_client_context:from_configuration_worker(
                         Name, <<"client_id">>, <<"client_secret">>
                     )
                 )
-            after
-                ok = sys:resume(Pid)
-            end
+            end)
         after
             ok = gen_server:stop(Pid)
         end
@@ -64,6 +61,14 @@ from_configuration_worker_global_name_test() ->
             ok = gen_server:stop(Pid)
         end
     end).
+
+with_suspended_worker(Pid, TestFun) ->
+    ok = sys:suspend(Pid),
+    try
+        TestFun()
+    after
+        ok = sys:resume(Pid)
+    end.
 
 with_provider_mock(TestFun) ->
     DiscoveryBody = iolist_to_binary(

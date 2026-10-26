@@ -368,7 +368,7 @@ refreshes_jwks_for_unknown_kid_without_jwks_test() ->
 
 refreshes_jwks_for_unknown_kid_only_test() ->
     JwksRequests = atomics:new(1, []),
-    HttpFun = two_key_jwks_http_fun(JwksRequests),
+    HttpFun = jwks_http_fun(JwksRequests, [<<"kid-1">>, <<"kid-2">>]),
 
     with_httpc_mock(HttpFun, fun() ->
         with_live_provider_worker(
@@ -398,13 +398,45 @@ refreshes_jwks_for_unknown_kid_only_test() ->
         )
     end).
 
-two_key_jwks_http_fun(JwksRequests) ->
+refreshes_jwks_for_unknown_kid_with_key_without_kid_test() ->
+    JwksRequests = atomics:new(1, []),
+    HttpFun = jwks_http_fun(JwksRequests, [undefined, <<"kid-1">>]),
+
+    with_httpc_mock(HttpFun, fun() ->
+        with_live_provider_worker(
+            #{issuer => <<"https://example.com">>},
+            fun(Pid) ->
+                ?assertMatch(
+                    #jose_jwk{keys = {jose_jwk_set, [_, _]}},
+                    wait_until(fun() ->
+                        oidcc_provider_configuration_worker:get_jwks(Pid)
+                    end)
+                ),
+                ?assertEqual(1, atomics:get(JwksRequests, 1)),
+
+                ok = oidcc_provider_configuration_worker:refresh_jwks_for_unknown_kid(
+                    Pid, <<"kid-1">>
+                ),
+                ?assertEqual(1, atomics:get(JwksRequests, 1)),
+
+                ok = oidcc_provider_configuration_worker:refresh_jwks_for_unknown_kid(
+                    Pid, <<"kid-2">>
+                ),
+                ?assertEqual(2, atomics:get(JwksRequests, 1))
+            end
+        )
+    end).
+
+jwks_http_fun(JwksRequests, Kids) ->
     Keys = [
         begin
             {_Kty, KeyMap} = jose_jwk:to_public_map(jose_jwk:generate_key({ec, <<"P-256">>})),
-            KeyMap#{<<"kid">> => Kid}
+            case Kid of
+                undefined -> KeyMap;
+                _ -> KeyMap#{<<"kid">> => Kid}
+            end
         end
-     || Kid <- [<<"kid-1">>, <<"kid-2">>]
+     || Kid <- Kids
     ],
     JwksBody = iolist_to_binary(json:encode(#{keys => Keys})),
     DiscoveryFun = jwks_failing_http_fun(fun() -> true end),

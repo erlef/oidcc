@@ -372,7 +372,9 @@ has_kid(#jose_jwk{keys = {jose_jwk_set, Keys}}, Kid) ->
         end,
         unknown,
         Keys
-    ).
+    );
+has_kid(#jose_jwk{}, _Kid) ->
+    unknown.
 
 -spec maybe_cancel_timer(Timer :: undefined | reference()) -> ok.
 maybe_cancel_timer(undefined) ->

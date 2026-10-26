@@ -453,16 +453,7 @@ refreshes_jwks_once_for_concurrent_unknown_kids_test() ->
 
                 TestPid = self(),
                 Refs = [
-                    begin
-                        Ref = make_ref(),
-                        spawn_link(fun() ->
-                            ok = oidcc_provider_configuration_worker:refresh_jwks_for_unknown_kid(
-                                Pid, integer_to_binary(N)
-                            ),
-                            TestPid ! {refreshed, Ref}
-                        end),
-                        Ref
-                    end
+                    spawn_unknown_kid_refresh(TestPid, Pid, integer_to_binary(N))
                  || N <- lists:seq(1, 20)
                 ],
                 [
@@ -479,17 +470,16 @@ refreshes_jwks_once_for_concurrent_unknown_kids_test() ->
         )
     end).
 
+spawn_unknown_kid_refresh(TestPid, Pid, Kid) ->
+    Ref = make_ref(),
+    spawn_link(fun() ->
+        ok = oidcc_provider_configuration_worker:refresh_jwks_for_unknown_kid(Pid, Kid),
+        TestPid ! {refreshed, Ref}
+    end),
+    Ref.
+
 jwks_http_fun(JwksRequests, Kids) ->
-    Keys = [
-        begin
-            {_Kty, KeyMap} = jose_jwk:to_public_map(jose_jwk:generate_key({ec, <<"P-256">>})),
-            case Kid of
-                undefined -> KeyMap;
-                _ -> KeyMap#{<<"kid">> => Kid}
-            end
-        end
-     || Kid <- Kids
-    ],
+    Keys = [public_key_map(Kid) || Kid <- Kids],
     JwksBody = iolist_to_binary(json:encode(#{keys => Keys})),
     DiscoveryFun = jwks_failing_http_fun(fun() -> true end),
     fun
@@ -498,6 +488,13 @@ jwks_http_fun(JwksRequests, Kids) ->
             {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], JwksBody}};
         (Method, Request, HttpOpts, Opts, Profile) ->
             DiscoveryFun(Method, Request, HttpOpts, Opts, Profile)
+    end.
+
+public_key_map(Kid) ->
+    {_Kty, KeyMap} = jose_jwk:to_public_map(jose_jwk:generate_key({ec, <<"P-256">>})),
+    case Kid of
+        undefined -> KeyMap;
+        _ -> KeyMap#{<<"kid">> => Kid}
     end.
 
 jwks_failing_http_fun(JwksAvailable) ->

@@ -354,10 +354,8 @@ decrypt(Jwt, #jose_jwk{} = Jwk, SupportedAlgorithms, SupportedEncValues) ->
                     {Token, _Jwe} = jose_jwe:block_decrypt(Jwk, Jwt),
                     {ok, Token}
                 catch
-                    error:_ when Kid =:= none ->
-                        {error, no_matching_key};
                     error:_ ->
-                        {error, {no_matching_key_with_kid, Kid}}
+                        {error, no_matching_key}
                 end
         end
     end.

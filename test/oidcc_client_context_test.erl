@@ -21,6 +21,86 @@ provider_not_running_test() ->
     ),
     ok.
 
+from_configuration_worker_reads_from_ets_test() ->
+    Name = from_configuration_worker_reads_from_ets_test,
+    with_provider_mock(fun() ->
+        {ok, Pid} = oidcc_provider_configuration_worker:start_link(#{
+            issuer => <<"https://example.com">>,
+            name => {local, Name}
+        }),
+        try
+            #jose_jwk{} = oidcc_provider_configuration_worker:get_jwks(Pid),
+            ok = sys:suspend(Pid),
+            try
+                ?assertMatch(
+                    {ok, #oidcc_client_context{}},
+                    oidcc_client_context:from_configuration_worker(
+                        Name, <<"client_id">>, <<"client_secret">>
+                    )
+                )
+            after
+                ok = sys:resume(Pid)
+            end
+        after
+            ok = gen_server:stop(Pid)
+        end
+    end).
+
+from_configuration_worker_global_name_test() ->
+    Name = {global, from_configuration_worker_global_name_test},
+    with_provider_mock(fun() ->
+        {ok, Pid} = oidcc_provider_configuration_worker:start_link(#{
+            issuer => <<"https://example.com">>,
+            name => Name
+        }),
+        try
+            ?assertMatch(
+                {ok, #oidcc_client_context{}},
+                oidcc_client_context:from_configuration_worker(
+                    Name, <<"client_id">>, <<"client_secret">>
+                )
+            )
+        after
+            ok = gen_server:stop(Pid)
+        end
+    end).
+
+with_provider_mock(TestFun) ->
+    DiscoveryBody = iolist_to_binary(
+        json:encode(#{
+            issuer => <<"https://example.com">>,
+            jwks_uri => <<"https://example.com/keys">>,
+            authorization_endpoint => <<"https://example.com/authorize">>,
+            scopes_supported => [<<"openid">>],
+            response_types_supported => [<<"code">>],
+            subject_types_supported => [<<"public">>],
+            id_token_signing_alg_values_supported => [<<"RS256">>]
+        })
+    ),
+    JwksBody = iolist_to_binary(json:encode(#{keys => []})),
+    HttpFun =
+        fun
+            (
+                get,
+                {"https://example.com/.well-known/openid-configuration", []},
+                _HttpOpts,
+                _Opts,
+                _Profile
+            ) ->
+                {ok, {
+                    {"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], DiscoveryBody
+                }};
+            (get, {<<"https://example.com/keys">>, []}, _HttpOpts, _Opts, _Profile) ->
+                {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], JwksBody}}
+        end,
+    ok = meck:new(httpc, [no_link]),
+    try
+        ok = meck:expect(httpc, request, HttpFun),
+        TestFun()
+    after
+        meck:unload(httpc)
+    end.
+
 apply_profiles_fapi2_security_profile_test() ->
     ClientContext0 = client_context_fixture(),
     Opts0 = #{

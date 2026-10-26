@@ -130,9 +130,42 @@ verify_signature_key_set_kid_test() ->
     ).
 
 key_with_kid(Kid) ->
-    jose_jwk:merge(jose_jwk:generate_key({ec, <<"P-256">>}), #{<<"kid">> => Kid}).
+    key_with_kid({ec, <<"P-256">>}, Kid).
+
+key_with_kid(KeyType, Kid) ->
+    jose_jwk:merge(jose_jwk:generate_key(KeyType), #{<<"kid">> => Kid}).
 
 sign_with_kid(Key, Kid) ->
     Jws = #{<<"alg">> => <<"ES256">>, <<"kid">> => Kid},
     {_Jws, Token} = jose_jws:compact(jose_jwt:sign(Key, Jws, jose_jwt:from(#{}))),
+    Token.
+
+decrypt_and_verify_key_set_kid_test() ->
+    Key1 = key_with_kid({rsa, 2048}, <<"kid-1">>),
+    Key2 = key_with_kid({rsa, 2048}, <<"kid-2">>),
+    OtherKey = jose_jwk:generate_key({rsa, 2048}),
+    KeySet = #jose_jwk{keys = {jose_jwk_set, [Key1, Key2]}},
+    DecryptAndVerify = fun(Token) ->
+        oidcc_jwt_util:decrypt_and_verify(
+            Token, KeySet, [<<"RS256">>], [<<"RSA-OAEP">>], [<<"A256GCM">>]
+        )
+    end,
+
+    ?assertMatch({ok, _}, DecryptAndVerify(encrypt_with_kid(Key2, <<"kid-2">>))),
+    ?assertEqual(
+        {error, no_matching_key},
+        DecryptAndVerify(encrypt_with_kid(OtherKey, <<"kid-1">>))
+    ),
+    ?assertEqual(
+        {error, no_matching_key},
+        DecryptAndVerify(encrypt_with_kid(OtherKey, <<"kid-2">>))
+    ),
+    ?assertEqual(
+        {error, {no_matching_key_with_kid, <<"kid-3">>}},
+        DecryptAndVerify(encrypt_with_kid(OtherKey, <<"kid-3">>))
+    ).
+
+encrypt_with_kid(Key, Kid) ->
+    Jwe = #{<<"alg">> => <<"RSA-OAEP">>, <<"enc">> => <<"A256GCM">>, <<"kid">> => Kid},
+    {_Jwe, Token} = jose_jwe:compact(jose_jwk:block_encrypt(<<"{}">>, Jwe, Key)),
     Token.

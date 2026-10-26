@@ -362,10 +362,13 @@ has_kid(#jose_jwk{fields = #{<<"kid">> := _}}, _Kid) ->
 has_kid(#jose_jwk{keys = {jose_jwk_set, Keys}}, Kid) ->
     lists:foldl(
         fun
-            (_Key, Acc) when is_boolean(Acc) ->
-                Acc;
-            (Key, unknown) ->
-                has_kid(Key, Kid)
+            (_Key, true) ->
+                true;
+            (Key, Acc) ->
+                case has_kid(Key, Kid) of
+                    unknown -> Acc;
+                    Result -> Result
+                end
         end,
         unknown,
         Keys

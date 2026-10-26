@@ -366,6 +366,56 @@ refreshes_jwks_for_unknown_kid_without_jwks_test() ->
         )
     end).
 
+refreshes_jwks_for_unknown_kid_only_test() ->
+    JwksRequests = atomics:new(1, []),
+    HttpFun = two_key_jwks_http_fun(JwksRequests),
+
+    with_httpc_mock(HttpFun, fun() ->
+        with_live_provider_worker(
+            #{issuer => <<"https://example.com">>},
+            fun(Pid) ->
+                ?assertMatch(
+                    #jose_jwk{keys = {jose_jwk_set, [_, _]}},
+                    wait_until(fun() ->
+                        oidcc_provider_configuration_worker:get_jwks(Pid)
+                    end)
+                ),
+                ?assertEqual(1, atomics:get(JwksRequests, 1)),
+
+                ok = oidcc_provider_configuration_worker:refresh_jwks_for_unknown_kid(
+                    Pid, <<"kid-1">>
+                ),
+                ok = oidcc_provider_configuration_worker:refresh_jwks_for_unknown_kid(
+                    Pid, <<"kid-2">>
+                ),
+                ?assertEqual(1, atomics:get(JwksRequests, 1)),
+
+                ok = oidcc_provider_configuration_worker:refresh_jwks_for_unknown_kid(
+                    Pid, <<"kid-3">>
+                ),
+                ?assertEqual(2, atomics:get(JwksRequests, 1))
+            end
+        )
+    end).
+
+two_key_jwks_http_fun(JwksRequests) ->
+    Keys = [
+        begin
+            {_Kty, KeyMap} = jose_jwk:to_public_map(jose_jwk:generate_key({ec, <<"P-256">>})),
+            KeyMap#{<<"kid">> => Kid}
+        end
+     || Kid <- [<<"kid-1">>, <<"kid-2">>]
+    ],
+    JwksBody = iolist_to_binary(json:encode(#{keys => Keys})),
+    DiscoveryFun = jwks_failing_http_fun(fun() -> true end),
+    fun
+        (get, {<<"https://example.com/keys">>, []}, _HttpOpts, _Opts, _Profile) ->
+            atomics:add(JwksRequests, 1, 1),
+            {ok, {{"HTTP/1.1", 200, "OK"}, [{"content-type", "application/json"}], JwksBody}};
+        (Method, Request, HttpOpts, Opts, Profile) ->
+            DiscoveryFun(Method, Request, HttpOpts, Opts, Profile)
+    end.
+
 jwks_failing_http_fun(JwksAvailable) ->
     fun
         (

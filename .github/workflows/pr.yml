@@ -20,7 +20,7 @@ jobs:
       contents: read
       security-events: write
 
-    uses: ./.github/workflows/part_test.yml
+    uses: $/.github/workflows/part_test.yml
 
   license:
     name: "License"
@@ -30,7 +30,7 @@ jobs:
       contents: read
       attestations: write
 
-    uses: ./.github/workflows/part_license.yml
+    uses: $/.github/workflows/part_license.yml
     with:
       attest: false
 
@@ -42,7 +42,7 @@ jobs:
       contents: read
       attestations: write
 
-    uses: ./.github/workflows/part_docs.yml
+    uses: $/.github/workflows/part_docs.yml
     with:
       attest: false
 

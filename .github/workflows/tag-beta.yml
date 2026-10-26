@@ -22,7 +22,7 @@ jobs:
       contents: read
       attestations: write
 
-    uses: ./.github/workflows/part_docs.yml
+    uses: $/.github/workflows/part_docs.yml
 
   license:
     name: "License"
@@ -32,12 +32,12 @@ jobs:
       contents: read
       attestations: write
 
-    uses: ./.github/workflows/part_license.yml
+    uses: $/.github/workflows/part_license.yml
 
   publish:
     name: "Publish"
 
-    uses: ./.github/workflows/part_publish.yml
+    uses: $/.github/workflows/part_publish.yml
     with:
       releaseName: "${{ github.ref_name }}"
     secrets:
@@ -51,6 +51,6 @@ jobs:
     permissions:
       contents: write
 
-    uses: ./.github/workflows/part_release.yml
+    uses: $/.github/workflows/part_release.yml
     with:
       releaseName: "${{ github.ref_name }}"

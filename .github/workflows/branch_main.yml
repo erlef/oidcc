@@ -19,7 +19,7 @@ jobs:
       contents: read
       security-events: write
 
-    uses: ./.github/workflows/part_test.yml
+    uses: $/.github/workflows/part_test.yml
 
   certification:
     name: "Certification"
@@ -27,7 +27,7 @@ jobs:
     permissions:
       contents: read
 
-    uses: ./.github/workflows/part_certification.yml
+    uses: $/.github/workflows/part_certification.yml
     secrets:
       OID_CERTIFICATION_API_TOKEN: ${{ secrets.OID_CERTIFICATION_API_TOKEN }}
 
@@ -39,7 +39,7 @@ jobs:
       contents: read
       attestations: write
 
-    uses: ./.github/workflows/part_license.yml
+    uses: $/.github/workflows/part_license.yml
     with:
       attest: false
 
@@ -51,7 +51,7 @@ jobs:
       contents: read
       attestations: write
 
-    uses: ./.github/workflows/part_docs.yml
+    uses: $/.github/workflows/part_docs.yml
     with:
       attest: false
 
@@ -61,4 +61,4 @@ jobs:
     permissions:
       contents: write
 
-    uses: ./.github/workflows/part_dependency_submission.yml
+    uses: $/.github/workflows/part_dependency_submission.yml

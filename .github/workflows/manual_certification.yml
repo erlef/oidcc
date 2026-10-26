@@ -26,7 +26,7 @@ jobs:
     permissions:
       contents: read
 
-    uses: ./.github/workflows/part_certification.yml
+    uses: $/.github/workflows/part_certification.yml
     with:
       oidcc_plug_version: ${{ inputs.oidcc_plug_version }}
     secrets:

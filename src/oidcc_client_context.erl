@@ -139,7 +139,24 @@ Create Client Context from a `m:oidcc_provider_configuration_worker`.
         ClientId :: binary(),
         ClientSecret :: unauthenticated,
         Opts :: unauthenticated_opts().
-from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts) when is_pid(ProviderName) ->
+from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts) when is_atom(ProviderName) ->
+    case erlang:whereis(ProviderName) of
+        undefined ->
+            {error, provider_not_ready};
+        _Pid ->
+            load_from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts)
+    end;
+from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts) ->
+    load_from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts).
+
+-spec load_from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts) ->
+    {ok, t()} | {error, error()}
+when
+    ProviderName :: gen_server:server_ref(),
+    ClientId :: binary(),
+    ClientSecret :: binary() | unauthenticated,
+    Opts :: opts().
+load_from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts) ->
     maybe
         #oidcc_provider_configuration{} =
             ProviderConfiguration ?=
@@ -155,13 +172,6 @@ from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts) when is_pi
             )}
     else
         undefined -> {error, provider_not_ready}
-    end;
-from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts) ->
-    case erlang:whereis(ProviderName) of
-        undefined ->
-            {error, provider_not_ready};
-        Pid ->
-            from_configuration_worker(Pid, ClientId, ClientSecret, Opts)
     end.
 
 -doc """

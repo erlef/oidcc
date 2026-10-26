@@ -86,23 +86,7 @@ when
     Jws :: #jose_jws{},
     Jwk :: jose_jwk:key().
 verify_signature(Token, AllowAlgorithms, #jose_jwk{keys = {jose_jwk_set, Keys}}) ->
-    lists:foldl(
-        fun
-            (_Key, {ok, _Res} = Acc) ->
-                Acc;
-            (Key, Acc) ->
-                case {verify_signature(Token, AllowAlgorithms, Key), Acc} of
-                    {{ok, Res}, _Acc} ->
-                        {ok, Res};
-                    {_Res, {error, {no_matching_key_with_kid, Kid}}} ->
-                        {error, {no_matching_key_with_kid, Kid}};
-                    {Res, _Acc} ->
-                        Res
-                end
-        end,
-        {error, no_matching_key},
-        Keys
-    );
+    try_key_set(fun(Key) -> verify_signature(Token, AllowAlgorithms, Key) end, Keys);
 verify_signature(Token, AllowAlgorithms, #jose_jwk{} = Jwks) ->
     try
         Kid =
@@ -344,22 +328,8 @@ decrypt(_Jwt, _Jwk, undefined, _SupportedEncValues) ->
 decrypt(_Jwt, _Jwk, _SupportedAlgorithms, undefined) ->
     {error, no_supported_alg_or_key};
 decrypt(Jwt, #jose_jwk{keys = {jose_jwk_set, Keys}}, SupportedAlgorithms, SupportedEncValues) ->
-    lists:foldl(
-        fun
-            (_Key, {ok, _Res} = Acc) ->
-                Acc;
-            (Key, Acc) ->
-                case {decrypt(Jwt, Key, SupportedAlgorithms, SupportedEncValues), Acc} of
-                    {{ok, Res}, _Acc} ->
-                        {ok, Res};
-                    {_Res, {error, {no_matching_key_with_kid, Kid}}} ->
-                        {error, {no_matching_key_with_kid, Kid}};
-                    {Res, _Acc} ->
-                        Res
-                end
-        end,
-        {error, no_matching_key},
-        Keys
+    try_key_set(
+        fun(Key) -> decrypt(Jwt, Key, SupportedAlgorithms, SupportedEncValues) end, Keys
     );
 decrypt(Jwt, #jose_jwk{} = Jwk, SupportedAlgorithms, SupportedEncValues) ->
     maybe
@@ -399,6 +369,38 @@ verify_in_list(Value, List) ->
         false ->
             {error, no_matching_key}
     end.
+
+-spec try_key_set(Fun, Keys) -> {ok, Result} | {error, error()} when
+    Fun :: fun((jose_jwk:key()) -> {ok, Result} | {error, error()}),
+    Keys :: [jose_jwk:key()],
+    Result :: term().
+try_key_set(Fun, Keys) ->
+    {_Rank, Result} =
+        lists:foldl(
+            fun
+                (_Key, {_AccRank, {ok, _Res}} = Acc) ->
+                    Acc;
+                (Key, {AccRank, _AccResult} = Acc) ->
+                    Result = Fun(Key),
+                    case key_result_rank(Key, Result) of
+                        Rank when Rank >= AccRank -> {Rank, Result};
+                        _Rank -> Acc
+                    end
+            end,
+            {0, {error, no_matching_key}},
+            Keys
+        ),
+    Result.
+
+%% The error of a key that the token kid selects must win over the kid error
+%% of other keys. The kid error must win over a key without kid, because only
+%% the kid error makes the caller refresh the key set.
+-spec key_result_rank(Key :: jose_jwk:key(), Result :: {ok, term()} | {error, error()}) ->
+    0..3.
+key_result_rank(_Key, {ok, _Res}) -> 3;
+key_result_rank(_Key, {error, {no_matching_key_with_kid, _Kid}}) -> 1;
+key_result_rank(#jose_jwk{fields = #{<<"kid">> := _}}, {error, _Reason}) -> 2;
+key_result_rank(#jose_jwk{}, {error, _Reason}) -> 0.
 
 verify_decrypted_token(Jwt, SigningAlgs, Jwe, Jwks) ->
     case verify_signature(Jwt, SigningAlgs, Jwks) of

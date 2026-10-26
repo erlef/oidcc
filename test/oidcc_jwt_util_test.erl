@@ -4,6 +4,7 @@
 -module(oidcc_jwt_util_test).
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("jose/include/jose_jwk.hrl").
 
 verify_claims_test() ->
     % Test exact match claims
@@ -95,3 +96,43 @@ verify_claims_test() ->
     ),
 
     ok.
+
+verify_signature_key_set_kid_test() ->
+    Key1 = key_with_kid(<<"kid-1">>),
+    Key2 = key_with_kid(<<"kid-2">>),
+    OtherKey = jose_jwk:generate_key({ec, <<"P-256">>}),
+    KeySet = #jose_jwk{keys = {jose_jwk_set, [Key1, Key2]}},
+    Algs = [<<"ES256">>],
+
+    ?assertMatch(
+        {ok, _},
+        oidcc_jwt_util:verify_signature(sign_with_kid(Key2, <<"kid-2">>), Algs, KeySet)
+    ),
+    ?assertEqual(
+        {error, no_matching_key},
+        oidcc_jwt_util:verify_signature(sign_with_kid(OtherKey, <<"kid-1">>), Algs, KeySet)
+    ),
+    ?assertEqual(
+        {error, no_matching_key},
+        oidcc_jwt_util:verify_signature(sign_with_kid(OtherKey, <<"kid-2">>), Algs, KeySet)
+    ),
+    ?assertEqual(
+        {error, {no_matching_key_with_kid, <<"kid-3">>}},
+        oidcc_jwt_util:verify_signature(sign_with_kid(OtherKey, <<"kid-3">>), Algs, KeySet)
+    ),
+
+    MixedKeySet = #jose_jwk{
+        keys = {jose_jwk_set, [jose_jwk:generate_key({ec, <<"P-256">>}), Key1]}
+    },
+    ?assertEqual(
+        {error, {no_matching_key_with_kid, <<"kid-3">>}},
+        oidcc_jwt_util:verify_signature(sign_with_kid(OtherKey, <<"kid-3">>), Algs, MixedKeySet)
+    ).
+
+key_with_kid(Kid) ->
+    jose_jwk:merge(jose_jwk:generate_key({ec, <<"P-256">>}), #{<<"kid">> => Kid}).
+
+sign_with_kid(Key, Kid) ->
+    Jws = #{<<"alg">> => <<"ES256">>, <<"kid">> => Kid},
+    {_Jws, Token} = jose_jws:compact(jose_jwt:sign(Key, Jws, jose_jwt:from(#{}))),
+    Token.

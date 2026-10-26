@@ -427,6 +427,58 @@ refreshes_jwks_for_unknown_kid_with_key_without_kid_test() ->
         )
     end).
 
+refreshes_jwks_once_for_concurrent_unknown_kids_test() ->
+    JwksRequests = atomics:new(1, []),
+    JwksFun = jwks_http_fun(JwksRequests, [<<"kid-1">>]),
+    HttpFun =
+        fun
+            (get, {<<"https://example.com/keys">>, []} = Request, HttpOpts, Opts, Profile) ->
+                timer:sleep(200),
+                JwksFun(get, Request, HttpOpts, Opts, Profile);
+            (Method, Request, HttpOpts, Opts, Profile) ->
+                JwksFun(Method, Request, HttpOpts, Opts, Profile)
+        end,
+
+    with_httpc_mock(HttpFun, fun() ->
+        with_live_provider_worker(
+            #{issuer => <<"https://example.com">>},
+            fun(Pid) ->
+                ?assertMatch(
+                    #jose_jwk{},
+                    wait_until(fun() ->
+                        oidcc_provider_configuration_worker:get_jwks(Pid)
+                    end)
+                ),
+                ?assertEqual(1, atomics:get(JwksRequests, 1)),
+
+                TestPid = self(),
+                Refs = [
+                    begin
+                        Ref = make_ref(),
+                        spawn_link(fun() ->
+                            ok = oidcc_provider_configuration_worker:refresh_jwks_for_unknown_kid(
+                                Pid, integer_to_binary(N)
+                            ),
+                            TestPid ! {refreshed, Ref}
+                        end),
+                        Ref
+                    end
+                 || N <- lists:seq(1, 20)
+                ],
+                [
+                    receive
+                        {refreshed, Ref} -> ok
+                    after 5_000 ->
+                        ct:fail(timeout_concurrent_refresh)
+                    end
+                 || Ref <- Refs
+                ],
+
+                ?assertEqual(2, atomics:get(JwksRequests, 1))
+            end
+        )
+    end).
+
 jwks_http_fun(JwksRequests, Kids) ->
     Keys = [
         begin

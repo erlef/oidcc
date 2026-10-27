@@ -139,15 +139,35 @@ Create Client Context from a `m:oidcc_provider_configuration_worker`.
         ClientId :: binary(),
         ClientSecret :: unauthenticated,
         Opts :: unauthenticated_opts().
-from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts) when is_atom(ProviderName) ->
-    case erlang:whereis(ProviderName) of
+from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts) ->
+    case resolve_pid(ProviderName) of
         undefined ->
             {error, provider_not_ready};
         _Pid ->
             load_from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts)
+    end.
+
+%% gen_server:server_ref() covers more than plain atoms (pid/{via,...}/
+%% {global,...}/{Name,Node}); erlang:whereis/1 alone only resolves the
+%% local atom case, so other refs would skip this check and only fail
+%% later as an uncaught `exit({noproc, ...})` from gen_server:call/2.
+-spec resolve_pid(gen_server:server_ref()) -> pid() | undefined.
+resolve_pid(Pid) when is_pid(Pid) ->
+    Pid;
+resolve_pid(Name) when is_atom(Name) ->
+    erlang:whereis(Name);
+resolve_pid({global, Name}) ->
+    resolve_pid({via, global, Name});
+resolve_pid({via, Module, Name}) ->
+    case erlang:apply(Module, whereis_name, [Name]) of
+        Pid when is_pid(Pid) -> Pid;
+        undefined -> undefined
     end;
-from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts) ->
-    load_from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts).
+resolve_pid({Name, Node}) when is_atom(Name), is_atom(Node) ->
+    case rpc:call(Node, erlang, whereis, [Name]) of
+        Pid when is_pid(Pid) -> Pid;
+        _ -> undefined
+    end.
 
 -spec load_from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts) ->
     {ok, t()} | {error, error()}

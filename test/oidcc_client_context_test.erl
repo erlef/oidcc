@@ -62,6 +62,51 @@ from_configuration_worker_global_name_test() ->
         end
     end).
 
+provider_not_running_global_name_test() ->
+    ?assertMatch(
+        {error, provider_not_ready},
+        oidcc_client_context:from_configuration_worker(
+            {global, provider_not_running_global_name_test},
+            <<"client_id">>,
+            <<"client_secret">>
+        )
+    ),
+    ok.
+
+provider_not_running_via_name_test() ->
+    %% `global' implements the `via' callback API (register_name/2,
+    %% unregister_name/1, whereis_name/1, send/2), so it doubles as a
+    %% stand-in for a custom registry (e.g. Elixir's `Registry') to
+    %% exercise the `{via, Module, Name}' branch of `gen_server:server_ref()'.
+    ?assertMatch(
+        {error, provider_not_ready},
+        oidcc_client_context:from_configuration_worker(
+            {via, global, provider_not_running_via_name_test},
+            <<"client_id">>,
+            <<"client_secret">>
+        )
+    ),
+    ok.
+
+from_configuration_worker_via_name_test() ->
+    Name = from_configuration_worker_via_name_test,
+    with_provider_mock(fun() ->
+        {ok, Pid} = oidcc_provider_configuration_worker:start_link(#{
+            issuer => <<"https://example.com">>,
+            name => {via, global, Name}
+        }),
+        try
+            ?assertMatch(
+                {ok, #oidcc_client_context{}},
+                oidcc_client_context:from_configuration_worker(
+                    {via, global, Name}, <<"client_id">>, <<"client_secret">>
+                )
+            )
+        after
+            ok = gen_server:stop(Pid)
+        end
+    end).
+
 with_suspended_worker(Pid, TestFun) ->
     ok = sys:suspend(Pid),
     try

@@ -24,6 +24,12 @@ jobs:
 
     if: "${{ inputs.releaseName }}"
 
+    # The GitHub environment that hex_core's workload identity on hex.pm names
+    environment: release
+    permissions:
+      contents: write # push the version tag and create the GitHub release
+      id-token: write # the OIDC token mix hex.publish exchanges with Workload Identity
+
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2

@@ -37,6 +37,10 @@ jobs:
   publish:
     name: "Publish"
 
+    permissions:
+      contents: write
+      id-token: write
+
     uses: $/.github/workflows/part_publish.yml
     with:
       releaseName: "${{ github.ref_name }}"

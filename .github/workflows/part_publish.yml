@@ -7,9 +7,6 @@ on:
       releaseName:
         required: false
         type: string
-    secrets:
-      HEX_API_KEY:
-        required: false
 
 name: "Publish"
 
@@ -58,5 +55,3 @@ jobs:
             mix_hex_publish-deps-${{ runner.os }}-${{ steps.setupBEAM.outputs.otp-version }}-
       - run: mix deps.get
       - run: mix hex.publish --yes
-        env:
-          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}

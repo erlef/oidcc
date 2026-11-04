@@ -4,8 +4,6 @@
 defmodule Oidcc.UserinfoTest do
   use ExUnit.Case, async: false
 
-  import Mock
-
   alias Oidcc.ClientContext
   alias Oidcc.ProviderConfiguration
   alias Oidcc.Token
@@ -26,14 +24,15 @@ defmodule Oidcc.UserinfoTest do
   doctest Userinfo
 
   describe inspect(&Userinfo.retrieve/3) do
-    test_with_mock "works", %{}, :oidcc_http_util, [:passthrough],
-      request: fn :get, {"https://my.provider/userinfo", _headers}, _telemetry_opts, _http_opts ->
-        {:ok,
-         {{:json,
-           %{
-             "sub" => "sub"
-           }}, []}}
-      end do
+    test "works" do
+      adapter =
+        {Oidcc.TestHttpAdapter,
+         %{
+           request: fn :get, {"https://my.provider/userinfo", _headers} ->
+             Oidcc.TestHttpAdapter.json_response(%{"sub" => "sub"})
+           end
+         }}
+
       client_context =
         ClientContext.from_manual(
           @example_metadata,
@@ -54,7 +53,7 @@ defmodule Oidcc.UserinfoTest do
                    scope: ["profile", "openid"]
                  },
                  client_context,
-                 %{expected_subject: "sub"}
+                 %{expected_subject: "sub", request_opts: %{http_adapter: adapter}}
                )
     end
   end

@@ -62,12 +62,12 @@ jobs:
       - name: "Attest provenance"
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         id: attest-provenance
-        if: "${{ github.event.inputs.attest }}"
+        if: "${{ inputs.attest }}"
         with:
           subject-path: 'sbom.spdx'
 
       - name: "Copy provenance"
-        if: "${{ github.event.inputs.attest }}"
+        if: "${{ inputs.attest }}"
         run: cp "$ATTESTATION" sbom.spdx.sigstore
         env:
           ATTESTATION: "${{ steps.attest-provenance.outputs.bundle-path }}"

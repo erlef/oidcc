@@ -350,9 +350,11 @@ decrypt(Jwt, #jose_jwk{} = Jwk, SupportedAlgorithms, SupportedEncValues) ->
             #jose_jwk{fields = #{<<"use">> := NotEnc}} when NotEnc =/= <<"enc">> ->
                 {error, no_matching_key};
             _ ->
-                try
-                    {Token, _Jwe} = jose_jwe:block_decrypt(Jwk, Jwt),
-                    {ok, Token}
+                try jose_jwe:block_decrypt(Jwk, Jwt) of
+                    {error, #jose_jwe{}} ->
+                        {error, no_matching_key};
+                    {Token, _Jwe} ->
+                        {ok, Token}
                 catch
                     error:_ ->
                         {error, no_matching_key}

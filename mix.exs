@@ -12,6 +12,7 @@ defmodule Oidcc.Mixfile do
       app: :oidcc,
       version: to_string(@props[:vsn]),
       elixir: "~> 1.17",
+      elixirc_paths: elixirc_paths(Mix.env()),
       erlc_options: erlc_options(Mix.env()),
       build_embedded: Mix.env() == :prod,
       start_permanent: Mix.env() == :prod,
@@ -42,13 +43,15 @@ defmodule Oidcc.Mixfile do
       {:telemetry, "~> 1.2"},
       {:telemetry_registry, "~> 0.3.1"},
       {:jose, "~> 1.11"},
-      {:mock, "~> 0.3.8", only: :test},
       {:ex_doc, "~> 0.29", only: :dev, runtime: false},
       {:credo, "~> 1.7", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false},
       {:igniter, ">= 0.6.3 and < 0.9.0", optional: true}
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_env), do: ["lib"]
 
   defp erlc_options(:prod), do: []
 

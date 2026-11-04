@@ -4,8 +4,6 @@
 defmodule Oidcc.TokenTest do
   use ExUnit.Case, async: false
 
-  import Mock
-
   alias Oidcc.ClientContext
   alias Oidcc.ProviderConfiguration
   alias Oidcc.Token
@@ -54,36 +52,38 @@ defmodule Oidcc.TokenTest do
 
   describe inspect(&Token.retrieve/3) do
     for scope <- ["profile openid", ["profile", "openid"]] do
-      test_with_mock "works with scope: #{inspect(scope)}", %{}, :oidcc_http_util, [],
-        request: fn :post,
-                    {"https://my.provider/token", _headers, ~c"application/x-www-form-urlencoded",
-                     _body},
-                    _telemetry_opts,
-                    _http_opts ->
-          {_jws, token} =
-            @example_jwks
-            |> JOSE.JWT.sign(
-              %{"alg" => "RS256"},
-              JOSE.JWT.from(%{
-                "iss" => "https://my.provider",
-                "sub" => "sub",
-                "aud" => "client_id",
-                "iat" => :erlang.system_time(:second),
-                "exp" => :erlang.system_time(:second) + 10
-              })
-            )
-            |> JOSE.JWS.compact()
+      test "works with scope: #{inspect(scope)}" do
+        adapter =
+          {Oidcc.TestHttpAdapter,
+           %{
+             request: fn
+               :post,
+               {"https://my.provider/token", _headers, ~c"application/x-www-form-urlencoded",
+                _body} ->
+                 {_jws, token} =
+                   @example_jwks
+                   |> JOSE.JWT.sign(
+                     %{"alg" => "RS256"},
+                     JOSE.JWT.from(%{
+                       "iss" => "https://my.provider",
+                       "sub" => "sub",
+                       "aud" => "client_id",
+                       "iat" => :erlang.system_time(:second),
+                       "exp" => :erlang.system_time(:second) + 10
+                     })
+                   )
+                   |> JOSE.JWS.compact()
 
-          {:ok,
-           {{:json,
-             %{
-               "access_token" => "access_token",
-               "token_type" => "Bearer",
-               "id_token" => token,
-               "scope" => unquote(scope),
-               "refresh_token" => "refresh_token"
-             }}, []}}
-        end do
+                 Oidcc.TestHttpAdapter.json_response(%{
+                   "access_token" => "access_token",
+                   "token_type" => "Bearer",
+                   "id_token" => token,
+                   "scope" => unquote(scope),
+                   "refresh_token" => "refresh_token"
+                 })
+             end
+           }}
+
         client_context =
           ClientContext.from_manual(
             @example_metadata,
@@ -111,42 +111,46 @@ defmodule Oidcc.TokenTest do
                  Token.retrieve(
                    "auth_code",
                    client_context,
-                   %{redirect_uri: "https://my.server/return"}
+                   %{
+                     redirect_uri: "https://my.server/return",
+                     request_opts: %{http_adapter: adapter}
+                   }
                  )
       end
     end
   end
 
   describe inspect(&Token.refresh/3) do
-    test_with_mock "works", %{}, :oidcc_http_util, [],
-      request: fn :post,
-                  {"https://my.provider/token", _headers, ~c"application/x-www-form-urlencoded",
-                   _body},
-                  _telemetry_opts,
-                  _http_opts ->
-        {_jws, token} =
-          @example_jwks
-          |> JOSE.JWT.sign(
-            %{"alg" => "RS256"},
-            JOSE.JWT.from(%{
-              "iss" => "https://my.provider",
-              "sub" => "sub",
-              "aud" => "client_id",
-              "iat" => :erlang.system_time(:second),
-              "exp" => :erlang.system_time(:second) + 10
-            })
-          )
-          |> JOSE.JWS.compact()
+    test "works" do
+      adapter =
+        {Oidcc.TestHttpAdapter,
+         %{
+           request: fn :post,
+                       {"https://my.provider/token", _headers,
+                        ~c"application/x-www-form-urlencoded", _body} ->
+             {_jws, token} =
+               @example_jwks
+               |> JOSE.JWT.sign(
+                 %{"alg" => "RS256"},
+                 JOSE.JWT.from(%{
+                   "iss" => "https://my.provider",
+                   "sub" => "sub",
+                   "aud" => "client_id",
+                   "iat" => :erlang.system_time(:second),
+                   "exp" => :erlang.system_time(:second) + 10
+                 })
+               )
+               |> JOSE.JWS.compact()
 
-        {:ok,
-         {{:json,
-           %{
-             "access_token" => "access_token",
-             "token_type" => "Bearer",
-             "id_token" => token,
-             "scope" => "profile openid"
-           }}, []}}
-      end do
+             Oidcc.TestHttpAdapter.json_response(%{
+               "access_token" => "access_token",
+               "token_type" => "Bearer",
+               "id_token" => token,
+               "scope" => "profile openid"
+             })
+           end
+         }}
+
       client_context =
         ClientContext.from_manual(
           @example_metadata,
@@ -178,7 +182,10 @@ defmodule Oidcc.TokenTest do
                    scope: ["profile", "openid"]
                  },
                  client_context,
-                 %{redirect_uri: "https://my.server/return"}
+                 %{
+                   redirect_uri: "https://my.server/return",
+                   request_opts: %{http_adapter: adapter}
+                 }
                )
     end
   end

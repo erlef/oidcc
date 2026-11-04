@@ -4,8 +4,6 @@
 defmodule Oidcc.TokenIntrospectionTest do
   use ExUnit.Case
 
-  import Mock
-
   alias Oidcc.ClientContext
   alias Oidcc.ProviderConfiguration
   alias Oidcc.Token
@@ -26,19 +24,21 @@ defmodule Oidcc.TokenIntrospectionTest do
                 |> JOSE.JWK.from_pem_file()
 
   describe inspect(&TokenIntrospection.introspect/3) do
-    test_with_mock "works", %{}, :oidcc_http_util, [:passthrough],
-      request: fn :post,
-                  {"https://my.provider/introspection", _headers,
-                   ~c"application/x-www-form-urlencoded", "token=access_token"},
-                  _telemetry_opts,
-                  _http_opts ->
-        {:ok,
-         {{:json,
-           %{
-             "active" => true,
-             "client_id" => "client_id"
-           }}, []}}
-      end do
+    test "works" do
+      adapter =
+        {Oidcc.TestHttpAdapter,
+         %{
+           request: fn
+             :post,
+             {"https://my.provider/introspection", _headers,
+              ~c"application/x-www-form-urlencoded", "token=access_token"} ->
+               Oidcc.TestHttpAdapter.json_response(%{
+                 "active" => true,
+                 "client_id" => "client_id"
+               })
+           end
+         }}
+
       client_context =
         ClientContext.from_manual(
           @example_metadata,
@@ -58,7 +58,8 @@ defmodule Oidcc.TokenIntrospectionTest do
                    refresh: :none,
                    scope: ["profile", "openid"]
                  },
-                 client_context
+                 client_context,
+                 %{request_opts: %{http_adapter: adapter}}
                )
     end
   end

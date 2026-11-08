@@ -16,6 +16,7 @@
 -export([merge_client_secret_oct_keys/3]).
 -export([decrypt_and_verify/5]).
 -export([encrypt/4]).
+-export([ensure_valid_keys/1]).
 -export([evaluate_for_all_keys/2]).
 -export([merge_jwks/2]).
 -export([peek_payload/1]).
@@ -500,6 +501,24 @@ sign_dpop(Jwt, Jwk, SigningAlgSupported) ->
                 <<"typ">> => <<"dpop+jwt">>, <<"jwk">> => PublicJwk
             })
     end).
+
+-doc false.
+-spec ensure_valid_keys(Jwk :: any()) -> jose_jwk:key() | error.
+ensure_valid_keys(#jose_jwk{keys = {jose_jwk_set, Keys}} = Jwks) ->
+    ValidKeys = lists:filtermap(
+        fun(Key) ->
+            case ensure_valid_keys(Key) of
+                #jose_jwk{} = Valid -> {true, Valid};
+                _ -> false
+            end
+        end,
+        Keys
+    ),
+    Jwks#jose_jwk{keys = {jose_jwk_set, ValidKeys}};
+ensure_valid_keys(#jose_jwk{} = Jwk) ->
+    Jwk;
+ensure_valid_keys(_Other) ->
+    error.
 
 -doc false.
 -spec evaluate_for_all_keys(Jwk :: jose_jwk:key(), fun((jose_jwk:key()) -> {ok, Result} | error)) ->

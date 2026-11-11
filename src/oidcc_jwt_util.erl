@@ -503,9 +503,14 @@ sign_dpop(Jwt, Jwk, SigningAlgSupported) ->
     end).
 
 -doc false.
--spec ensure_valid_keys(Jwk :: any()) -> jose_jwk:key() | error.
+-spec ensure_valid_keys(Jwk :: any()) -> jose_jwk:key() | [jose_jwk:key()] | error.
 ensure_valid_keys(#jose_jwk{keys = {jose_jwk_set, Keys}} = Jwks) ->
-    ValidKeys = lists:filtermap(
+    ValidKeys = ensure_valid_keys(Keys),
+    Jwks#jose_jwk{keys = {jose_jwk_set, ValidKeys}};
+ensure_valid_keys(#jose_jwk{} = Jwk) ->
+    Jwk;
+ensure_valid_keys(Keys) when is_list(Keys) ->
+    lists:filtermap(
         fun(Key) ->
             case ensure_valid_keys(Key) of
                 #jose_jwk{} = Valid -> {true, Valid};
@@ -513,11 +518,8 @@ ensure_valid_keys(#jose_jwk{keys = {jose_jwk_set, Keys}} = Jwks) ->
             end
         end,
         Keys
-    ),
-    Jwks#jose_jwk{keys = {jose_jwk_set, ValidKeys}};
-ensure_valid_keys(#jose_jwk{} = Jwk) ->
-    Jwk;
-ensure_valid_keys(_Other) ->
+    );
+ensure_valid_keys({error, _}) ->
     error.
 
 -doc false.

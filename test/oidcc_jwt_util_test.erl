@@ -132,7 +132,7 @@ verify_signature_key_set_kid_test() ->
 ensure_valid_keys_test() ->
     Key1 = jose_jwk:generate_key({ec, <<"P-256">>}),
     Key2 = jose_jwk:generate_key({ec, <<"P-256">>}),
-    Invalid = not_a_jwk,
+    Invalid = {error, not_a_key},
     KeySet = #jose_jwk{keys = {jose_jwk_set, [Key1, Invalid, Key2]}},
 
     ?assertEqual(

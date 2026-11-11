@@ -129,6 +129,23 @@ verify_signature_key_set_kid_test() ->
         oidcc_jwt_util:verify_signature(sign_with_kid(OtherKey, <<"kid-3">>), Algs, MixedKeySet)
     ).
 
+ensure_valid_keys_test() ->
+    Key1 = jose_jwk:generate_key({ec, <<"P-256">>}),
+    Key2 = jose_jwk:generate_key({ec, <<"P-256">>}),
+    Invalid = {error, not_a_key},
+    KeySet = #jose_jwk{keys = {jose_jwk_set, [Key1, Invalid, Key2]}},
+
+    ?assertEqual(
+        #jose_jwk{keys = {jose_jwk_set, [Key1, Key2]}},
+        oidcc_jwt_util:ensure_valid_keys(KeySet)
+    ),
+    ?assertEqual(
+        #jose_jwk{keys = {jose_jwk_set, []}},
+        oidcc_jwt_util:ensure_valid_keys(#jose_jwk{keys = {jose_jwk_set, [Invalid]}})
+    ),
+    ?assertEqual(error, oidcc_jwt_util:ensure_valid_keys(Invalid)),
+    ?assertEqual(Key1, oidcc_jwt_util:ensure_valid_keys(Key1)).
+
 key_with_kid(Kid) ->
     key_with_kid({ec, <<"P-256">>}, Kid).
 

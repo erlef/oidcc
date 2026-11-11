@@ -396,7 +396,7 @@ load_jwks_raw(JwksUri, Opts) ->
         true ?=
             (is_map(JwksMap) orelse is_list(JwksMap)) orelse {invalid_document, JwksMap},
         Expiry = cache_deadline(Headers, DefaultExpiry),
-        Jwks = jose_jwk:from(JwksMap),
+        Jwks = oidcc_jwt_util:ensure_valid_keys(jose_jwk:from(JwksMap)),
         {ok, {Jwks, Expiry, JwksMap}}
     else
         {error, Reason} -> {error, Reason};

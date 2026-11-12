@@ -33,7 +33,9 @@ See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
 * `pkce_verifier` - PKCE verifier (random string), see [https://datatracker.ietf.org/doc/html/rfc7636#section-4.1]
 * `require_pkce` - whether to require PKCE when getting the token
 * `redirect_uri` - redirect target after authorization is completed
-* `url_extension` - add custom query parameters to the authorization URL
+* `url_extension` - add custom query parameters to the authorization URL, also
+  included in the request object. A key that `oidcc` generates for this request,
+  or `request` / `request_uri`, returns `{error, {url_extension_conflict, Keys}}`.
 * `response_mode` - response mode to use (defaults to `<<"query">>`)
 * `request_opts` - config for the pushed authorization HTTP request
 """.
@@ -61,6 +63,7 @@ See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
     | pkce_verifier_required
     | purpose_required
     | no_supported_code_challenge
+    | {url_extension_conflict, [binary()]}
     | oidcc_http_util:error().
 
 -telemetry_event(#{
@@ -161,6 +164,7 @@ redirect_params(#oidcc_client_context{client_id = ClientId} = ClientContext, Opt
             maps:get(scopes, Opts, [openid]), QueryParams5
         ),
         QueryParams7 = maybe_append_dpop_jkt(QueryParams6, ClientContext),
+        ok ?= validate_url_extension(UrlExtension, QueryParams7),
         {ok, QueryParams} ?= attempt_request_object(QueryParams7, ClientContext, UrlExtension),
         attempt_par(QueryParams, ClientContext, Opts)
     end.
@@ -231,6 +235,22 @@ validate_purpose_required(#{purpose_required := true}) ->
     {error, purpose_required};
 validate_purpose_required(_Opts) ->
     ok.
+
+%% Rejects `url_extension` keys that are already present in `QueryParams`, plus
+%% `request`/`request_uri` unconditionally.
+-spec validate_url_extension(UrlExtension, QueryParams) ->
+    ok | {error, {url_extension_conflict, [binary()]}}
+when
+    UrlExtension :: oidcc_http_util:query_params(),
+    QueryParams :: oidcc_http_util:query_params().
+validate_url_extension(UrlExtension, QueryParams) ->
+    Reserved = [<<"request">>, <<"request_uri">>],
+    Generated = [iolist_to_binary(Key) || {Key, _Value} <- QueryParams] ++ Reserved,
+    ExtensionKeys = [iolist_to_binary(Key) || {Key, _Value} <- UrlExtension],
+    case [Key || Key <- ExtensionKeys, lists:member(Key, Generated)] of
+        [] -> ok;
+        Conflicts -> {error, {url_extension_conflict, lists:usort(Conflicts)}}
+    end.
 
 -spec maybe_append_dpop_jkt(QueryParams, ClientContext) ->
     QueryParams

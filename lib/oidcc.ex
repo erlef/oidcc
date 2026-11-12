@@ -53,7 +53,7 @@ defmodule Oidcc do
           opts :: :oidcc_authorization.opts() | :oidcc_client_context.opts()
         ) ::
           {:ok, :uri_string.uri_string()}
-          | {:error, :oidcc_client_context.error()}
+          | {:error, :oidcc_client_context.error() | :oidcc_authorization.error()}
   def create_redirect_url(provider_configuration_name, client_id, client_secret, opts),
     do: :oidcc.create_redirect_url(provider_configuration_name, client_id, client_secret, opts)
 

@@ -1130,6 +1130,103 @@ create_redirect_url_response_mode_jwt_test() ->
 
     ok.
 
+create_redirect_url_url_extension_collision_test() ->
+    ClientContext = url_extension_collision_fixture(),
+
+    ?assertEqual(
+        {error, {url_extension_conflict, [<<"redirect_uri">>]}},
+        oidcc_authorization:create_redirect_url(ClientContext, #{
+            redirect_uri => <<"https://my.server/return">>,
+            url_extension => [{<<"redirect_uri">>, <<"https://attacker.example">>}]
+        })
+    ),
+
+    ?assertEqual(
+        {error, {url_extension_conflict, [<<"client_id">>, <<"response_type">>, <<"scope">>]}},
+        oidcc_authorization:create_redirect_url(ClientContext, #{
+            redirect_uri => <<"https://my.server/return">>,
+            url_extension => [
+                {<<"response_type">>, <<"token">>},
+                {<<"client_id">>, <<"other_client">>},
+                {<<"scope">>, <<"openid admin">>}
+            ]
+        })
+    ),
+
+    %% Rejected even though `oidcc` does not add them to `QueryParams`.
+    ?assertEqual(
+        {error, {url_extension_conflict, [<<"request">>]}},
+        oidcc_authorization:create_redirect_url(ClientContext, #{
+            redirect_uri => <<"https://my.server/return">>,
+            url_extension => [{<<"request">>, <<"attacker.request.object">>}]
+        })
+    ),
+
+    ?assertEqual(
+        {error, {url_extension_conflict, [<<"request_uri">>]}},
+        oidcc_authorization:create_redirect_url(ClientContext, #{
+            redirect_uri => <<"https://my.server/return">>,
+            url_extension => [{<<"request_uri">>, <<"https://attacker.example/object">>}]
+        })
+    ),
+
+    %% String keys collide just as binary ones do.
+    ?assertEqual(
+        {error, {url_extension_conflict, [<<"redirect_uri">>]}},
+        oidcc_authorization:create_redirect_url(ClientContext, #{
+            redirect_uri => <<"https://my.server/return">>,
+            url_extension => [{"redirect_uri", "https://attacker.example"}]
+        })
+    ),
+
+    ok.
+
+create_redirect_url_url_extension_no_collision_test() ->
+    ClientContext = url_extension_collision_fixture(),
+    ClientSecret = <<"at_least_32_character_client_secret">>,
+
+    %% A non-colliding key lands in both the URL and the request object.
+    {ok, Url} = oidcc_authorization:create_redirect_url(ClientContext, #{
+        redirect_uri => <<"https://my.server/return">>,
+        url_extension => [{<<"kc_action">>, <<"UPDATE_PASSWORD">>}]
+    }),
+
+    QueryParams = parse_query_string(iolist_to_binary(Url)),
+
+    ?assertMatch(#{<<"kc_action">> := <<"UPDATE_PASSWORD">>}, QueryParams),
+
+    {true, #jose_jwt{fields = Claims}, _Jws} =
+        jose_jwt:verify(jose_jwk:from_oct(ClientSecret), maps:get(<<"request">>, QueryParams)),
+
+    ?assertMatch(
+        #{
+            <<"kc_action">> := <<"UPDATE_PASSWORD">>,
+            <<"redirect_uri">> := <<"https://my.server/return">>
+        },
+        Claims
+    ),
+
+    ok.
+
+url_extension_collision_fixture() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration0} = oidcc_provider_configuration:decode_configuration(
+        json:decode(ValidConfigString)
+    ),
+
+    Configuration = Configuration0#oidcc_provider_configuration{
+        request_parameter_supported = true,
+        request_object_signing_alg_values_supported = [<<"HS256">>]
+    },
+
+    ClientId = <<"client_id">>,
+    ClientSecret = <<"at_least_32_character_client_secret">>,
+    Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+
+    oidcc_client_context:from_manual(Configuration, Jwks, ClientId, ClientSecret).
+
 private_key_jwt_fixture() ->
     PrivDir = code:priv_dir(oidcc),
 

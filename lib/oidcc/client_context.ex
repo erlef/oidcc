@@ -43,6 +43,9 @@ defmodule Oidcc.ClientContext do
   @doc """
   Create Client Context from a `Oidcc.ProviderConfiguration.Worker`
 
+  An empty `client_secret` (`""`) is rejected with `{:error, :empty_client_secret}`.
+  Use `:unauthenticated` for public clients.
+
   ## Examples
 
       iex> {:ok, pid} =
@@ -95,6 +98,9 @@ defmodule Oidcc.ClientContext do
 
   @doc """
   Create Client Context manually
+
+  An empty `client_secret` (`""`) raises an `ErlangError` with
+  `:empty_client_secret`. Use `:unauthenticated` for public clients.
 
   ## Examples
 

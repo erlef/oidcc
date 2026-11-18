@@ -186,3 +186,17 @@ encrypt_with_kid(Key, Kid) ->
     Jwe = #{<<"alg">> => <<"RSA-OAEP">>, <<"enc">> => <<"A256GCM">>, <<"kid">> => Kid},
     {_Jwe, Token} = jose_jwe:compact(jose_jwk:block_encrypt(<<"{}">>, Jwe, Key)),
     Token.
+
+client_secret_oct_keys_empty_secret_test() ->
+    HmacAlgs = [<<"HS256">>, <<"HS384">>, <<"HS512">>],
+    ?assertEqual(none, oidcc_jwt_util:client_secret_oct_keys(HmacAlgs, <<>>)),
+    ?assertEqual(none, oidcc_jwt_util:client_secret_oct_keys(HmacAlgs, unauthenticated)),
+    ?assertMatch(
+        #jose_jwk{},
+        oidcc_jwt_util:client_secret_oct_keys(HmacAlgs, <<"at_least_32_character_client_secret">>)
+    ),
+
+    Jwks = jose_jwk:generate_key({rsa, 2048}),
+    ?assertEqual(Jwks, oidcc_jwt_util:merge_client_secret_oct_keys(Jwks, HmacAlgs, <<>>)),
+
+    ok.

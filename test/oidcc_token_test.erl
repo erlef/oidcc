@@ -2891,3 +2891,71 @@ retrieve_with_refresh_reports_refresh_info_test() ->
     ),
 
     ok.
+
+validate_id_token_empty_client_secret_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, #oidcc_provider_configuration{issuer = Issuer} = Configuration} =
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
+
+    ClientId = <<"client_id">>,
+    Claims =
+        #{
+            <<"iss">> => Issuer,
+            <<"sub">> => <<"sub">>,
+            <<"aud">> => ClientId,
+            <<"iat">> => erlang:system_time(second),
+            <<"exp">> => erlang:system_time(second) + 10
+        },
+
+    %% Anyone can produce an HMAC with an empty key.
+    {_Jws, Token} = jose_jws:compact(
+        jose_jwt:sign(jose_jwk:from_oct(<<>>), #{<<"alg">> => <<"HS256">>}, jose_jwt:from(Claims))
+    ),
+
+    OtherJwk = jose_jwk:from_file(PrivDir ++ "/test/fixtures/openid-certification-jwks.json"),
+    %% from_manual/4 rejects an empty secret, so set it on the record to check
+    %% that key derivation refuses it on its own as well.
+    ClientContext0 = oidcc_client_context:from_manual(
+        Configuration, OtherJwk, ClientId, <<"at_least_32_character_client_secret">>
+    ),
+    ClientContext = ClientContext0#oidcc_client_context{client_secret = <<>>},
+
+    ?assertMatch(
+        {error, no_matching_key},
+        oidcc_token:validate_id_token(Token, ClientContext, any)
+    ),
+
+    ok.
+
+validate_jarm_empty_client_secret_test() ->
+    #oidcc_client_context{
+        client_id = ClientId,
+        provider_configuration =
+            #oidcc_provider_configuration{issuer = Issuer} = Configuration0
+    } = ClientContext0 = client_context_fapi2_fixture(),
+    ClientContext = ClientContext0#oidcc_client_context{
+        client_secret = <<>>,
+        provider_configuration = Configuration0#oidcc_provider_configuration{
+            authorization_signing_alg_values_supported = [<<"HS256">>]
+        }
+    },
+    JarmClaims = #{
+        <<"iss">> => Issuer,
+        <<"aud">> => ClientId,
+        <<"code">> => <<"123456">>,
+        <<"exp">> => erlang:system_time(second) + 10
+    },
+    {_, JarmToken} = jose_jws:compact(
+        jose_jwt:sign(
+            jose_jwk:from_oct(<<>>), #{<<"alg">> => <<"HS256">>}, jose_jwt:from(JarmClaims)
+        )
+    ),
+
+    ?assertMatch(
+        {error, no_matching_key},
+        oidcc_token:validate_jarm(JarmToken, ClientContext, #{})
+    ),
+
+    ok.

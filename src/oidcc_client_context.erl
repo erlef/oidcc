@@ -70,7 +70,7 @@ To use the record, import the definition:
 -type opts() :: authenticated_opts() | unauthenticated_opts().
 
 -doc #{since => <<"3.0.0">>}.
--type error() :: provider_not_ready.
+-type error() :: provider_not_ready | empty_client_secret.
 
 -doc """
 Create Client Context from a `m:oidcc_provider_configuration_worker`.
@@ -92,6 +92,9 @@ from_configuration_worker(ProviderName, ClientId, ClientSecret) ->
 
 -doc """
 Create Client Context from a `m:oidcc_provider_configuration_worker`.
+
+An empty `ClientSecret` (`<<>>`) is rejected with `{error, empty_client_secret}`.
+Use `unauthenticated` for public clients.
 
 ## Examples
 
@@ -139,6 +142,8 @@ Create Client Context from a `m:oidcc_provider_configuration_worker`.
         ClientId :: binary(),
         ClientSecret :: unauthenticated,
         Opts :: unauthenticated_opts().
+from_configuration_worker(_ProviderName, _ClientId, <<>>, _Opts) ->
+    {error, empty_client_secret};
 from_configuration_worker(ProviderName, ClientId, ClientSecret, Opts) ->
     case resolve_pid(ProviderName) of
         undefined ->
@@ -217,6 +222,9 @@ from_manual(Configuration, Jwks, ClientId, ClientSecret) ->
 -doc """
 Create Client Context manually.
 
+An empty `ClientSecret` (`<<>>`) raises an `empty_client_secret` error.
+Use `unauthenticated` for public clients.
+
 ## Examples
 
 ```erlang
@@ -264,6 +272,14 @@ from_manual(
         client_id = ClientId,
         client_secret = unauthenticated
     };
+from_manual(
+    #oidcc_provider_configuration{},
+    #jose_jwk{},
+    ClientId,
+    <<>>,
+    _Opts
+) when is_binary(ClientId) ->
+    erlang:error(empty_client_secret);
 from_manual(
     #oidcc_provider_configuration{} = Configuration,
     #jose_jwk{} = Jwks,

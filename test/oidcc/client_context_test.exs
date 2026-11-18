@@ -56,4 +56,15 @@ defmodule Oidcc.ClientContextTest do
                )
     end
   end
+
+  describe "empty client secret" do
+    test "from_configuration_worker rejects it" do
+      assert {:error, :empty_client_secret} =
+               Oidcc.ClientContext.from_configuration_worker(
+                 __MODULE__.AnyProvider,
+                 "client_id",
+                 ""
+               )
+    end
+  end
 end

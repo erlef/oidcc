@@ -377,7 +377,8 @@ create_redirect_url_with_request_object_no_hmac_test() ->
     },
 
     ClientId = <<"client_id">>,
-    ClientSecret = <<"">>,
+    %% Dummy secret as in guides/private-key-jwt.md; an empty one is rejected.
+    ClientSecret = <<"dummy_client_secret">>,
 
     Jwks0 = jose_jwk:to_public(jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem")),
     Jwks = Jwks0#jose_jwk{fields = #{<<"use">> => <<"sig">>}},

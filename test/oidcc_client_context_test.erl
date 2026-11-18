@@ -410,3 +410,35 @@ client_context_fixture() ->
     ClientSecret = <<"client_secret">>,
 
     oidcc_client_context:from_manual(Configuration, Jwks, ClientId, ClientSecret).
+
+empty_client_secret_test() ->
+    PrivDir = code:priv_dir(oidcc),
+    {ok, ConfigurationBinary} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, Configuration} =
+        oidcc_provider_configuration:decode_configuration(json:decode(ConfigurationBinary)),
+    Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+
+    ?assertError(
+        empty_client_secret,
+        oidcc_client_context:from_manual(Configuration, Jwks, <<"client_id">>, <<>>)
+    ),
+    ?assertError(
+        empty_client_secret,
+        oidcc_client_context:from_manual(Configuration, Jwks, <<"client_id">>, <<>>, #{})
+    ),
+    ?assertMatch(
+        #oidcc_client_context{client_secret = unauthenticated},
+        oidcc_client_context:from_manual(Configuration, Jwks, <<"client_id">>, unauthenticated)
+    ),
+
+    %% Rejected before the provider is even looked up
+    ?assertEqual(
+        {error, empty_client_secret},
+        oidcc_client_context:from_configuration_worker(invalid, <<"client_id">>, <<>>)
+    ),
+    ?assertEqual(
+        {error, empty_client_secret},
+        oidcc_client_context:from_configuration_worker(invalid, <<"client_id">>, <<>>, #{})
+    ),
+
+    ok.

@@ -1254,3 +1254,79 @@ parse_query_string(UriString) ->
     #{query := QueryStringBinary} = uri_string:parse(UriString),
     QueryList = uri_string:dissect_query(QueryStringBinary),
     maps:from_list(QueryList).
+
+validate_iss_parameter_test() ->
+    PrivDir = code:priv_dir(oidcc),
+
+    {ok, ValidConfigString} = file:read_file(PrivDir ++ "/test/fixtures/example-metadata.json"),
+    {ok, #oidcc_provider_configuration{issuer = Issuer} = Configuration} =
+        oidcc_provider_configuration:decode_configuration(json:decode(ValidConfigString)),
+    Jwks = jose_jwk:from_pem_file(PrivDir ++ "/test/fixtures/jwk.pem"),
+
+    ClientContext = oidcc_client_context:from_manual(
+        Configuration#oidcc_provider_configuration{
+            authorization_response_iss_parameter_supported = false
+        },
+        Jwks,
+        <<"client_id">>,
+        <<"client_secret">>
+    ),
+    IssRequiredClientContext = oidcc_client_context:from_manual(
+        Configuration#oidcc_provider_configuration{
+            authorization_response_iss_parameter_supported = true
+        },
+        Jwks,
+        <<"client_id">>,
+        <<"client_secret">>
+    ),
+    RegexClientContext = oidcc_client_context:from_manual(
+        Configuration#oidcc_provider_configuration{
+            issuer_regex = <<"^https://tenant-[a-z]+\\.example\\.com$">>
+        },
+        Jwks,
+        <<"client_id">>,
+        <<"client_secret">>
+    ),
+
+    %% Matching issuer, advertised or not
+    ?assertEqual(ok, oidcc_authorization:validate_iss_parameter(Issuer, ClientContext)),
+    ?assertEqual(
+        ok, oidcc_authorization:validate_iss_parameter(Issuer, IssRequiredClientContext)
+    ),
+
+    %% Mismatching issuer is rejected even when the provider does not advertise support
+    ?assertEqual(
+        {error, {invalid_iss_parameter, <<"https://attacker.example.com">>}},
+        oidcc_authorization:validate_iss_parameter(
+            <<"https://attacker.example.com">>, ClientContext
+        )
+    ),
+    ?assertEqual(
+        {error, {invalid_iss_parameter, <<"https://attacker.example.com">>}},
+        oidcc_authorization:validate_iss_parameter(
+            <<"https://attacker.example.com">>, IssRequiredClientContext
+        )
+    ),
+
+    %% Absent parameter is only rejected when the provider advertises support
+    ?assertEqual(ok, oidcc_authorization:validate_iss_parameter(undefined, ClientContext)),
+    ?assertEqual(
+        {error, missing_iss_parameter},
+        oidcc_authorization:validate_iss_parameter(undefined, IssRequiredClientContext)
+    ),
+
+    %% issuer_regex quirk
+    ?assertEqual(
+        ok,
+        oidcc_authorization:validate_iss_parameter(
+            <<"https://tenant-a.example.com">>, RegexClientContext
+        )
+    ),
+    ?assertEqual(
+        {error, {invalid_iss_parameter, <<"https://tenant-a.example.com.attacker.com">>}},
+        oidcc_authorization:validate_iss_parameter(
+            <<"https://tenant-a.example.com.attacker.com">>, RegexClientContext
+        )
+    ),
+
+    ok.

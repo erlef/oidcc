@@ -2915,7 +2915,12 @@ validate_id_token_empty_client_secret_test() ->
     ),
 
     OtherJwk = jose_jwk:from_file(PrivDir ++ "/test/fixtures/openid-certification-jwks.json"),
-    ClientContext = oidcc_client_context:from_manual(Configuration, OtherJwk, ClientId, <<>>),
+    %% from_manual/4 rejects an empty secret, so set it on the record to check
+    %% that key derivation refuses it on its own as well.
+    ClientContext0 = oidcc_client_context:from_manual(
+        Configuration, OtherJwk, ClientId, <<"at_least_32_character_client_secret">>
+    ),
+    ClientContext = ClientContext0#oidcc_client_context{client_secret = <<>>},
 
     ?assertMatch(
         {error, no_matching_key},

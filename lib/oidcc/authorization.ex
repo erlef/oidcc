@@ -74,20 +74,11 @@ defmodule Oidcc.Authorization do
       |> :oidcc_authorization.create_redirect_url(opts)
 
   @doc """
-  Validate the `iss` parameter of an authorization response
+  Validate the `iss` parameter of an authorization response (RFC 9207)
 
-  See https://datatracker.ietf.org/doc/html/rfc9207.
-
-  `Oidcc` does not handle the authorization callback itself, so the
-  application (or a higher level library such as `oidcc_plug`) has to call
-  this with the `iss` query parameter of the callback request, before
-  exchanging the code with `Oidcc.Token.retrieve/3`. Pass `nil` if the
-  parameter is absent.
-
-  * If `iss` is present, it must match the issuer of the provider (or the
-    `issuer_regex` quirk, if configured).
-  * If `iss` is absent, the request is only rejected when the provider
-    advertises `authorization_response_iss_parameter_supported`.
+  Call with the `iss` query parameter of the callback (`nil` if absent) before
+  `Oidcc.Token.retrieve/3`. See `:oidcc_authorization.validate_iss_parameter/2`
+  for the rules.
 
   ## Examples
 

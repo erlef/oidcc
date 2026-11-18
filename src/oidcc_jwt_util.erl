@@ -163,6 +163,9 @@ client_secret_oct_keys(undefined, _ClientSecret) ->
     none;
 client_secret_oct_keys(_AllowedAlgorithms, unauthenticated) ->
     none;
+%% An empty secret would yield an HMAC key anyone can reproduce; never use it.
+client_secret_oct_keys(_AllowedAlgorithms, <<>>) ->
+    none;
 client_secret_oct_keys(AllowedAlgorithms, ClientSecret) ->
     case
         lists:member(<<"HS256">>, AllowedAlgorithms) or

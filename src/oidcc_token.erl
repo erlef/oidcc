@@ -1399,7 +1399,7 @@ retrieve_a_token(QsBodyIn, ClientContext, Opts, TelemetryOpts, AuthenticateClien
                 #{}
         end,
     maybe
-        {ok, QsBody} ?= add_pkce_verifier(QsBody0, Opts, ClientContext),
+        {ok, QsBody} ?= maybe_add_pkce_verifier(QsBody0, Opts, ClientContext),
         {ok, {Body, Header1}, AuthMethod} ?=
             oidcc_auth_util:add_client_authentication(
                 QsBody, Header0, SupportedAuthMethods, SigningAlgs, Opts, ClientContext
@@ -1434,6 +1434,19 @@ retrieve_a_token(QsBodyIn, ClientContext, Opts, TelemetryOpts, AuthenticateClien
             );
         {error, Reason} ->
             {error, Reason}
+    end.
+
+%% PKCE (RFC 7636) only binds the authorization code exchange.
+-spec maybe_add_pkce_verifier(QueryList, Opts, ClientContext) ->
+    {ok, QueryList} | {error, error()}
+when
+    QueryList :: oidcc_http_util:query_params(),
+    Opts :: retrieve_opts() | refresh_opts(),
+    ClientContext :: oidcc_client_context:t().
+maybe_add_pkce_verifier(BodyQs, Opts, ClientContext) ->
+    case lists:keyfind(<<"grant_type">>, 1, BodyQs) of
+        {_, <<"authorization_code">>} -> add_pkce_verifier(BodyQs, Opts, ClientContext);
+        _ -> {ok, BodyQs}
     end.
 
 -spec add_pkce_verifier(QueryList, Opts, ClientContext) ->

@@ -1947,6 +1947,49 @@ retrieve_pkce_test() ->
 
     ok.
 
+refresh_and_client_credentials_ignore_require_pkce_test() ->
+    ok = meck:new(httpc, [no_link]),
+    HttpFun =
+        fun(
+            post,
+            {_TokenEndpoint, _Header, "application/x-www-form-urlencoded", _Body},
+            _HttpOpts,
+            _Opts,
+            _Profile
+        ) ->
+            {ok, {{"HTTP/1.1", 500, "Server Error"}, [], "SUCCESS"}}
+        end,
+    ok = meck:expect(httpc, request, HttpFun),
+
+    ClientContext0 = client_context_fapi2_fixture(),
+    Configuration0 = ClientContext0#oidcc_client_context.provider_configuration,
+    ClientContext = ClientContext0#oidcc_client_context{
+        provider_configuration = Configuration0#oidcc_provider_configuration{
+            grant_types_supported = [
+                <<"authorization_code">>, <<"refresh_token">>, <<"client_credentials">>
+            ]
+        }
+    },
+
+    %% PKCE only applies to the authorization code exchange
+    ?assertEqual(
+        {error, {http_error, 500, "SUCCESS"}},
+        oidcc_token:refresh(<<"refresh">>, ClientContext, #{
+            expected_subject => <<"sub">>,
+            require_pkce => true
+        })
+    ),
+    ?assertEqual(
+        {error, {http_error, 500, "SUCCESS"}},
+        oidcc_token:client_credentials(ClientContext, #{require_pkce => true})
+    ),
+
+    true = meck:validate(httpc),
+
+    meck:unload(httpc),
+
+    ok.
+
 validate_jarm_test() ->
     ClientContext0 = client_context_fapi2_fixture(),
     #oidcc_client_context{

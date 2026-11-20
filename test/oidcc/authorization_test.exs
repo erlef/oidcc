@@ -29,4 +29,33 @@ defmodule Oidcc.AuthorizationTest do
                )
     end
   end
+
+  describe inspect(&Authorization.validate_iss_parameter/2) do
+    test "works" do
+      pid =
+        start_supervised!(
+          {Oidcc.ProviderConfiguration.Worker, %{issuer: "https://accounts.google.com"}}
+        )
+
+      {:ok, client_context} =
+        Oidcc.ClientContext.from_configuration_worker(pid, "client_id", "client_secret")
+
+      assert {:error, {:invalid_iss_parameter, "https://attacker.example.com"}} =
+               Authorization.validate_iss_parameter(
+                 "https://attacker.example.com",
+                 client_context
+               )
+
+      required_client_context = %{
+        client_context
+        | provider_configuration: %{
+            client_context.provider_configuration
+            | authorization_response_iss_parameter_supported: true
+          }
+      }
+
+      assert {:error, :missing_iss_parameter} =
+               Authorization.validate_iss_parameter(nil, required_client_context)
+    end
+  end
 end

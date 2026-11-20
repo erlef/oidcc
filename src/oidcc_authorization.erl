@@ -14,8 +14,10 @@
 -include_lib("jose/include/jose_jwk.hrl").
 
 -export([create_redirect_url/2]).
+-export([validate_iss_parameter/2]).
 
 -export_type([error/0]).
+-export_type([iss_error/0]).
 -export_type([opts/0]).
 
 -doc """
@@ -65,6 +67,11 @@ See https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
     | no_supported_code_challenge
     | {url_extension_conflict, [binary()]}
     | oidcc_http_util:error().
+
+-doc #{since => <<"3.10.0">>}.
+-type iss_error() ::
+    missing_iss_parameter
+    | {invalid_iss_parameter, Iss :: binary()}.
 
 -telemetry_event(#{
     event => [oidcc, par_request, start],
@@ -131,6 +138,56 @@ create_redirect_url(#oidcc_client_context{} = ClientContext, Opts) ->
             {error, Reason};
         false ->
             {error, {grant_type_not_supported, authorization_code}}
+    end.
+
+-doc """
+Validate the `iss` parameter of an authorization response.
+
+See https://datatracker.ietf.org/doc/html/rfc9207.
+
+Call with the `iss` query parameter of the callback (`undefined` if absent)
+before `oidcc_token:retrieve/3`. A present `iss` must match the provider's
+issuer (or `issuer_regex`). An absent one is rejected only if the provider
+advertises `authorization_response_iss_parameter_supported`.
+
+## Examples
+
+```erlang
+{ok, ClientContext} =
+    oidcc_client_context:from_configuration_worker(provider_name,
+                                                   <<"client_id">>,
+                                                   <<"client_secret">>),
+
+%% Get Iss from Redirect
+
+ok = oidcc_authorization:validate_iss_parameter(Iss, ClientContext).
+```
+""".
+-doc #{since => <<"3.10.0">>}.
+-spec validate_iss_parameter(Iss, ClientContext) -> ok | {error, iss_error()} when
+    Iss :: binary() | undefined,
+    ClientContext :: oidcc_client_context:t().
+validate_iss_parameter(undefined, #oidcc_client_context{
+    provider_configuration = #oidcc_provider_configuration{
+        authorization_response_iss_parameter_supported = true
+    }
+}) ->
+    {error, missing_iss_parameter};
+validate_iss_parameter(undefined, #oidcc_client_context{}) ->
+    ok;
+validate_iss_parameter(Iss, #oidcc_client_context{
+    provider_configuration = #oidcc_provider_configuration{
+        issuer = Issuer, issuer_regex = IssuerRegex
+    }
+}) when is_binary(Iss) ->
+    Valid =
+        case IssuerRegex of
+            undefined -> Iss =:= Issuer;
+            Pattern -> re:run(Iss, Pattern, [{capture, none}]) =:= match
+        end,
+    case Valid of
+        true -> ok;
+        false -> {error, {invalid_iss_parameter, Iss}}
     end.
 
 -spec redirect_params(ClientContext, Opts) -> {ok, oidcc_http_util:query_params()} when

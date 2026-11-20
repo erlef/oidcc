@@ -121,6 +121,8 @@ A security audit was performed by [SAFE-Erlang-Elixir](https://github.com/SAFE-E
   * [PKCE](https://oauth.net/2/pkce/)
   * [Pushed Authorization Requests](https://datatracker.ietf.org/doc/html/rfc9126)
   * [Authorization Server Issuer Identification](https://datatracker.ietf.org/doc/html/rfc9207)
+    (via `oidcc_authorization:validate_iss_parameter/2`; automatic in
+    [`oidcc_plug`](https://hex.pm/packages/oidcc_plug))
 * Token
   * Authorization: `client_secret_basic`, `client_secret_post`,
     `client_secret_jwt`, and `private_key_jwt`

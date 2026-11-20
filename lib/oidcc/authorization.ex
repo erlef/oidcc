@@ -72,4 +72,43 @@ defmodule Oidcc.Authorization do
       client_context
       |> ClientContext.struct_to_record()
       |> :oidcc_authorization.create_redirect_url(opts)
+
+  @doc """
+  Validate the `iss` parameter of an authorization response (RFC 9207)
+
+  Call with the `iss` query parameter of the callback (`nil` if absent) before
+  `Oidcc.Token.retrieve/3`. See `:oidcc_authorization.validate_iss_parameter/2`
+  for the rules.
+
+  ## Examples
+
+      iex> {:ok, pid} =
+      ...>   Oidcc.ProviderConfiguration.Worker.start_link(%{
+      ...>     issuer: "https://accounts.google.com"
+      ...>   })
+      ...>
+      ...> {:ok, client_context} =
+      ...>   Oidcc.ClientContext.from_configuration_worker(
+      ...>     pid,
+      ...>     "client_id",
+      ...>     "client_secret"
+      ...>   )
+      ...>
+      ...> Oidcc.Authorization.validate_iss_parameter(
+      ...>   "https://accounts.google.com",
+      ...>   client_context
+      ...> )
+      :ok
+  """
+  @doc since: "3.10.0"
+  @spec validate_iss_parameter(
+          iss :: String.t() | nil,
+          client_context :: ClientContext.t()
+        ) :: :ok | {:error, :oidcc_authorization.iss_error()}
+  def validate_iss_parameter(iss, client_context) do
+    :oidcc_authorization.validate_iss_parameter(
+      iss || :undefined,
+      ClientContext.struct_to_record(client_context)
+    )
+  end
 end

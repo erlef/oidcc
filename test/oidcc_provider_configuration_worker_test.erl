@@ -7,6 +7,8 @@
 -include_lib("jose/include/jose_jwk.hrl").
 -include_lib("oidcc/include/oidcc_provider_configuration.hrl").
 
+-export([log/2]).
+
 does_not_start_without_issuer_test() ->
     ?assertMatch(
         {error, issuer_required},
@@ -65,6 +67,60 @@ retries_with_backoff_with_invalid_issuer_test() ->
             end
         )
     end).
+
+logs_trailing_slash_hint_on_issuer_mismatch_test() ->
+    HttpFun =
+        fun(
+            get,
+            {"https://example.com/.well-known/openid-configuration", []},
+            _HttpOpts,
+            _Opts,
+            _Profile
+        ) ->
+            {ok, {
+                {"HTTP/1.1", 200, "OK"},
+                [{"content-type", "application/json"}],
+                iolist_to_binary(
+                    json:encode(#{
+                        issuer => <<"https://example.com">>,
+                        jwks_uri => <<"https://example.com/keys">>,
+                        authorization_endpoint => <<"https://example.com/authorize">>,
+                        scopes_supported => [<<"openid">>],
+                        response_types_supported => [<<"code">>],
+                        subject_types_supported => [<<"public">>],
+                        id_token_signing_alg_values_supported => [<<"RS256">>]
+                    })
+                )
+            }}
+        end,
+
+    HandlerId = ?FUNCTION_NAME,
+    ok = logger:add_handler(HandlerId, ?MODULE, #{config => self()}),
+    try
+        with_httpc_mock(HttpFun, fun() ->
+            with_stopping_provider_worker(#{issuer => <<"https://example.com/">>}, fun(Pid) ->
+                receive
+                    {'EXIT', Pid, {configuration_load_failed, {issuer_mismatch, _}}} ->
+                        ok;
+                    {'EXIT', Pid, Reason} ->
+                        ct:fail({unexpected_exit, Reason})
+                after 1_000 ->
+                    ?assert(false)
+                end
+            end)
+        end),
+        receive
+            {logged, Message} ->
+                ?assertNotEqual(
+                    nomatch,
+                    string:find(Message, "has an extra trailing `/'")
+                )
+        after 1_000 ->
+            ?assert(false)
+        end
+    after
+        logger:remove_handler(HandlerId)
+    end.
 
 refreshes_with_empty_key_set_test() ->
     Adapter = provider_adapter(self()),
@@ -717,3 +773,10 @@ adapter_response_headers(TestPid, {counted, Counter}, Url) ->
         false ->
             [{"cache-control", "max-age=3600"}]
     end.
+
+%% Minimal `logger' handler forwarding formatted error messages to a process.
+log(#{level := error, msg := {Format, Args}}, #{config := Pid}) when is_list(Format) ->
+    Pid ! {logged, lists:flatten(io_lib:format(Format, Args))},
+    ok;
+log(_Event, _Config) ->
+    ok.

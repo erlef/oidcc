@@ -456,6 +456,7 @@ handle_backoff_retry(
     } = State
 ) ->
     ErrorDetails = {ErrorType, Reason},
+    maybe_log_trailing_slash_hint(Issuer, Reason),
     case oidcc_backoff:handle_retry(BackoffType, BackoffMin, BackoffMax, BackoffState) of
         stop ->
             {stop, ErrorDetails, State};
@@ -470,3 +471,34 @@ handle_backoff_retry(
                 backoff_state = NewBackoffState
             }}
     end.
+
+%% The issuer has to match the `issuer' of the discovery document exactly. A
+%% trailing `/' is an easy to miss difference, so point it out explicitly.
+-spec maybe_log_trailing_slash_hint(Issuer, Reason) -> ok when
+    Issuer :: binary() | uri_string:uri_string(),
+    Reason :: term().
+maybe_log_trailing_slash_hint(Issuer, {issuer_mismatch, ConfigIssuer}) when
+    is_binary(ConfigIssuer)
+->
+    IssuerBin = unicode:characters_to_binary(Issuer),
+    case {IssuerBin, ConfigIssuer} of
+        {<<ConfigIssuer:(byte_size(ConfigIssuer))/binary, "/">>, _} ->
+            log_trailing_slash_hint(IssuerBin, ConfigIssuer, "has an extra trailing `/'");
+        {_, <<IssuerBin:(byte_size(IssuerBin))/binary, "/">>} ->
+            log_trailing_slash_hint(IssuerBin, ConfigIssuer, "is missing a trailing `/'");
+        _ ->
+            ok
+    end;
+maybe_log_trailing_slash_hint(_Issuer, _Reason) ->
+    ok.
+
+-spec log_trailing_slash_hint(Issuer, ConfigIssuer, Difference) -> ok when
+    Issuer :: binary(),
+    ConfigIssuer :: binary(),
+    Difference :: string().
+log_trailing_slash_hint(Issuer, ConfigIssuer, Difference) ->
+    logger:error(
+        "Issuer mismatch: the configured issuer ~ts ~s compared to the issuer ~ts "
+        "returned by the provider. The issuer has to match exactly.",
+        [Issuer, Difference, ConfigIssuer]
+    ).
